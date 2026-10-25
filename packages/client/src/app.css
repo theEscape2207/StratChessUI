@@ -38,11 +38,12 @@ main {
 .board.cg-wrap coords.files {
   bottom: 0;
   left: 0;
-  text-align: right;
+  /* Left-aligned: at a square's right edge a letter reads as the next square's. */
+  text-align: left;
 }
 
 .board.cg-wrap coords.files coord {
-  padding-right: 2px;
+  padding-left: 2px;
 }
 
 /* Over the board; a tap outside the pieces cancels the move. */

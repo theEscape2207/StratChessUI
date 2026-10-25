@@ -129,11 +129,14 @@ for (const side of ['white', 'black'] as const) {
     // Chessground snaps cg-board to whole device pixels, so it can be smaller than the wrapper.
     const board = (await page.locator('cg-board').boundingBox())!;
     const square = board.width / 8;
-    const labels = await page
-      .locator('coords.files coord, coords.ranks coord')
-      .evaluateAll((els) =>
-        els.map((el) => ({ text: el.textContent!, box: el.getBoundingClientRect().toJSON() })),
-      );
+    const labels = await page.locator('coords.files coord, coords.ranks coord').evaluateAll((els) =>
+      els.map((el) => {
+        // The glyphs, not the label's box: a box can fit its square while its text hangs over.
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        return { text: el.textContent!, box: range.getBoundingClientRect().toJSON() };
+      }),
+    );
     expect(labels).toHaveLength(16);
     for (const { text, box } of labels) {
       // Seen from white, file a is the left column and rank 8 the top row; black mirrors both.
