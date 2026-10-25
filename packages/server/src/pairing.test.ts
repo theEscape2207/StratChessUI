@@ -1,5 +1,8 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { memoryStore, Pairings } from './pairing.ts';
+import { fileStore, memoryStore, Pairings } from './pairing.ts';
 
 /** Pairings whose announced codes are collected, latest last. */
 function open() {
@@ -31,5 +34,22 @@ describe('Pairings', () => {
     pairings.pair(wrong, 'guess');
     expect(codes).toHaveLength(2);
     expect(pairings.pair(codes[1]!, 'phone')).toBeDefined();
+  });
+});
+
+describe('fileStore', () => {
+  it('creates the host directory on the first pairing', () => {
+    const root = mkdtempSync(join(tmpdir(), 'stratchess-ui-'));
+    try {
+      const file = join(root, 'host', 'pairings.json');
+      const store = fileStore(file);
+      const pairings = new Pairings({ store, announce: () => {}, fixedCode: '123456' });
+      const token = pairings.pair('123456', 'phone')!;
+      expect(new Pairings({ store: fileStore(file), announce: () => {} }).isPaired(token)).toBe(
+        true,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

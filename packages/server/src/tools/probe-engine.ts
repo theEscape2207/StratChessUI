@@ -1,10 +1,12 @@
 // Manual check against a real engine: handshake, then one search from the start position.
-// Usage: npm run probe-engine -- [profile-id] [engines.json]
+// Usage: npm run probe-engine -- [profile-id] [engines.json, default in the host directory]
+import { join } from 'node:path';
 import { START_FEN } from '@stratchess-ui/shared';
 import { loadProfiles } from '../engines/profiles.ts';
+import { hostDir } from '../host-dir.ts';
 import { EngineError, UciEngine } from '../uci/engine.ts';
 
-const [id, file = 'engines.json'] = process.argv.slice(2);
+const [id, file = join(hostDir(), 'engines.json')] = process.argv.slice(2);
 const profiles = loadProfiles(file);
 const profile = id ? profiles.find((p) => p.id === id) : profiles[0];
 if (!profile) {

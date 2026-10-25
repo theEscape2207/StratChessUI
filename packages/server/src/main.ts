@@ -1,6 +1,8 @@
 import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildApp, defaultHosts } from './app.ts';
+import { hostDir } from './host-dir.ts';
 import { loadProfiles, ProfileError, type EngineProfile } from './engines/profiles.ts';
 import { fileStore, memoryStore, Pairings } from './pairing.ts';
 import { fakeProfile } from './uci/fake-profile.ts';
@@ -8,8 +10,8 @@ import { fakeProfile } from './uci/fake-profile.ts';
 const port = Number(process.env.PORT ?? 8080);
 const staticRoot = fileURLToPath(new URL('../../client/dist', import.meta.url));
 const extraHosts = process.env.EXTRA_HOSTS?.split(',').filter(Boolean);
-const enginesFile = fileURLToPath(new URL('../../../engines.json', import.meta.url));
-const pairingsFile = fileURLToPath(new URL('../../../pairings.json', import.meta.url));
+const enginesFile = join(hostDir(), 'engines.json');
+const pairingsFile = join(hostDir(), 'pairings.json');
 
 /** `FAKE_ENGINE=<mode>` serves only the test engine, for Playwright. */
 function profiles(): EngineProfile[] {
@@ -22,7 +24,7 @@ function profiles(): EngineProfile[] {
     return loadProfiles(enginesFile);
   } catch (error) {
     if (!(error instanceof ProfileError)) throw error;
-    console.error(`engines.json: ${error.message}`);
+    console.error(`${enginesFile}: ${error.message}`);
     process.exit(1);
   }
 }
