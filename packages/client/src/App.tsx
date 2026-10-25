@@ -1,13 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
-import {
-  START_FEN,
-  type ClientMessage,
-  type EngineChoice,
-  type GameState,
-  type ServerMessage,
-} from '@stratchess-ui/shared';
+import { useState } from 'react';
+import { START_FEN, type EngineChoice, type GameState } from '@stratchess-ui/shared';
 import { Board } from './Board.tsx';
 import { NewGameForm } from './NewGameForm.tsx';
+import { PairForm } from './PairForm.tsx';
+import { useGameSocket, type Link } from './useGameSocket.ts';
+
+const TOKEN_KEY = 'pairing-token';
+
+const LINK_STATUS: Record<Exclude<Link, 'connected'>, string> = {
+  connecting: 'connecting',
+  reconnecting: 'disconnected, reconnecting',
+  busy: 'another device is playing',
+  replaced: 'opened in another tab',
+};
 
 function describe(game: GameState | undefined): string {
   if (!game) return 'choose a side and start a game';
@@ -25,21 +30,48 @@ function describe(game: GameState | undefined): string {
   }
 }
 
+/** Storage can be unavailable, as in some private windows; the browser then pairs every visit. */
+function readToken(): string | undefined {
+  try {
+    return localStorage.getItem(TOKEN_KEY) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeToken(token: string | undefined): void {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // Paired for this page only.
+  }
+}
+
 export function App() {
-  const socket = useRef<WebSocket | undefined>(undefined);
-  const [connection, setConnection] = useState('connecting');
+  const [token, setToken] = useState(readToken);
+  const remember = (next: string | undefined) => {
+    writeToken(next);
+    setToken(next);
+  };
+  if (!token) {
+    return (
+      <main>
+        <PairForm onPaired={remember} />
+      </main>
+    );
+  }
+  return <Game token={token} onUnpaired={() => remember(undefined)} />;
+}
+
+function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) {
   const [engines, setEngines] = useState<EngineChoice[]>();
   const [game, setGame] = useState<GameState>();
   const [notice, setNotice] = useState('');
   const [revision, setRevision] = useState(0);
-
-  useEffect(() => {
-    const ws = new WebSocket(`ws://${location.host}/ws`);
-    socket.current = ws;
-    ws.onopen = () => setConnection('connected');
-    ws.onclose = () => setConnection('disconnected');
-    ws.onmessage = (event: MessageEvent<string>) => {
-      const msg = JSON.parse(event.data) as ServerMessage;
+  const { link, send, retry } = useGameSocket(
+    token,
+    (msg) => {
       if (msg.type === 'hello') return setEngines(msg.engines);
       if (msg.type === 'error') {
         setNotice(msg.reason);
@@ -49,11 +81,9 @@ export function App() {
       }
       setNotice('');
       setGame(msg.game);
-    };
-    return () => ws.close();
-  }, []);
-
-  const send = (msg: ClientMessage) => socket.current?.send(JSON.stringify(msg));
+    },
+    onUnpaired,
+  );
   const humanColor = game?.humanColor ?? 'white';
 
   return (
@@ -63,12 +93,17 @@ export function App() {
         lastMove={game?.lastMove}
         revision={revision}
         orientation={humanColor}
-        movable={game?.phase === 'human' ? humanColor : undefined}
+        movable={link === 'connected' && game?.phase === 'human' ? humanColor : undefined}
         onMove={(uci) => send({ type: 'move', uci })}
       />
       <p className={game?.phase === 'over' ? 'status result' : 'status'} data-testid="status">
-        {connection === 'connected' ? describe(game) : connection}
+        {link === 'connected' ? describe(game) : LINK_STATUS[link]}
       </p>
+      {(link === 'busy' || link === 'replaced') && (
+        <button type="button" onClick={retry}>
+          {link === 'busy' ? 'Try again' : 'Play here'}
+        </button>
+      )}
       {notice && (
         <p className="status notice" data-testid="notice">
           {notice}
@@ -77,10 +112,14 @@ export function App() {
       <p className="status" data-testid="fen">
         {game?.fen ?? START_FEN}
       </p>
-      {engines && (
+      {engines && link === 'connected' && (
         <NewGameForm
           engines={engines}
-          onStart={(request) => send({ type: 'new-game', ...request })}
+          onStart={(request) => {
+            // Until the new game arrives, the old one's status must not pass for it.
+            setGame(undefined);
+            send({ type: 'new-game', ...request });
+          }}
         />
       )}
     </main>

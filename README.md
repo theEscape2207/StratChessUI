@@ -6,9 +6,8 @@ Stockfish and others later.
 
 Requirements, decisions and milestones: [`docs/Requirements.md`](docs/Requirements.md).
 
-Status: M1 in progress. A browser plays white or black against an engine profile, limited by depth
-or move time, through to a result the server decides, automatic draws included; pairing is still
-to come.
+Status: M1 in progress. A paired browser plays white or black against an engine profile, limited
+by depth or move time, through to a result the server decides, automatic draws included.
 
 ## Layout
 
@@ -37,7 +36,18 @@ npm run e2e                  # Playwright, desktop and phone; first run: npx pla
 
 `PORT` changes the port; `EXTRA_HOSTS` (comma-separated) adds Host names beyond localhost, this
 machine's name and its IPv4 addresses. `FAKE_ENGINE=legal` replaces the configured engines with
-the test engine (`packages/server/src/uci/fake-engine.ts`), as Playwright does.
+the test engine (`packages/server/src/uci/fake-engine.ts`), as Playwright does; with it,
+pairings are not saved and `PAIRING_CODE` fixes the code.
+
+## Pairing
+
+The server prints a six-digit pairing code to its console; a browser enters it once and keeps a
+token. The code changes after each pairing and after five wrong attempts. Pairings are kept in
+`pairings.json` at the repository root (git-ignored); delete an entry, or the file, to revoke a
+browser. It applies the next time that browser connects.
+
+One paired browser controls the game; others are refused until it has been gone for 60 seconds,
+which is also how long a locked phone or a reloaded page has to resume the game.
 
 ## Engines
 

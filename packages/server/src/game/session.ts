@@ -1,5 +1,5 @@
-// One connection's human-vs-engine game: the server's position, whose turn it is, and the engine
-// process that plays the other side.
+// The human-vs-engine game: the server's position, whose turn it is, and the engine process that
+// plays the other side.
 import {
   applyUciMove,
   outcome,
@@ -42,6 +42,10 @@ export class GameSession {
     this.options = options;
   }
 
+  get state(): GameState | undefined {
+    return this.game?.state;
+  }
+
   /** Replaces any current game, starting the profile's engine and asking it to move if it is white. */
   async newGame(request: NewGameRequest): Promise<void> {
     const profile = this.options.profiles.find((p) => p.id === request.engineId);
@@ -81,7 +85,7 @@ export class GameSession {
     this.play(game, result.uci, result.fen);
   }
 
-  /** Ends the game with the connection, stopping its engine. */
+  /** Ends the game, stopping its engine. */
   async close(): Promise<void> {
     const engine = this.game?.engine;
     this.game = undefined;
