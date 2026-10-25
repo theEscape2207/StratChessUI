@@ -7,7 +7,8 @@ Stockfish and others later.
 Requirements, decisions and milestones: [`docs/Requirements.md`](docs/Requirements.md).
 
 Status: M1 in progress. A browser plays white or black against an engine profile, limited by depth
-or move time; pairing and promotion choice are still to come.
+or move time, through to a result the server decides, automatic draws included; pairing is still
+to come.
 
 ## Layout
 
