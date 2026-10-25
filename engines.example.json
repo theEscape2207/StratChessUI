@@ -1,0 +1,11 @@
+{
+  "engines": [
+    {
+      "id": "stratchess",
+      "name": "StratChess",
+      "executable": "C:/Users/you/source/repos/StratChessEvolved/build/windows-clang-cl/StratChessEvolved.exe",
+      "cwd": "C:/Users/you/source/repos/StratChessEvolved/StratChessEvolved",
+      "options": { "Threads": 2, "Hash": 256 }
+    }
+  ]
+}
