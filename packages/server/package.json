@@ -1,0 +1,15 @@
+{
+  "name": "@stratchess-ui/server",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "start": "node src/main.ts"
+  },
+  "dependencies": {
+    "@fastify/static": "^10.1.7",
+    "@fastify/websocket": "^11.3.4",
+    "@stratchess-ui/shared": "*",
+    "fastify": "^5.12.7"
+  }
+}

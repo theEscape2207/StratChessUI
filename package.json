@@ -1,0 +1,38 @@
+{
+  "name": "stratchess-ui",
+  "private": true,
+  "description": "Browser chess UI for UCI engines, served on the home LAN",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "packages/shared",
+    "packages/server",
+    "packages/client"
+  ],
+  "scripts": {
+    "build": "npm run build -w @stratchess-ui/client",
+    "start": "npm run start -w @stratchess-ui/server",
+    "dev": "npm run dev -w @stratchess-ui/client",
+    "typecheck": "tsc",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^24.0.0",
+    "@types/ws": "^8.18.2",
+    "eslint": "^10.13.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.0",
+    "vitest": "^5.0.5"
+  }
+}
