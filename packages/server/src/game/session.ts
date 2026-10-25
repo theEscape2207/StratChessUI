@@ -75,7 +75,7 @@ export class GameSession {
     if (game.state.phase !== 'human') return this.error('not your turn');
     const result = applyUciMove(game.state.fen, uci);
     if (!result.ok) return this.error(result.reason);
-    this.play(game, uci, result.fen);
+    this.play(game, result.uci, result.fen);
   }
 
   /** Ends the game with the connection, stopping its engine. */
@@ -120,7 +120,7 @@ export class GameSession {
         reason: `${game.state.engineName} played an illegal move: ${bestMove}`,
       });
     }
-    this.play(game, bestMove, result.fen);
+    this.play(game, result.uci, result.fen);
   }
 
   private fail(game: Game, error: unknown): void {

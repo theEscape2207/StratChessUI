@@ -90,6 +90,22 @@ describe('GameSession', () => {
     expect(state.fen.split(' ')[1]).toBe('b');
   });
 
+  it('sends castling to the engine in standard UCI, whichever square the board used', async () => {
+    const { session, next, settled } = open();
+    void session.newGame(game('legal', 'white'));
+    await settled();
+    for (const move of ['e2e4', 'g1f3', 'f1c4']) {
+      session.move(move);
+      await settled();
+    }
+    // Chessground lets the king be dropped on its rook; StratChess rejects e1h1.
+    session.move('e1h1');
+    expect(await next()).toMatchObject({ game: { phase: 'thinking', lastMove: 'e1g1' } });
+    const state = await settled();
+    expect(state.phase).toBe('human');
+    expect(state.fen).toMatch(/\/RNBQ1RK1 w kq /);
+  });
+
   it('refuses a move out of turn or against the rules', async () => {
     const { session, next, settled } = open();
     session.move('e2e4');

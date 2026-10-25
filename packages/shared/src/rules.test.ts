@@ -14,8 +14,22 @@ describe('rules', () => {
     expect(result).toEqual({
       ok: true,
       fen: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
+      uci: 'e2e4',
     });
     if (result.ok) expect(turn(result.fen)).toBe('black');
+  });
+
+  it('returns castling in standard UCI, king two squares, whichever form it was given', () => {
+    const fen = 'r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1';
+    for (const [given, standard] of [
+      ['e1h1', 'e1g1'],
+      ['e1g1', 'e1g1'],
+      ['e1a1', 'e1c1'],
+      ['e1c1', 'e1c1'],
+    ]) {
+      expect(applyUciMove(fen, given!)).toMatchObject({ ok: true, uci: standard });
+    }
+    expect(applyUciMove(fen.replace(' w ', ' b '), 'e8h8')).toMatchObject({ uci: 'e8g8' });
   });
 
   it('rejects an illegal move with a reason', () => {
