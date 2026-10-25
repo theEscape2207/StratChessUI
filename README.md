@@ -59,6 +59,24 @@ by the server. Check a profile against the real engine with:
 npm run probe-engine -- stratchess
 ```
 
+## Play from a phone
+
+1. Configure an engine profile (above) and check it with `probe-engine`.
+2. Once, from an elevated PowerShell, open the port to the home network:
+   `powershell -ExecutionPolicy Bypass -File scripts\firewall.ps1` (`-Port` if `PORT` is not
+   8080; `-Remove` undoes it). The rule covers Private networks and the local subnet only.
+3. `npm run build && npm start`. The console lists this machine's addresses and the pairing code.
+4. On a phone on the same Wi-Fi, open the address of the Wi-Fi or Ethernet adapter (not a
+   `vEthernet` one from WSL or Hyper-V) and enter the code.
+
+If the page does not load:
+
+- The firewall script warns when the network is Public, or when Windows's first-run prompt for
+  `node.exe` left program-wide rules (a Block one wins over the script's rule); fix what it prints.
+- The phone must be on the same subnet: a guest Wi-Fi network usually is not.
+- `unknown host` means the phone used a name the server does not know, such as `pc.fritz.box`:
+  add it with `EXTRA_HOSTS=pc.fritz.box`.
+
 ## License
 
 GPL-3.0-or-later, as required by Chessground and chessops. See [LICENSE](LICENSE).
