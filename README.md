@@ -36,6 +36,16 @@ npm run e2e                  # Playwright, desktop and phone; first run: npx pla
 `PORT` changes the port; `EXTRA_HOSTS` (comma-separated) adds Host names beyond localhost, this
 machine's name and its IPv4 addresses.
 
+## Engines
+
+Engines are configured on the host only, in `engines.json` at the repository root (git-ignored;
+copy `engines.example.json`). Relative paths resolve against the file. Threads and Hash are capped
+by the server. Check a profile against the real engine with:
+
+```sh
+npm run probe-engine -- stratchess
+```
+
 ## License
 
 GPL-3.0-or-later, as required by Chessground and chessops. See [LICENSE](LICENSE).
