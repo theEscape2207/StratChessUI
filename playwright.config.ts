@@ -13,7 +13,7 @@ export default defineConfig({
   webServer: {
     command: 'npm run build && npm start',
     url: 'http://localhost:8090/api/health',
-    env: { PORT: '8090' },
+    env: { PORT: '8090', FAKE_ENGINE: 'legal' },
     reuseExistingServer: !process.env.CI,
   },
 });

@@ -4,7 +4,9 @@
 //   no-uciok        never finishes the handshake
 //   crash-on-go     exits as soon as a search starts
 //   ignore-stop     never answers `stop` (and searches forever)
+//   legal           like normal, but answers the first legal move, so whole games can be played
 import { createInterface } from 'node:readline';
+import { applyUciMove, legalDests, START_FEN } from '@stratchess-ui/shared';
 
 const mode = process.argv.find((a) => a.startsWith('--mode='))?.slice(7) ?? 'normal';
 
@@ -41,7 +43,22 @@ function finishSearch() {
   SEARCH_END.forEach(out);
   // Encodes the position it searched, so tests can tell which search a bestmove belongs to.
   if (position.includes(STALEMATE)) out('bestmove 0000');
+  else if (mode === 'legal') out(`bestmove ${firstLegalMove(position)}`);
   else out(`bestmove ${position.includes('moves') ? 'g8f6' : 'b1c3'}`);
+}
+
+function firstLegalMove(command: string): string {
+  const [setup, moves = ''] = command.split(' moves ');
+  let fen = setup!.startsWith('position fen ') ? setup!.slice(13) : START_FEN;
+  for (const move of moves.split(' ').filter(Boolean)) {
+    const result = applyUciMove(fen, move);
+    if (result.ok) fen = result.fen;
+  }
+  for (const [from, dests] of legalDests(fen)) {
+    const move = `${from}${dests[0]}`;
+    return applyUciMove(fen, move).ok ? move : `${move}q`;
+  }
+  return '0000';
 }
 
 createInterface({ input: process.stdin }).on('line', (line) => {

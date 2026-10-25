@@ -22,3 +22,32 @@ main {
   font-size: 0.85rem;
   overflow-wrap: anywhere;
 }
+
+.notice {
+  color: #a02020;
+}
+
+.new-game {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+}
+
+.new-game label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.new-game fieldset label {
+  flex-direction: row;
+  align-items: center;
+}
+
+.new-game input,
+.new-game select,
+.new-game button {
+  font: inherit;
+  min-height: 2.25rem;
+}

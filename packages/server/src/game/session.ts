@@ -1,0 +1,153 @@
+// One connection's human-vs-engine game: the server's position, whose turn it is, and the engine
+// process that plays the other side.
+import {
+  applyUciMove,
+  outcome,
+  START_FEN,
+  turn,
+  type GameState,
+  type NewGameRequest,
+  type SearchLimit,
+  type ServerMessage,
+} from '@stratchess-ui/shared';
+import type { EngineProfile } from '../engines/profiles.ts';
+import { EngineError, SearchCancelledError, UciEngine, type Timeouts } from '../uci/engine.ts';
+
+export type SessionOptions = {
+  profiles: readonly EngineProfile[];
+  send: (msg: ServerMessage) => void;
+  timeouts?: Partial<Timeouts>;
+  /** Where engine failures and their transcripts are reported. */
+  log: (text: string) => void;
+};
+
+type Game = {
+  state: GameState;
+  /** From the start position; the engine is sent the whole game on every search. */
+  moves: string[];
+  limit: SearchLimit;
+  engine?: UciEngine;
+};
+
+const TRANSCRIPT_TAIL = 20;
+
+export class GameSession {
+  private readonly options: SessionOptions;
+  /** The current game; an engine callback for any other game is stale and ignored. */
+  private game?: Game;
+
+  constructor(options: SessionOptions) {
+    this.options = options;
+  }
+
+  /** Replaces any current game, starting the profile's engine and asking it to move if it is white. */
+  async newGame(request: NewGameRequest): Promise<void> {
+    const profile = this.options.profiles.find((p) => p.id === request.engineId);
+    if (!profile) return this.error(`unknown engine: ${request.engineId}`);
+    this.endCurrent();
+    const game: Game = {
+      state: {
+        fen: START_FEN,
+        humanColor: request.humanColor,
+        engineName: profile.name,
+        phase: 'starting',
+      },
+      moves: [],
+      limit: request.limit,
+    };
+    this.game = game;
+    this.publish(game);
+    let engine: UciEngine;
+    try {
+      engine = await UciEngine.start(profile, this.options.timeouts);
+    } catch (error) {
+      return this.fail(game, error);
+    }
+    if (this.game !== game) return void engine.quit(); // replaced or closed while starting
+    game.engine = engine;
+    this.nextTurn(game);
+  }
+
+  move(uci: string): void {
+    const game = this.game;
+    if (!game) return this.error('no game in progress');
+    if (game.state.phase === 'over') return this.error('the game is over');
+    if (game.state.phase !== 'human') return this.error('not your turn');
+    const result = applyUciMove(game.state.fen, uci);
+    if (!result.ok) return this.error(result.reason);
+    this.play(game, uci, result.fen);
+  }
+
+  /** Ends the game with the connection, stopping its engine. */
+  async close(): Promise<void> {
+    const engine = this.game?.engine;
+    this.game = undefined;
+    await engine?.quit();
+  }
+
+  private play(game: Game, uci: string, fen: string): void {
+    game.moves.push(uci);
+    game.state = { ...game.state, fen, lastMove: uci };
+    this.nextTurn(game);
+  }
+
+  private nextTurn(game: Game): void {
+    const result = outcome(game.state.fen);
+    if (result) return this.finish(game, { result });
+    const humanToMove = turn(game.state.fen) === game.state.humanColor;
+    game.state = { ...game.state, phase: humanToMove ? 'human' : 'thinking' };
+    this.publish(game);
+    if (!humanToMove) void this.engineMove(game);
+  }
+
+  private async engineMove(game: Game): Promise<void> {
+    let bestMove: string;
+    try {
+      ({ bestMove } = await game.engine!.search({
+        fen: START_FEN,
+        moves: game.moves,
+        limit: game.limit,
+      }));
+    } catch (error) {
+      if (!(error instanceof SearchCancelledError)) this.fail(game, error);
+      return;
+    }
+    if (this.game !== game) return;
+    // The engine is not trusted: its move goes through the same rules as the human's.
+    const result = applyUciMove(game.state.fen, bestMove);
+    if (!result.ok) {
+      return this.finish(game, {
+        reason: `${game.state.engineName} played an illegal move: ${bestMove}`,
+      });
+    }
+    this.play(game, bestMove, result.fen);
+  }
+
+  private fail(game: Game, error: unknown): void {
+    if (this.game !== game) return;
+    const message = (error as Error).message;
+    const transcript = error instanceof EngineError ? error.transcript.slice(-TRANSCRIPT_TAIL) : [];
+    this.options.log([`${game.state.engineName}: ${message}`, ...transcript].join('\n'));
+    this.finish(game, { reason: `${game.state.engineName} failed: ${message}` });
+  }
+
+  private finish(game: Game, end: Pick<GameState, 'result' | 'reason'>): void {
+    game.state = { ...game.state, ...end, phase: 'over' };
+    this.publish(game);
+    void game.engine?.quit();
+  }
+
+  private endCurrent(): void {
+    const engine = this.game?.engine;
+    this.game = undefined;
+    void engine?.quit();
+  }
+
+  private publish(game: Game): void {
+    this.options.send({ type: 'game', game: game.state });
+  }
+
+  private error(reason: string): void {
+    this.options.send({ type: 'error', reason });
+  }
+}

@@ -2,18 +2,21 @@ import { Chessground } from '@lichess-org/chessground';
 import type { Api } from '@lichess-org/chessground/api';
 import type { Key } from '@lichess-org/chessground/types';
 import { useEffect, useEffectEvent, useRef } from 'react';
-import { legalDests, turn } from '@stratchess-ui/shared';
+import { legalDests, turn, type Color } from '@stratchess-ui/shared';
 
 type BoardProps = {
   fen: string;
   lastMove?: string;
   /** Bumped to redraw the same position, e.g. after the server rejects a move. */
   revision: number;
+  orientation: Color;
+  /** The side the user may move now; undefined locks the board. */
+  movable?: Color;
   onMove: (uci: string) => void;
 };
 
 /** Thin wrapper: Chessground is a view of the server's position, never the source of truth. */
-export function Board({ fen, lastMove, revision, onMove }: BoardProps) {
+export function Board({ fen, lastMove, revision, orientation, movable, onMove }: BoardProps) {
   const element = useRef<HTMLDivElement>(null);
   const api = useRef<Api | undefined>(undefined);
   const handleMove = useEffectEvent(onMove);
@@ -36,14 +39,14 @@ export function Board({ fen, lastMove, revision, onMove }: BoardProps) {
   }, []);
 
   useEffect(() => {
-    const color = turn(fen);
     api.current?.set({
       fen: fen.split(' ')[0],
-      turnColor: color,
+      orientation,
+      turnColor: turn(fen),
       lastMove: lastMove ? [lastMove.slice(0, 2) as Key, lastMove.slice(2, 4) as Key] : undefined,
-      movable: { color, dests: legalDests(fen) as Map<Key, Key[]> },
+      movable: { color: movable, dests: legalDests(fen) as Map<Key, Key[]> },
     });
-  }, [fen, lastMove, revision]);
+  }, [fen, lastMove, revision, orientation, movable]);
 
   return <div ref={element} className="board" data-testid="board" />;
 }

@@ -2,6 +2,7 @@ import { Chess } from 'chessops/chess';
 import { chessgroundDests } from 'chessops/compat';
 import { makeFen, parseFen } from 'chessops/fen';
 import { parseUci } from 'chessops/util';
+import type { Color } from './protocol.ts';
 
 export const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -33,7 +34,7 @@ export function applyUciMove(fen: string, uci: string): MoveResult {
 }
 
 /** 'white', 'black' or 'draw' once the game is over by rule; undefined while it goes on. */
-export function outcome(fen: string): string | undefined {
+export function outcome(fen: string): Color | 'draw' | undefined {
   const pos = positionFromFen(fen);
   if (typeof pos === 'string') return undefined;
   const result = pos.outcome();
@@ -41,6 +42,6 @@ export function outcome(fen: string): string | undefined {
   return result.winner ?? 'draw';
 }
 
-export function turn(fen: string): 'white' | 'black' {
+export function turn(fen: string): Color {
   return fen.split(' ')[1] === 'b' ? 'black' : 'white';
 }

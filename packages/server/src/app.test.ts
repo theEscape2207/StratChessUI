@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { WebSocket } from 'ws';
 import type { ServerMessage } from '@stratchess-ui/shared';
 import { buildApp } from './app.ts';
+import { fakeProfile } from './uci/fake-profile.ts';
 
 let app: FastifyInstance;
 afterEach(() => app?.close());
@@ -44,17 +45,27 @@ describe('server', () => {
     expect(res.statusCode).toBe(421);
   });
 
-  it('owns the game: applies legal moves and rejects illegal ones', async () => {
-    app = await buildApp({ port: 0 });
+  it('offers its engines and plays a game over the socket', async () => {
+    app = await buildApp({ port: 0, profiles: [fakeProfile('legal')] });
     await app.ready();
     const { ws, next } = await connect(app);
-    expect((await next()).type).toBe('position');
+    expect(await next()).toEqual({
+      type: 'hello',
+      engines: [{ id: 'fake', name: 'StratChess (fake)' }],
+    });
 
-    ws.send(JSON.stringify({ type: 'move', uci: 'e2e5' }));
-    expect(await next()).toEqual({ type: 'error', reason: 'illegal move: e2e5' });
+    ws.send(JSON.stringify({ type: 'move', uci: '{' }));
+    expect(await next()).toEqual({ type: 'error', reason: 'no game in progress' });
+    ws.send(JSON.stringify({ type: 'new-game', humanColor: 'white', engineId: 'fake' }));
+    expect(await next()).toEqual({ type: 'error', reason: 'malformed message' });
 
+    const limit = { movetimeMs: 100 };
+    ws.send(JSON.stringify({ type: 'new-game', humanColor: 'white', engineId: 'fake', limit }));
+    expect(await next()).toMatchObject({ type: 'game', game: { phase: 'starting' } });
+    expect(await next()).toMatchObject({ type: 'game', game: { phase: 'human' } });
     ws.send(JSON.stringify({ type: 'move', uci: 'e2e4' }));
-    expect(await next()).toMatchObject({ type: 'position', lastMove: 'e2e4' });
+    expect(await next()).toMatchObject({ game: { phase: 'thinking', lastMove: 'e2e4' } });
+    expect(await next()).toMatchObject({ game: { phase: 'human', lastMove: 'a7a5' } });
     ws.terminate();
   });
 });

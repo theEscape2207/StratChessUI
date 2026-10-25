@@ -6,7 +6,8 @@ Stockfish and others later.
 
 Requirements, decisions and milestones: [`docs/Requirements.md`](docs/Requirements.md).
 
-Status: scaffold. One browser plays both sides against the server's rules; no engine yet (M1).
+Status: M1 in progress. A browser plays white or black against an engine profile, limited by depth
+or move time; pairing and promotion choice are still to come.
 
 ## Layout
 
@@ -34,7 +35,8 @@ npm run e2e                  # Playwright, desktop and phone; first run: npx pla
 ```
 
 `PORT` changes the port; `EXTRA_HOSTS` (comma-separated) adds Host names beyond localhost, this
-machine's name and its IPv4 addresses.
+machine's name and its IPv4 addresses. `FAKE_ENGINE=legal` replaces the configured engines with
+the test engine (`packages/server/src/uci/fake-engine.ts`), as Playwright does.
 
 ## Engines
 
