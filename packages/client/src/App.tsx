@@ -20,7 +20,8 @@ function describe(game: GameState | undefined): string {
       return `${game.engineName} thinking`;
     case 'over':
       if (game.reason) return `game over: ${game.reason}`;
-      return game.result === 'draw' ? 'game over: draw' : `game over: ${game.result} wins`;
+      if (game.result === 'draw') return `game over: draw by ${game.termination}`;
+      return `game over: ${game.result} wins by ${game.termination}`;
   }
 }
 
@@ -65,7 +66,7 @@ export function App() {
         movable={game?.phase === 'human' ? humanColor : undefined}
         onMove={(uci) => send({ type: 'move', uci })}
       />
-      <p className="status" data-testid="status">
+      <p className={game?.phase === 'over' ? 'status result' : 'status'} data-testid="status">
         {connection === 'connected' ? describe(game) : connection}
       </p>
       {notice && (
