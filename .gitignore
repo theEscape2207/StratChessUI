@@ -4,3 +4,4 @@ playwright-report/
 test-results/
 *.log
 engines.json
+pairings.json

@@ -1,0 +1,42 @@
+import { expect, type Page } from '@playwright/test';
+
+// The server runs the fake engine, which answers its first legal move (see playwright.config.ts).
+export const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+export const THINKING = 'StratChess (fake) thinking';
+
+/** Clicks (or taps, on touch devices) a square on the board, seen from `bottom`'s side. */
+export async function tapSquare(page: Page, sq: string, touch: boolean, bottom = 'white') {
+  const board = page.getByTestId('board');
+  // Pressing New game scrolls the form into view, which can push the top ranks off screen.
+  // Chessground caches the board's position until it sees the scroll event, so wait for it.
+  await board.evaluate(
+    (el) =>
+      new Promise<void>((resolve) => {
+        const before = scrollY;
+        el.scrollIntoView({ block: 'nearest' });
+        if (scrollY === before) resolve();
+        else addEventListener('scroll', () => resolve(), { once: true });
+      }),
+  );
+  const box = (await board.boundingBox())!;
+  const square = box.width / 8;
+  let file = sq.charCodeAt(0) - 'a'.charCodeAt(0);
+  let rank = Number(sq[1]) - 1;
+  if (bottom === 'black') [file, rank] = [7 - file, 7 - rank];
+  const x = box.x + (file + 0.5) * square;
+  const y = box.y + (7 - rank + 0.5) * square;
+  if (touch) await page.touchscreen.tap(x, y);
+  else await page.mouse.click(x, y);
+}
+
+export async function playMove(page: Page, uci: string, touch: boolean, bottom = 'white') {
+  await tapSquare(page, uci.slice(0, 2), touch, bottom);
+  await tapSquare(page, uci.slice(2, 4), touch, bottom);
+}
+
+/** Opens the app as the paired browser and waits until whatever game it resumes is idle. */
+export async function openSettled(page: Page) {
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'New game' })).toBeVisible();
+  await expect(page.getByTestId('status')).not.toHaveText(/thinking|starting/);
+}

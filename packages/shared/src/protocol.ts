@@ -41,6 +41,16 @@ export type ServerMessage =
   | { type: 'game'; game: GameState }
   | { type: 'error'; reason: string };
 
+/** Why the server closed the game WebSocket; none of them is worth reconnecting for. */
+export const CLOSE_CODES = {
+  /** The token is unknown or was revoked: pair again. */
+  notPaired: 4401,
+  /** Another browser controls the game. */
+  busy: 4409,
+  /** This browser opened the game in another tab or a reloaded page. */
+  replaced: 4000,
+};
+
 export const MAX_MESSAGE_BYTES = 4096;
 
 export function parseClientMessage(raw: string): ClientMessage | undefined {
