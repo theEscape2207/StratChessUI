@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { buildApp } from './app.ts';
+import { buildApp, defaultHosts } from './app.ts';
 import { loadProfiles, ProfileError, type EngineProfile } from './engines/profiles.ts';
 import { fileStore, memoryStore, Pairings } from './pairing.ts';
 import { fakeProfile } from './uci/fake-profile.ts';
@@ -43,3 +43,6 @@ const app = await buildApp({
 });
 await app.listen({ host: '0.0.0.0', port });
 console.log(`StratChessUI listening on port ${port}`);
+for (const host of defaultHosts().filter((h) => h !== 'localhost' && h !== '127.0.0.1')) {
+  console.log(`  http://${host}:${port}`);
+}
