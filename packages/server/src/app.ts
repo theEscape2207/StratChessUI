@@ -3,14 +3,10 @@ import fastifyWebsocket from '@fastify/websocket';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { existsSync } from 'node:fs';
 import { networkInterfaces, hostname } from 'node:os';
-import {
-  applyUciMove,
-  MAX_MESSAGE_BYTES,
-  outcome,
-  parseClientMessage,
-  START_FEN,
-  type ServerMessage,
-} from '@stratchess-ui/shared';
+import { MAX_MESSAGE_BYTES, parseClientMessage, type ServerMessage } from '@stratchess-ui/shared';
+import type { EngineProfile } from './engines/profiles.ts';
+import { GameSession } from './game/session.ts';
+import type { Timeouts } from './uci/engine.ts';
 
 export type AppOptions = {
   port: number;
@@ -18,6 +14,11 @@ export type AppOptions = {
   staticRoot?: string;
   /** Extra Host names to accept beyond localhost, this machine's name and its IPv4 addresses. */
   extraHosts?: string[];
+  /** Engines a browser may choose from. */
+  profiles?: EngineProfile[];
+  engineTimeouts?: Partial<Timeouts>;
+  /** Where engine failures are reported; defaults to stderr. */
+  log?: (text: string) => void;
 };
 
 /** Host names the server answers to. Anything else is a DNS-rebinding attempt or a typo. */
@@ -53,23 +54,26 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.get('/api/health', async () => ({ ok: true }));
 
   // One game per connection until pairing and the single-controller rule land (M1).
+  const profiles = options.profiles ?? [];
   app.get('/ws', { websocket: true }, (socket) => {
-    let fen = START_FEN;
-    const send = (msg: ServerMessage) => socket.send(JSON.stringify(msg));
-    send({ type: 'position', fen });
+    const send = (msg: ServerMessage) => {
+      if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(msg));
+    };
+    const session = new GameSession({
+      profiles,
+      send,
+      timeouts: options.engineTimeouts,
+      log: options.log ?? ((text) => console.error(text)),
+    });
+    send({ type: 'hello', engines: profiles.map(({ id, name }) => ({ id, name })) });
 
     socket.on('message', (data) => {
       const msg = parseClientMessage(data.toString());
       if (!msg) return send({ type: 'error', reason: 'malformed message' });
-      if (msg.type === 'new-game') {
-        fen = START_FEN;
-        return send({ type: 'position', fen });
-      }
-      const result = applyUciMove(fen, msg.uci);
-      if (!result.ok) return send({ type: 'error', reason: result.reason });
-      fen = result.fen;
-      send({ type: 'position', fen, lastMove: msg.uci, outcome: outcome(fen) });
+      if (msg.type === 'new-game') return void session.newGame(msg);
+      session.move(msg.uci);
     });
+    socket.on('close', () => void session.close());
   });
 
   if (options.staticRoot && existsSync(options.staticRoot)) {

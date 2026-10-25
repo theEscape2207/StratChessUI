@@ -1,4 +1,7 @@
 // Pure UCI text handling: building commands safely and parsing engine output.
+import type { SearchLimit } from '@stratchess-ui/shared';
+
+export type { SearchLimit };
 
 /** Longest engine line kept; anything longer is truncated before parsing. */
 export const MAX_LINE_LENGTH = 16 * 1024;
@@ -20,8 +23,6 @@ export function positionCommand(fen: string, moves: readonly string[]): string {
   }
   return moves.length ? `position fen ${fen} moves ${moves.join(' ')}` : `position fen ${fen}`;
 }
-
-export type SearchLimit = { depth: number } | { movetimeMs: number };
 
 /** Always carries a limit: a bare `go` makes StratChess search to depth 20. */
 export function goCommand(limit: SearchLimit): string {

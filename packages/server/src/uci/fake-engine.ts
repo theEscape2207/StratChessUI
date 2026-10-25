@@ -4,7 +4,9 @@
 //   no-uciok        never finishes the handshake
 //   crash-on-go     exits as soon as a search starts
 //   ignore-stop     never answers `stop` (and searches forever)
+//   legal           like normal, but answers the first legal move, so whole games can be played
 import { createInterface } from 'node:readline';
+import { applyUciMove, legalDests, START_FEN } from '@stratchess-ui/shared';
 
 const mode = process.argv.find((a) => a.startsWith('--mode='))?.slice(7) ?? 'normal';
 
@@ -41,7 +43,41 @@ function finishSearch() {
   SEARCH_END.forEach(out);
   // Encodes the position it searched, so tests can tell which search a bestmove belongs to.
   if (position.includes(STALEMATE)) out('bestmove 0000');
+  else if (mode === 'legal') out(`bestmove ${firstLegalMove(position)}`);
   else out(`bestmove ${position.includes('moves') ? 'g8f6' : 'b1c3'}`);
+}
+
+/** Plays a `position` command's moves, failing on any StratChess would reject. */
+function replay(command: string): { fen: string } | { illegal: string } {
+  const [setup, moves = ''] = command.split(' moves ');
+  let fen = setup!.startsWith('position fen ') ? setup!.slice(13) : START_FEN;
+  for (const move of moves.split(' ').filter(Boolean)) {
+    const result = applyUciMove(fen, move);
+    // Standard UCI castles king two squares; king-takes-rook is chessops' form, not StratChess's.
+    if (!result.ok || castlesOntoRook(fen, move)) return { illegal: move };
+    fen = result.fen;
+  }
+  return { fen };
+}
+
+function castlesOntoRook(fen: string, move: string): boolean {
+  const pieceAt = (square: string) => {
+    const row = fen.split('/')[8 - Number(square[1])]!.replace(/\d/g, (n) => '.'.repeat(+n));
+    return row[square.charCodeAt(0) - 'a'.charCodeAt(0)];
+  };
+  const [from, to] = [pieceAt(move.slice(0, 2)), pieceAt(move.slice(2, 4))];
+  return (from === 'K' && to === 'R') || (from === 'k' && to === 'r');
+}
+
+function firstLegalMove(command: string): string {
+  const replayed = replay(command);
+  if ('illegal' in replayed) return '0000';
+  const fen = replayed.fen;
+  for (const [from, dests] of legalDests(fen)) {
+    const move = `${from}${dests[0]}`;
+    return applyUciMove(fen, move).ok ? move : `${move}q`;
+  }
+  return '0000';
 }
 
 createInterface({ input: process.stdin }).on('line', (line) => {
@@ -59,16 +95,14 @@ createInterface({ input: process.stdin }).on('line', (line) => {
       out('readyok');
       break;
     case 'position': {
-      // A null move like a1a1 stands in for any illegal move.
-      const illegal = line
-        .split(' moves ')[1]
-        ?.split(' ')
-        .find((m) => m.slice(0, 2) === m.slice(2, 4));
       if (line.startsWith('position fen ') && line.split(' ').length < 8) {
         out('info string position: rejected FEN, board reset to the starting position');
         position = 'startpos';
-      } else if (illegal) {
-        out(`info string position: illegal move '${illegal}', move list not applied`);
+        break;
+      }
+      const replayed = replay(line);
+      if ('illegal' in replayed) {
+        out(`info string position: illegal move '${replayed.illegal}', move list not applied`);
         position = 'startpos';
       } else {
         position = line;

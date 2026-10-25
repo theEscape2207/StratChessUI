@@ -1,6 +1,7 @@
 // Engine profiles live on the host. Browsers pick a profile id; they never send paths or commands.
 import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
+import { LIMIT_RANGES } from '@stratchess-ui/shared';
 
 export type OptionValue = string | number | boolean;
 
@@ -18,8 +19,8 @@ export type EngineProfile = {
 export const LIMITS = {
   maxThreads: 8,
   maxHashMiB: 1024,
-  maxDepth: 40,
-  maxMovetimeMs: 60_000,
+  maxDepth: LIMIT_RANGES.depth.max,
+  maxMovetimeMs: LIMIT_RANGES.movetimeMs.max,
 };
 
 export class ProfileError extends Error {}

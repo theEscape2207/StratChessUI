@@ -1,11 +1,12 @@
-import { Chess } from 'chessops/chess';
+import { castlingSide, Chess } from 'chessops/chess';
 import { chessgroundDests } from 'chessops/compat';
 import { makeFen, parseFen } from 'chessops/fen';
-import { parseUci } from 'chessops/util';
+import { makeUci, parseUci } from 'chessops/util';
+import type { Color } from './protocol.ts';
 
 export const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
-export type MoveResult = { ok: true; fen: string } | { ok: false; reason: string };
+export type MoveResult = { ok: true; fen: string; uci: string } | { ok: false; reason: string };
 
 function positionFromFen(fen: string): Chess | string {
   const setup = parseFen(fen);
@@ -23,17 +24,23 @@ export function legalDests(fen: string): Map<string, string[]> {
   return chessgroundDests(pos) as Map<string, string[]>;
 }
 
+/**
+ * Plays a move given in UCI, or with the king dropped on its rook as Chessground allows. The
+ * result's `uci` is standard UCI (castling moves the king two squares), the form engines accept.
+ */
 export function applyUciMove(fen: string, uci: string): MoveResult {
   const pos = positionFromFen(fen);
   if (typeof pos === 'string') return { ok: false, reason: pos };
   const move = parseUci(uci);
   if (!move || !pos.isLegal(move)) return { ok: false, reason: `illegal move: ${uci}` };
+  const side = castlingSide(pos, move);
+  const standard = side ? `${uci.slice(0, 2)}${side === 'h' ? 'g' : 'c'}${uci[1]}` : makeUci(move);
   pos.play(move);
-  return { ok: true, fen: makeFen(pos.toSetup()) };
+  return { ok: true, fen: makeFen(pos.toSetup()), uci: standard };
 }
 
 /** 'white', 'black' or 'draw' once the game is over by rule; undefined while it goes on. */
-export function outcome(fen: string): string | undefined {
+export function outcome(fen: string): Color | 'draw' | undefined {
   const pos = positionFromFen(fen);
   if (typeof pos === 'string') return undefined;
   const result = pos.outcome();
@@ -41,6 +48,6 @@ export function outcome(fen: string): string | undefined {
   return result.winner ?? 'draw';
 }
 
-export function turn(fen: string): 'white' | 'black' {
+export function turn(fen: string): Color {
   return fen.split(' ')[1] === 'b' ? 'black' : 'white';
 }

@@ -1,7 +1,5 @@
-import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { START_FEN } from '@stratchess-ui/shared';
-import type { EngineProfile } from '../engines/profiles.ts';
 import {
   EngineError,
   PositionRejectedError,
@@ -9,20 +7,10 @@ import {
   UciEngine,
   type Timeouts,
 } from './engine.ts';
+import { fakeProfile as profile } from './fake-profile.ts';
 import { UciCommandError } from './protocol.ts';
 
-const FAKE = fileURLToPath(new URL('./fake-engine.ts', import.meta.url));
 const FAST: Partial<Timeouts> = { handshakeMs: 2000, readyMs: 1000, stopGraceMs: 300 };
-
-function profile(mode = 'normal', options: EngineProfile['options'] = {}): EngineProfile {
-  return {
-    id: 'fake',
-    name: 'Fake',
-    executable: process.execPath,
-    args: [FAKE, `--mode=${mode}`],
-    options,
-  };
-}
 
 let engine: UciEngine | undefined;
 afterEach(async () => {
