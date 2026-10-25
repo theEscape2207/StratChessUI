@@ -1,7 +1,8 @@
 // Pairing: the host shows a short code; a browser that enters it gets a token it keeps until the
 // owner revokes it by deleting its entry from the pairings file.
 import { randomBytes, randomInt } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 export type Pairing = { token: string; pairedAt: string; userAgent: string };
 
@@ -19,7 +20,10 @@ export function memoryStore(): PairingStore {
 export function fileStore(path: string): PairingStore {
   return {
     load: () => (existsSync(path) ? (JSON.parse(readFileSync(path, 'utf8')) as Pairing[]) : []),
-    save: (pairings) => writeFileSync(path, JSON.stringify(pairings, null, 2) + '\n'),
+    save: (pairings) => {
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, JSON.stringify(pairings, null, 2) + '\n');
+    },
   };
 }
 

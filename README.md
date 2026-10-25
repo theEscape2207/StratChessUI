@@ -39,21 +39,28 @@ machine's name and its IPv4 addresses. `FAKE_ENGINE=legal` replaces the configur
 the test engine (`packages/server/src/uci/fake-engine.ts`), as Playwright does; with it,
 pairings are not saved and `PAIRING_CODE` fixes the code.
 
+## Host directory
+
+`engines.json` and `pairings.json` live outside the checkout, so every worktree shares one set of
+engines and paired browsers: `%APPDATA%\StratChessUI` on Windows, otherwise
+`$XDG_CONFIG_HOME/stratchess-ui` or `~/.config/stratchess-ui`. `STRATCHESS_UI_HOME` overrides it.
+Files left at the repository root by older versions are not read; move them there.
+
 ## Pairing
 
 The server prints a six-digit pairing code to its console; a browser enters it once and keeps a
 token. The code changes after each pairing and after five wrong attempts. Pairings are kept in
-`pairings.json` at the repository root (git-ignored); delete an entry, or the file, to revoke a
-browser. It applies the next time that browser connects.
+`pairings.json` in the host directory (above); delete an entry, or the file, to revoke a browser.
+It applies the next time that browser connects.
 
 One paired browser controls the game; others are refused until it has been gone for 60 seconds,
 which is also how long a locked phone or a reloaded page has to resume the game.
 
 ## Engines
 
-Engines are configured on the host only, in `engines.json` at the repository root (git-ignored;
-copy `engines.example.json`). Relative paths resolve against the file. Threads and Hash are capped
-by the server. Check a profile against the real engine with:
+Engines are configured on the host only, in `engines.json` in the host directory (copy
+`engines.example.json`). Relative paths resolve against the file. Threads and Hash are capped by
+the server. Check a profile against the real engine with:
 
 ```sh
 npm run probe-engine -- stratchess
