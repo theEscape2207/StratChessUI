@@ -122,3 +122,30 @@ for (const [side, moves, fen] of [
     await expect(page.getByTestId('fen')).toHaveText(fen);
   });
 }
+
+for (const side of ['white', 'black'] as const) {
+  test(`coordinates sit inside their edge squares, ${side} at the bottom`, async ({ page }) => {
+    await newGame(page, side);
+    // Chessground snaps cg-board to whole device pixels, so it can be smaller than the wrapper.
+    const board = (await page.locator('cg-board').boundingBox())!;
+    const square = board.width / 8;
+    const labels = await page
+      .locator('coords.files coord, coords.ranks coord')
+      .evaluateAll((els) =>
+        els.map((el) => ({ text: el.textContent!, box: el.getBoundingClientRect().toJSON() })),
+      );
+    expect(labels).toHaveLength(16);
+    for (const { text, box } of labels) {
+      // Seen from white, file a is the left column and rank 8 the top row; black mirrors both.
+      const isFile = /[a-h]/i.test(text);
+      const index = isFile ? text.toLowerCase().charCodeAt(0) - 97 : 8 - Number(text);
+      const slot = side === 'white' ? index : 7 - index;
+      const [col, row] = isFile ? [slot, 7] : [0, slot];
+      const sq = { left: board.x + col * square, top: board.y + row * square };
+      expect.soft(box.left, text).toBeGreaterThanOrEqual(sq.left - 0.5);
+      expect.soft(box.right, text).toBeLessThanOrEqual(sq.left + square + 0.5);
+      expect.soft(box.top, text).toBeGreaterThanOrEqual(sq.top - 0.5);
+      expect.soft(box.bottom, text).toBeLessThanOrEqual(sq.top + square + 0.5);
+    }
+  });
+}
