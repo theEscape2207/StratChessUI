@@ -1,5 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
-import { openSettled, playMove, START, tapSquare, THINKING } from './helpers.ts';
+import {
+  newGame,
+  openSettled,
+  playAndAwaitReply,
+  playMove,
+  START,
+  tapSquare,
+  THINKING,
+} from './helpers.ts';
 
 // Every test resumes the game the previous one left (see pairing.setup.ts); New game replaces it.
 
@@ -9,6 +17,7 @@ test('plays white against the engine, with the board locked while it thinks', as
   page,
   hasTouch,
 }) => {
+  // The move-time default: the fake sleeps it out, which leaves time to try the locked board.
   await page.getByRole('button', { name: 'New game' }).click();
   await expect(page.getByTestId('status')).toHaveText('your move');
 
@@ -30,10 +39,7 @@ test('plays white against the engine, with the board locked while it thinks', as
 });
 
 test('plays black: the engine opens and the board is flipped', async ({ page, hasTouch }) => {
-  await page.getByLabel('black').check();
-  await page.getByRole('combobox', { name: 'Limit' }).selectOption('depth');
-  await page.getByRole('button', { name: 'New game' }).click();
-  await expect(page.getByTestId('status')).toHaveText('your move');
+  await newGame(page, 'black');
   await expect(page.getByTestId('fen')).toHaveText(
     'rnbqkbnr/pppppppp/8/8/8/N7/PPPPPPPP/R1BQKBNR b KQkq - 1 1',
   );
@@ -46,24 +52,18 @@ test('plays black: the engine opens and the board is flipped', async ({ page, ha
 });
 
 test('the board refuses an illegal move', async ({ page, hasTouch }) => {
-  await page.getByRole('button', { name: 'New game' }).click();
-  await expect(page.getByTestId('status')).toHaveText('your move');
+  await newGame(page);
   await playMove(page, 'e2e5', hasTouch);
   await expect(page.getByTestId('fen')).toHaveText(START);
 });
 
 /** Plays each move and waits for the engine's reply, as `side`. */
 async function playLine(page: Page, moves: string[], touch: boolean, side = 'white') {
-  for (const move of moves) {
-    await playMove(page, move, touch, side);
-    await expect(page.getByTestId('status')).toHaveText(THINKING);
-    await expect(page.getByTestId('status')).toHaveText('your move');
-  }
+  for (const move of moves) await playAndAwaitReply(page, move, touch, side);
 }
 
 test('checkmate ends the game and locks the board', async ({ page, hasTouch }) => {
-  await page.getByRole('button', { name: 'New game' }).click();
-  await expect(page.getByTestId('status')).toHaveText('your move');
+  await newGame(page);
   // The fake's first legal move is always an a-pawn push, which never defends f7.
   await playLine(page, ['e2e4', 'f1c4', 'd1h5'], hasTouch);
   await playMove(page, 'h5f7', hasTouch);
@@ -77,8 +77,7 @@ test('en passant, then promotion to a knight after a cancelled choice', async ({
   page,
   hasTouch,
 }) => {
-  await page.getByRole('button', { name: 'New game' }).click();
-  await expect(page.getByTestId('status')).toHaveText('your move');
+  await newGame(page);
   // Black answers a5, a4, a3, then b5 beside the pawn on c5.
   await playLine(page, ['c2c4', 'c4c5', 'b2b3', 'g1f3'], hasTouch);
   await expect(page.getByTestId('fen')).toHaveText(
@@ -117,9 +116,7 @@ for (const [side, moves, fen] of [
   ],
 ] as const) {
   test(`castles ${side} as black`, async ({ page, hasTouch }) => {
-    await page.getByLabel('black').check();
-    await page.getByRole('button', { name: 'New game' }).click();
-    await expect(page.getByTestId('status')).toHaveText('your move');
+    await newGame(page, 'black');
     // The fake opens b1a3, then shuffles its rook between a1 and b1.
     await playLine(page, [...moves], hasTouch, 'black');
     await expect(page.getByTestId('fen')).toHaveText(fen);

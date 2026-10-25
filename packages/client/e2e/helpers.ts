@@ -40,3 +40,29 @@ export async function openSettled(page: Page) {
   await expect(page.getByRole('button', { name: 'New game' })).toBeVisible();
   await expect(page.getByTestId('status')).not.toHaveText(/thinking|starting/);
 }
+
+/** Starts a game with a depth limit, which the fake answers at once; it sleeps out a move time. */
+export async function newGame(page: Page, side: 'white' | 'black' = 'white') {
+  await page.getByLabel(side).check();
+  await page.getByRole('combobox', { name: 'Limit' }).selectOption('depth');
+  await page.getByRole('button', { name: 'New game' }).click();
+  await expect(page.getByTestId('status')).toHaveText('your move');
+}
+
+/**
+ * Plays a move as `side` and waits for the engine's reply. The reply can come too fast to see
+ * "thinking", and "your move" still shows before the move lands, so this waits on the FEN: it
+ * must differ from before the move and have `side` to move again.
+ */
+export async function playAndAwaitReply(page: Page, uci: string, touch: boolean, side = 'white') {
+  const fen = page.getByTestId('fen');
+  const before = await fen.textContent();
+  await playMove(page, uci, touch, side);
+  await expect
+    .poll(async () => {
+      const now = await fen.textContent();
+      return now !== before && now?.split(' ')[1] === side[0];
+    })
+    .toBe(true);
+  await expect(page.getByTestId('status')).toHaveText('your move');
+}

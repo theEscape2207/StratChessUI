@@ -35,8 +35,9 @@ change could fail; a docs-only change needs lint at most.
 - **Prove a new test guards something:** break the code, watch it fail, restore. Drive it through
   the production path (`GameSession`, the WebSocket, the board), not by feeding a value in below
   the code under test.
-- **Playwright: wait for "thinking" before "your move".** Right after the human moves, the status
-  still reads "your move", so waiting for it alone passes before the engine has replied.
+- **Playwright: "your move" does not mean the engine replied.** Right after the human moves, the
+  status still reads it, and under a depth limit the fake replies too fast to see "thinking". Wait
+  through `playAndAwaitReply` (`e2e/helpers.ts`), which watches the FEN.
 - **Chessground caches the board's bounds** until it sees a scroll event; after anything that
   scrolls the page, wait for that event before clicking squares (`board.spec.ts`).
 
