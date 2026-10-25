@@ -73,7 +73,33 @@ describe('GameSession', () => {
     expect(replies).toEqual(['a7a5', 'a5a4', 'a4a3']);
 
     session.move('h5f7');
-    expect(await settled()).toMatchObject({ phase: 'over', result: 'white', lastMove: 'h5f7' });
+    expect(await settled()).toMatchObject({
+      phase: 'over',
+      result: 'white',
+      termination: 'checkmate',
+      lastMove: 'h5f7',
+    });
+  });
+
+  it('draws by threefold repetition without a claim', async () => {
+    const { session, settled } = open();
+    void session.newGame(game('legal', 'black'));
+    await settled();
+    // The fake opens b1a3, then shuffles its rook between a1 and b1. Its first rook move loses
+    // white's queenside castling, so the position after it is the first of the three.
+    const moves = ['g8f6', 'f6g8', 'g8f6', 'f6g8', 'g8f6'];
+    let state: GameState | undefined;
+    for (const move of moves) {
+      expect(state?.phase ?? 'human').toBe('human');
+      session.move(move);
+      state = await settled();
+    }
+    expect(state).toMatchObject({
+      phase: 'over',
+      result: 'draw',
+      termination: 'threefold repetition',
+      lastMove: 'a1b1',
+    });
   });
 
   it('lets the engine open when the human plays black', async () => {

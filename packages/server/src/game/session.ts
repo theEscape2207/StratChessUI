@@ -25,6 +25,8 @@ type Game = {
   state: GameState;
   /** From the start position; the engine is sent the whole game on every search. */
   moves: string[];
+  /** Every position of the game as a FEN, for repetition. */
+  positions: string[];
   limit: SearchLimit;
   engine?: UciEngine;
 };
@@ -53,6 +55,7 @@ export class GameSession {
         phase: 'starting',
       },
       moves: [],
+      positions: [START_FEN],
       limit: request.limit,
     };
     this.game = game;
@@ -87,13 +90,14 @@ export class GameSession {
 
   private play(game: Game, uci: string, fen: string): void {
     game.moves.push(uci);
+    game.positions.push(fen);
     game.state = { ...game.state, fen, lastMove: uci };
     this.nextTurn(game);
   }
 
   private nextTurn(game: Game): void {
-    const result = outcome(game.state.fen);
-    if (result) return this.finish(game, { result });
+    const ended = outcome(game.positions);
+    if (ended) return this.finish(game, ended);
     const humanToMove = turn(game.state.fen) === game.state.humanColor;
     game.state = { ...game.state, phase: humanToMove ? 'human' : 'thinking' };
     this.publish(game);
@@ -131,7 +135,7 @@ export class GameSession {
     this.finish(game, { reason: `${game.state.engineName} failed: ${message}` });
   }
 
-  private finish(game: Game, end: Pick<GameState, 'result' | 'reason'>): void {
+  private finish(game: Game, end: Pick<GameState, 'result' | 'termination' | 'reason'>): void {
     game.state = { ...game.state, ...end, phase: 'over' };
     this.publish(game);
     void game.engine?.quit();

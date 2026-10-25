@@ -1,8 +1,8 @@
 import { castlingSide, Chess } from 'chessops/chess';
 import { chessgroundDests } from 'chessops/compat';
 import { makeFen, parseFen } from 'chessops/fen';
-import { makeUci, parseUci } from 'chessops/util';
-import type { Color } from './protocol.ts';
+import { makeUci, opposite, parseUci } from 'chessops/util';
+import type { Color, Outcome } from './protocol.ts';
 
 export const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -39,13 +39,29 @@ export function applyUciMove(fen: string, uci: string): MoveResult {
   return { ok: true, fen: makeFen(pos.toSetup()), uci: standard };
 }
 
-/** 'white', 'black' or 'draw' once the game is over by rule; undefined while it goes on. */
-export function outcome(fen: string): Color | 'draw' | undefined {
+/**
+ * Decides a game from its positions so far, oldest first, or returns undefined while it goes on.
+ * Threefold repetition and the fifty-move rule end the game at once rather than on a claim.
+ */
+export function outcome(positions: readonly string[]): Outcome | undefined {
+  const fen = positions.at(-1);
+  if (fen === undefined) return undefined;
   const pos = positionFromFen(fen);
   if (typeof pos === 'string') return undefined;
-  const result = pos.outcome();
-  if (!result) return undefined;
-  return result.winner ?? 'draw';
+  // Checkmate on the hundredth half-move still wins, so the position's own rules come first.
+  if (pos.isCheckmate()) return { result: opposite(pos.turn), termination: 'checkmate' };
+  if (pos.isStalemate()) return { result: 'draw', termination: 'stalemate' };
+  if (pos.isInsufficientMaterial()) return { result: 'draw', termination: 'insufficient material' };
+  if (pos.halfmoves >= 100) return { result: 'draw', termination: 'fifty-move rule' };
+  const key = repetitionKey(fen);
+  if (positions.filter((p) => repetitionKey(p) === key).length >= 3)
+    return { result: 'draw', termination: 'threefold repetition' };
+  return undefined;
+}
+
+/** Board, side to move, castling rights and en passant square, which FENs carry only when legal. */
+function repetitionKey(fen: string): string {
+  return fen.split(' ').slice(0, 4).join(' ');
 }
 
 export function turn(fen: string): Color {

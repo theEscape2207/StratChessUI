@@ -18,14 +18,20 @@ export type EngineChoice = { id: string; name: string };
 
 export type GamePhase = 'starting' | 'human' | 'thinking' | 'over';
 
+export type Termination =
+  'checkmate' | 'stalemate' | 'insufficient material' | 'fifty-move rule' | 'threefold repetition';
+
+export type Outcome = { result: Color | 'draw'; termination: Termination };
+
 export type GameState = {
   fen: string;
   lastMove?: string;
   humanColor: Color;
   engineName: string;
   phase: GamePhase;
-  /** Set when the game ended by rule. */
+  /** Set, with how it ended, when the game ended by rule. */
   result?: Color | 'draw';
+  termination?: Termination;
   /** Set when the game ended for another reason, such as an engine failure. */
   reason?: string;
 };
