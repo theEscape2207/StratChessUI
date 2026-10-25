@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect, test } from './fixtures.ts';
 import {
   newGame,
   openSettled,
@@ -9,7 +10,7 @@ import {
   THINKING,
 } from './helpers.ts';
 
-// Every test resumes the game the previous one left (see pairing.setup.ts); New game replaces it.
+// Each test resumes whatever game its server last held; New game replaces it.
 
 test.beforeEach(async ({ page }) => openSettled(page));
 
