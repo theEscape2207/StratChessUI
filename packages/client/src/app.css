@@ -20,6 +20,32 @@ main {
   aspect-ratio: 1;
 }
 
+/* Chessground's base stylesheet offsets the labels by fixed pixels that fit only lichess's own
+   layout; on a fluid board they drift off their squares. Pin them inside the edge squares. */
+.board.cg-wrap coords coord {
+  flex: 1 1 0;
+}
+
+.board.cg-wrap coords.ranks {
+  top: 0;
+  left: 2px;
+}
+
+.board.cg-wrap coords.ranks coord {
+  transform: none;
+}
+
+.board.cg-wrap coords.files {
+  bottom: 0;
+  left: 0;
+  /* Left-aligned: at a square's right edge a letter reads as the next square's. */
+  text-align: left;
+}
+
+.board.cg-wrap coords.files coord {
+  padding-left: 2px;
+}
+
 /* Over the board; a tap outside the pieces cancels the move. */
 .promotion.cg-wrap {
   position: absolute;
