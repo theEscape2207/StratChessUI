@@ -43,7 +43,11 @@ change could fail; a docs-only change needs lint at most.
 
 ## Workflow
 
-- **Every task forks fresh from `origin/main`** in its own worktree or branch; PRs target `main`.
+- **Every task that changes files starts in a Claude-managed worktree**: `EnterWorktree` named
+  after the issue (`issue-23-handshake-timeout`), which branches fresh from `origin/main` into
+  `.claude/worktrees/<name>`; a session launched in one already has it. Then `npm ci`: without it
+  the worktree resolves packages from the main checkout's `node_modules`, which may predate the
+  lockfile. PRs target `main`.
 - **One slice per session.** An issue split into PRs ends the session at each PR with a one-line
   start prompt for the next (issue, what landed, what is next, cleanup due).
 - **Design first** when a decision could reasonably go more than one way and affects the protocol,
@@ -51,12 +55,8 @@ change could fail; a docs-only change needs lint at most.
   confirm. Post it as an issue comment: problem, decisions with the rejected alternatives,
   unverified assumptions and how each gets verified, validation. No placeholders. A decision
   surfacing mid-implementation means stop and write it.
-- **Review** before opening a PR that changes code: skill `code-review` against `origin/main`, the
-  issue as spec, this file's Code section as standards. Size it to the risk; a trivial fix can be
-  reviewed inline. Reviewing another agent's issue, design or PR: skill `cross-agent-review`.
-- **Open the PR** with `gh pr create --body-file <path>`; say `Closes #N` exactly, and keep the body
-  sized to the diff. The owner merges on github.com: never `gh pr merge`. Green CI means
-  "awaiting merge". After the merge, switch to `main`, pull, and delete the branch and worktree.
+- **Finishing a branch, opening a PR or cleaning up after a merge:** skill `open-pull-request`.
+  Reviewing another agent's issue, design or PR: skill `cross-agent-review`.
 - Commit messages stay short; stage named files, never `git add -A`.
 
 **Public repo.** Every issue, PR or comment body goes through `--body-file` (an inline `--body`
