@@ -3,7 +3,7 @@
 Status: requirements agreed 2026-10-25; repository scaffolded. Moved here from the engine repository
 (`theEscape2207/StratChess`, PR 915).
 
-**Next task:** Milestone 1. Engine issues below follow when their milestone needs them; they live in
+**Next task:** Milestone 2 (GitHub milestone "M2: Technical"). Engine issues below follow when their milestone needs them; they live in
 the engine repository.
 
 ## Intent
@@ -36,11 +36,11 @@ separate open-source repository, and has no commercial goal.
 
 ## Milestones
 
-| Milestone           | Audience            | Scope                                                                                                                                 | Done when                                                                                                                                                   |
-| ------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1. Initial gameplay | Owner               | Raw UI, standard start, human vs StratChess, depth/time limit, LAN access, pairing                                                    | A full game played from a phone finishes with the correct result, covering promotion choice, castling, en passant, checkmate, stalemate and automatic draws |
-| 2. Technical        | Owner               | Board, move list, side selection, FEN load/copy, engine profile and limits, live search info, UCI transcript, legal-move highlighting | Any valid FEN can be loaded and played from; an invalid FEN is rejected with a reason; live depth/score/nodes/PV shown                                      |
-| 3. Play             | Daughter, beginners | Simple controls, understandable difficulty choice, technical detail hidden, takebacks, hints                                          | A beginner can win against the easiest setting, and use hints and takebacks without help                                                                    |
+| Milestone           | Audience            | Scope                                                                                                                                 | Done when                                                                                                                                                                                                  |
+| ------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Initial gameplay | Owner               | Raw UI, standard start, human vs StratChess, depth/time limit, LAN access, pairing                                                    | A full game played from a phone finishes with the correct result, covering promotion choice, castling, en passant, checkmate, stalemate and automatic draws                                                |
+| 2. Technical        | Owner               | Board, move list, side selection, FEN load/copy, engine profile and limits, live search info, UCI transcript, legal-move highlighting | Any valid FEN can be loaded and played from; an invalid FEN is rejected with a reason; live depth/score/nodes/PV shown; promotion, stalemate and automatic draws confirmed from a phone (deferred from M1) |
+| 3. Play             | Daughter, beginners | Simple controls, understandable difficulty choice, technical detail hidden, takebacks, hints                                          | A beginner can win against the easiest setting, and use hints and takebacks without help                                                                                                                   |
 
 M2 and M3 are two views of one app, sharing game and engine handling. No configurable dashboard.
 
