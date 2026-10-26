@@ -45,9 +45,9 @@ change could fail; a docs-only change needs lint at most.
 
 - **Every task that changes files starts in a Claude-managed worktree**: `EnterWorktree` named
   after the issue (`issue-23-handshake-timeout`), which branches fresh from `origin/main` into
-  `.claude/worktrees/<name>`; a session launched in one already has it. Then `npm ci`: without it
-  the worktree resolves packages from the main checkout's `node_modules`, which may predate the
-  lockfile. PRs target `main`.
+  `.claude/worktrees/<name>`; a session launched in one already has it. Then `npm ci`: a new worktree
+  has no `node_modules`, and Node falls back to the main checkout's root one, which lacks the
+  workspace packages' own dependencies. PRs target `main`.
 - **One slice per session.** An issue split into PRs ends the session at each PR with a one-line
   start prompt for the next (issue, what landed, what is next, cleanup due).
 - **Design first** when a decision could reasonably go more than one way and affects the protocol,
