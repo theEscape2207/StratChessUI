@@ -9,10 +9,14 @@ import {
   type GameState,
   type NewGameRequest,
   type SearchLimit,
+  type SearchUpdate,
   type ServerMessage,
 } from '@stratchess-ui/shared';
 import type { EngineProfile } from '../engines/profiles.ts';
 import { EngineError, SearchCancelledError, UciEngine, type Timeouts } from '../uci/engine.ts';
+import type { SearchInfo } from '../uci/protocol.ts';
+import { searchReport } from './search-report.ts';
+import { Throttle } from './throttle.ts';
 
 export type SessionOptions = {
   profiles: readonly EngineProfile[];
@@ -28,9 +32,12 @@ type Game = {
   positions: string[];
   limit: SearchLimit;
   engine?: UciEngine;
+  /** The last search line sent, resent to a browser that reattaches. */
+  search?: SearchUpdate;
 };
 
 const TRANSCRIPT_TAIL = 20;
+const REPORT_INTERVAL_MS = 100;
 
 export class GameSession {
   private readonly options: SessionOptions;
@@ -43,6 +50,10 @@ export class GameSession {
 
   get state(): GameState | undefined {
     return this.game?.state;
+  }
+
+  get search(): SearchUpdate | undefined {
+    return this.game?.search;
   }
 
   /**
@@ -117,18 +128,28 @@ export class GameSession {
   }
 
   private async engineMove(game: Game): Promise<void> {
+    const fen = game.state.fen;
+    const feed = new Throttle<SearchInfo>(
+      (info) => this.report(game, fen, info),
+      REPORT_INTERVAL_MS,
+    );
     let bestMove: string;
     try {
       // The whole game rather than the position alone, so the engine can see repetitions.
-      ({ bestMove } = await game.engine!.search({
-        fen: game.state.startFen,
-        moves: game.state.moves,
-        limit: game.limit,
-      }));
+      ({ bestMove } = await game.engine!.search(
+        { fen: game.state.startFen, moves: game.state.moves, limit: game.limit },
+        (info) => {
+          // A line without a score (a future currmove line) would blank the display.
+          if (info.score) feed.push(info);
+        },
+      ));
     } catch (error) {
+      feed.cancel();
       if (!(error instanceof SearchCancelledError)) this.fail(game, error);
       return;
     }
+    // The final line goes out before the move it led to.
+    feed.flush();
     if (this.game !== game) return;
     // The engine is not trusted: its move goes through the same rules as the human's.
     const result = applyUciMove(game.state.fen, bestMove);
@@ -158,6 +179,12 @@ export class GameSession {
     const engine = this.game?.engine;
     this.game = undefined;
     void engine?.quit();
+  }
+
+  private report(game: Game, fen: string, info: SearchInfo): void {
+    if (this.game !== game) return;
+    game.search = { fen, info: searchReport(fen, info) };
+    this.options.send({ type: 'search', ...game.search });
   }
 
   private publish(game: Game): void {

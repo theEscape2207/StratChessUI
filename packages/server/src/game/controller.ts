@@ -48,6 +48,8 @@ export class Controller {
     connection.send({ type: 'hello', engines });
     const game = this.session.state;
     if (game) connection.send({ type: 'game', game });
+    const search = this.session.search;
+    if (search) connection.send({ type: 'search', ...search });
   }
 
   /** Messages from a connection that has been replaced are dropped. */

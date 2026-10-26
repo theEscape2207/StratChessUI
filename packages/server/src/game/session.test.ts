@@ -52,8 +52,20 @@ function open(timeouts = TIMEOUTS) {
         return msg.game;
     }
   };
-  return { session, next, settled, logged };
+  /** Every message up to and including the next settled game state. */
+  const untilSettled = async (): Promise<ServerMessage[]> => {
+    const messages: ServerMessage[] = [];
+    for (;;) {
+      const msg = await next();
+      messages.push(msg);
+      if (msg.type === 'game' && msg.game.phase !== 'starting' && msg.game.phase !== 'thinking')
+        return messages;
+    }
+  };
+  return { session, next, settled, untilSettled, logged };
 }
+
+const searches = (messages: ServerMessage[]) => messages.filter((m) => m.type === 'search');
 
 const game = (engineId: string, humanColor: NewGameRequest['humanColor']): NewGameRequest => ({
   engineId,
@@ -224,6 +236,74 @@ describe('GameSession', () => {
     await next(); // thinking
     // Only the new game's engine answers; the replaced one was stopped with its game.
     expect(await settled()).toMatchObject({ humanColor: 'white', lastMove: 'a7a5' });
+  });
+
+  describe('search info', () => {
+    it("reports the engine's search as white sees it, PV in SAN, when the engine is white", async () => {
+      const { session, untilSettled } = open();
+      void session.newGame(game('legal', 'black'));
+      const messages = await untilSettled();
+      const reports = searches(messages);
+      expect(reports[0]).toEqual({
+        type: 'search',
+        fen: START_FEN,
+        info: { depth: 1, seldepth: 1, score: { cp: 36 }, nodes: 20, nps: 20000, pv: ['e4'] },
+      });
+      // The final line, sent before the move it led to.
+      expect(messages.at(-2)).toEqual({
+        type: 'search',
+        fen: START_FEN,
+        info: {
+          depth: 3,
+          seldepth: 7,
+          score: { cp: 29 },
+          nodes: 798,
+          nps: 798000,
+          pv: ['d4', 'd5', 'Nf3'],
+        },
+      });
+    });
+
+    it("reports the engine's search as white sees it, PV in SAN, when the engine is black", async () => {
+      const { session, settled, untilSettled } = open();
+      void session.newGame(game('legal', 'white'));
+      await settled();
+      session.move('e2e4');
+      const messages = await untilSettled();
+      const fen = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1';
+      expect(searches(messages)[0]).toEqual({
+        type: 'search',
+        fen,
+        info: { depth: 1, seldepth: 1, score: { cp: -36 }, nodes: 20, nps: 20000, pv: ['a5'] },
+      });
+      expect(messages.at(-2)).toEqual({
+        type: 'search',
+        fen,
+        info: {
+          depth: 3,
+          seldepth: 7,
+          score: { cp: -29 },
+          nodes: 798,
+          nps: 798000,
+          pv: ['a5', 'Na3', 'a4'],
+        },
+      });
+    });
+
+    it('forwards nothing from a search a new game cancelled', async () => {
+      const { session, next, untilSettled } = open();
+      // A move-time search: the fake reports its iterations at once, then sleeps until stopped.
+      void session.newGame({ ...game('legal', 'black'), limit: { movetimeMs: 60_000 } });
+      let msg: ServerMessage;
+      do msg = await next();
+      while (msg.type !== 'search');
+
+      void session.newGame(game('legal', 'white'));
+      const messages = await untilSettled();
+      expect(messages[0]).toMatchObject({ game: { phase: 'starting', humanColor: 'white' } });
+      expect(searches(messages)).toEqual([]);
+      expect(session.search).toBeUndefined();
+    });
   });
 
   describe('from a FEN', () => {

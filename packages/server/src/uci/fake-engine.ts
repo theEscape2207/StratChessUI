@@ -1,4 +1,4 @@
-// A stand-in UCI engine for tests, replaying lines recorded from StratChess (main, 2026-10-25).
+// A stand-in UCI engine for tests, replaying lines recorded from StratChess (main, 2026-10-26).
 // Run as `node fake-engine.ts [--mode=<mode>]`. Modes:
 //   normal          behaves like StratChess
 //   no-uciok        never finishes the handshake
@@ -20,13 +20,13 @@ const HANDSHAKE = [
 ];
 
 const SEARCH = [
-  'info depth 1 score cp 35 nodes 34 hashfull 0 time 0 pv d2d4',
-  'info depth 2 score cp 18 nodes 173 hashfull 0 time 0 pv d2d4 d7d6',
-  'info depth 3 score cp 25 nodes 2136 hashfull 0 time 1 pv b1c3 b8c6 f1c4',
+  'info depth 1 seldepth 1 score cp 36 nodes 20 nps 20000 hashfull 0 time 0 pv e2e4',
+  'info depth 2 seldepth 4 score cp 0 nodes 95 nps 95000 hashfull 0 time 0 pv e2e4 e7e5',
+  'info depth 3 seldepth 7 score cp 29 nodes 798 nps 798000 hashfull 0 time 0 pv d2d4 d7d5 g1f3',
 ];
 const SEARCH_END = [
-  'info depth 3 score cp 25 nodes 2136 hashfull 0 time 1 pv b1c3',
-  'info string treenodes main 1800 qs 336',
+  'info depth 3 seldepth 7 score cp 29 nodes 798 nps 798000 hashfull 0 time 0 pv d2d4 d7d5 g1f3',
+  'info string treenodes main 751 qs 47',
 ];
 
 const STALEMATE = '7k/5Q2/6K1/8/8/8/8/8 b - - 0 1';
@@ -40,7 +40,7 @@ function finishSearch() {
   if (!searching) return;
   clearTimeout(searching.timer);
   searching = undefined;
-  SEARCH_END.forEach(out);
+  SEARCH_END.map(withLegalPv).forEach(out);
   // Encodes the position it searched, so tests can tell which search a bestmove belongs to.
   if (position.includes(STALEMATE)) out('bestmove 0000');
   else if (mode === 'legal') out(`bestmove ${firstLegalMove(position)}`);
@@ -69,15 +69,38 @@ function castlesOntoRook(fen: string, move: string): boolean {
   return (from === 'K' && to === 'R') || (from === 'k' && to === 'r');
 }
 
+/**
+ * The recorded PVs are from the start position; elsewhere a line's PV becomes as many first legal
+ * moves in a row, so the PV a test sees is always legal from the position searched.
+ */
+function withLegalPv(line: string): string {
+  const [head, pv] = line.split(' pv ');
+  const replayed = replay(position);
+  if (pv === undefined || 'illegal' in replayed || replayed.fen === START_FEN) return line;
+  let fen = replayed.fen;
+  const moves: string[] = [];
+  const plies = pv.split(' ').length;
+  while (moves.length < plies) {
+    const move = firstLegalMoveFrom(fen);
+    if (!move) break;
+    moves.push(move);
+    fen = (applyUciMove(fen, move) as { fen: string }).fen;
+  }
+  return moves.length ? `${head} pv ${moves.join(' ')}` : head!;
+}
+
 function firstLegalMove(command: string): string {
   const replayed = replay(command);
   if ('illegal' in replayed) return '0000';
-  const fen = replayed.fen;
+  return firstLegalMoveFrom(replayed.fen) ?? '0000';
+}
+
+function firstLegalMoveFrom(fen: string): string | undefined {
   for (const [from, dests] of legalDests(fen)) {
     const move = `${from}${dests[0]}`;
     return applyUciMove(fen, move).ok ? move : `${move}q`;
   }
-  return '0000';
+  return undefined;
 }
 
 createInterface({ input: process.stdin }).on('line', (line) => {
@@ -111,7 +134,7 @@ createInterface({ input: process.stdin }).on('line', (line) => {
     }
     case 'go': {
       if (mode === 'crash-on-go') process.exit(3);
-      SEARCH.forEach(out);
+      SEARCH.map(withLegalPv).forEach(out);
       searching = {};
       const movetime = /movetime (\d+)/.exec(line);
       if (mode === 'ignore-stop') break;

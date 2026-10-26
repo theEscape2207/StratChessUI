@@ -1,10 +1,16 @@
 import { useState } from 'react';
-import { START_FEN, type EngineChoice, type GameState } from '@stratchess-ui/shared';
+import {
+  START_FEN,
+  type EngineChoice,
+  type GameState,
+  type SearchUpdate,
+} from '@stratchess-ui/shared';
 import { Board } from './Board.tsx';
 import { CopyFen } from './CopyFen.tsx';
 import { MoveList } from './MoveList.tsx';
 import { NewGameForm } from './NewGameForm.tsx';
 import { PairForm } from './PairForm.tsx';
+import { SearchInfo } from './SearchInfo.tsx';
 import { useGameSocket, type Link } from './useGameSocket.ts';
 
 const TOKEN_KEY = 'pairing-token';
@@ -69,12 +75,14 @@ export function App() {
 function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) {
   const [engines, setEngines] = useState<EngineChoice[]>();
   const [game, setGame] = useState<GameState>();
+  const [search, setSearch] = useState<SearchUpdate>();
   const [notice, setNotice] = useState('');
   const [revision, setRevision] = useState(0);
   const { link, send, retry } = useGameSocket(
     token,
     (msg) => {
       if (msg.type === 'hello') return setEngines(msg.engines);
+      if (msg.type === 'search') return setSearch({ fen: msg.fen, info: msg.info });
       if (msg.type === 'error') {
         setNotice(msg.reason);
         // Redraw the last server position to undo the board's optimistic move.
@@ -83,6 +91,9 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
       }
       setNotice('');
       setGame(msg.game);
+      // The last search stays up until the engine starts on another position.
+      const { phase, fen } = msg.game;
+      if (phase === 'thinking') setSearch((last) => (last?.fen === fen ? last : undefined));
     },
     onUnpaired,
   );
@@ -108,6 +119,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
             {link === 'busy' ? 'Try again' : 'Play here'}
           </button>
         )}
+        {game && search && <SearchInfo fen={search.fen} info={search.info} />}
         {notice && (
           <p className="status notice" data-testid="notice">
             {notice}
@@ -123,6 +135,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
             onStart={(request) => {
               // Until the new game arrives, the old one's status must not pass for it.
               setGame(undefined);
+              setSearch(undefined);
               send({ type: 'new-game', ...request });
             }}
           />

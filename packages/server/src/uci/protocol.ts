@@ -1,7 +1,7 @@
 // Pure UCI text handling: building commands safely and parsing engine output.
-import type { SearchLimit } from '@stratchess-ui/shared';
+import type { Score, SearchLimit } from '@stratchess-ui/shared';
 
-export type { SearchLimit };
+export type { Score, SearchLimit };
 
 /** Longest engine line kept; anything longer is truncated before parsing. */
 export const MAX_LINE_LENGTH = 16 * 1024;
@@ -66,8 +66,7 @@ export function parseOption(line: string): UciOption | undefined {
   return option;
 }
 
-export type Score = { cp: number } | { mate: number };
-
+/** As the engine reports it: scores from the side to move, the PV in UCI. */
 export type SearchInfo = {
   depth?: number;
   seldepth?: number;

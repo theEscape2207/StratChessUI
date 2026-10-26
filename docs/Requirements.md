@@ -91,10 +91,10 @@ progress`). The controller must send `stop` and wait for `bestmove` before the n
   No `ponder`, `mate` or `searchmoves`.
 - Options: Threads, Hash, plus tuning options from `SearchTuning.def`. No MultiPV, Chess960 or
   strength limiting.
-- Per-iteration info: `depth score nodes hashfull time pv`. No `nps`, `seldepth`, `currmove` or
+- Per-iteration info: `depth seldepth score nodes nps hashfull time pv`. No `currmove` or
   `multipv`.
 - Iteration nodes count the main thread only; the final line counts all threads and quiescence.
-- The final info line carries a one-move PV.
+- The final info line carries the full PV.
 - Engine-specific `info string` lines (`treenodes main N qs N`, search telemetry counters) can
   feed the StratChess statistics view later. TT and profile counters need instrumented builds; show
   them as unavailable, not zero.
