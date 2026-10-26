@@ -20,6 +20,14 @@ type Promotion = { fen: string; uci: string };
 
 const PROMOTION_ROLES = { queen: 'q', rook: 'r', bishop: 'b', knight: 'n' } as const;
 
+/** a1 is dark. Chessground's squares carry no colour of their own, so the stylesheet needs this. */
+const shade = (key: Key) => ((key.charCodeAt(0) + Number(key[1])) % 2 === 0 ? 'dark' : 'light');
+
+/** The last move's from and to squares. */
+function lastMoveSquares(uci: string | undefined): [Key, Key] | undefined {
+  return uci ? [uci.slice(0, 2) as Key, uci.slice(2, 4) as Key] : undefined;
+}
+
 /** Thin wrapper: Chessground is a view of the server's position, never the source of truth. */
 export function Board({ fen, lastMove, revision, orientation, movable, onMove }: BoardProps) {
   const element = useRef<HTMLDivElement>(null);
@@ -47,11 +55,13 @@ export function Board({ fen, lastMove, revision, orientation, movable, onMove }:
   }, []);
 
   useEffect(() => {
+    const squares = lastMoveSquares(lastMove);
     api.current?.set({
       fen: fen.split(' ')[0],
       orientation,
       turnColor: turn(fen),
-      lastMove: lastMove ? [lastMove.slice(0, 2) as Key, lastMove.slice(2, 4) as Key] : undefined,
+      lastMove: squares,
+      highlight: { custom: new Map(squares?.map((key) => [key, shade(key)])) },
       movable: { color: movable, dests: legalDests(fen) as Map<Key, Key[]> },
     });
   }, [fen, lastMove, revision, redraw, orientation, movable]);

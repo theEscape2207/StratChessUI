@@ -1,14 +1,19 @@
 body {
   margin: 0;
-  font-family: system-ui, sans-serif;
-  background: #f4f1ea;
-  color: #222;
+  font: var(--text-body);
+  background: var(--bg);
+  color: var(--ink);
 }
 
 main {
-  max-width: 640px;
+  max-width: var(--board-max);
   margin: 0 auto;
-  padding: 16px;
+  padding: var(--space-5);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .board-frame {
@@ -20,19 +25,82 @@ main {
   aspect-ratio: 1;
 }
 
+/* The squares, drawn here in place of a theme image: a two-square tile, light at its top left,
+   which is a8 or h1 depending on orientation, both light. */
+.board cg-board {
+  background: repeating-conic-gradient(var(--board-dark) 0 25%, var(--board-light) 0 50%) 0 0 / 25%
+    25%;
+}
+
+.board cg-board square.last-move.light {
+  background-color: var(--highlight-light);
+}
+
+.board cg-board square.last-move.dark {
+  background-color: var(--highlight-dark);
+}
+
+.board cg-board square.selected {
+  background-color: var(--move-dest);
+}
+
+.board cg-board square.move-dest {
+  background: radial-gradient(var(--move-dest) 22%, transparent 23%);
+}
+
+.board cg-board square.oc.move-dest {
+  background: radial-gradient(transparent 80%, var(--move-dest) 0);
+}
+
+.board cg-board square.premove-dest {
+  background: radial-gradient(var(--premove) 22%, transparent 23%);
+}
+
+.board cg-board square.oc.premove-dest {
+  background: radial-gradient(transparent 80%, var(--premove) 0);
+}
+
+.board cg-board square.move-dest:hover,
+.board cg-board square.move-dest.hover {
+  background: var(--move-dest);
+}
+
+.board cg-board square.premove-dest:hover,
+.board cg-board square.premove-dest.hover,
+.board cg-board square.current-premove {
+  background: var(--premove);
+}
+
+.board cg-board square.check {
+  background: radial-gradient(ellipse at center, var(--check) 25%, transparent 89%);
+}
+
+/* About 80% of the square and raised off its bottom, so rank-1 file letters clear the pieces. */
+.board.cg-wrap piece {
+  background-size: 80%;
+  background-position: 50% 20%;
+  background-repeat: no-repeat;
+}
+
 /* Chessground's base stylesheet offsets the labels by fixed pixels that fit only lichess's own
    layout; on a fluid board they drift off their squares. Pin them inside the edge squares. */
+.board.cg-wrap coords {
+  font: var(--text-coord);
+  opacity: 1;
+}
+
 .board.cg-wrap coords coord {
   flex: 1 1 0;
 }
 
 .board.cg-wrap coords.ranks {
   top: 0;
-  left: 2px;
+  left: var(--space-1);
 }
 
 .board.cg-wrap coords.ranks coord {
   transform: none;
+  padding-top: var(--space-1);
 }
 
 .board.cg-wrap coords.files {
@@ -40,32 +108,50 @@ main {
   left: 0;
   /* Left-aligned: at a square's right edge a letter reads as the next square's. */
   text-align: left;
+  text-transform: none;
 }
 
 .board.cg-wrap coords.files coord {
-  padding-left: 2px;
+  padding-left: var(--space-1);
+}
+
+/* Each label in the other square's colour. The first rank and file label sits on a1 or h8, both
+   dark. */
+.board.orientation-white .ranks :nth-child(even),
+.board.orientation-white .files :nth-child(even),
+.board.orientation-black .ranks :nth-child(odd),
+.board.orientation-black .files :nth-child(odd) {
+  color: var(--board-dark);
+}
+
+.board.orientation-white .ranks :nth-child(odd),
+.board.orientation-white .files :nth-child(odd),
+.board.orientation-black .ranks :nth-child(even),
+.board.orientation-black .files :nth-child(even) {
+  color: var(--board-light);
 }
 
 /* Over the board; a tap outside the pieces cancels the move. */
 .promotion.cg-wrap {
   position: absolute;
   inset: 0;
-  z-index: 10;
+  z-index: var(--z-promotion);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 2%;
-  background: rgb(0 0 0 / 45%);
+  background: var(--scrim);
 }
 
-.promotion button {
-  width: 22%;
+.promotion.cg-wrap button {
+  width: var(--promotion-piece);
   aspect-ratio: 1;
   padding: 4%;
   border: none;
-  border-radius: 50%;
-  background: #f4f1ea;
-  cursor: pointer;
+  border-radius: var(--radius-full);
+  background: var(--board-light);
+  box-shadow: none;
+  translate: none;
 }
 
 .promotion.cg-wrap piece {
@@ -76,43 +162,140 @@ main {
 }
 
 .status {
-  margin-top: 12px;
-  font-family: ui-monospace, monospace;
-  font-size: 0.85rem;
+  margin: var(--space-4) 0 0;
+  font: var(--text-status);
   overflow-wrap: anywhere;
 }
 
 .notice {
-  color: #a02020;
+  color: var(--notice);
 }
 
 .result {
-  font-family: inherit;
-  font-size: 1.25rem;
-  font-weight: bold;
+  font: var(--text-result);
+}
+
+button {
+  min-height: var(--control-min-height);
+  padding: 0 var(--space-5);
+  border: none;
+  border-radius: var(--radius-md);
+  font: var(--text-button);
+  color: var(--ink);
+  background: var(--panel-raised);
+  box-shadow: var(--shadow-button-secondary);
+  cursor: pointer;
+}
+
+button.primary {
+  color: var(--on-accent);
+  background: var(--accent);
+  box-shadow: var(--shadow-button);
+}
+
+button.primary:hover {
+  background: var(--accent-hover);
+}
+
+/* Pressed, a button moves down onto its solid edge. */
+button:active {
+  translate: 0 2px;
+  box-shadow: none;
+}
+
+button.primary:active {
+  box-shadow: 0 2px 0 0 var(--accent-edge);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.status + button {
+  margin-top: var(--space-4);
 }
 
 .new-game {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--space-4);
   align-items: end;
+  margin-top: var(--space-6);
+  padding: var(--space-5);
+  border-radius: var(--radius-md);
+  background: var(--panel);
 }
 
-.new-game label {
+.new-game label,
+.new-game legend {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-}
-
-.new-game fieldset label {
-  flex-direction: row;
-  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
 }
 
 .new-game input,
-.new-game select,
-.new-game button {
-  font: inherit;
-  min-height: 2.25rem;
+.new-game select {
+  min-height: var(--control-min-height);
+  box-sizing: border-box;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-sm);
+  font: var(--text-body);
+  color: var(--ink);
+  background: var(--bg);
+}
+
+/* The side picker as a two-way segmented control; each radio covers its own segment. */
+.new-game fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.new-game legend {
+  padding: 0 0 var(--space-2);
+}
+
+.new-game fieldset label {
+  position: relative;
+  justify-content: center;
+  min-height: var(--control-min-height);
+  padding: 0 var(--space-5);
+  border: 1px solid var(--control-border);
+  font: var(--text-button);
+  text-transform: capitalize;
+  background: var(--bg);
+}
+
+.new-game fieldset label:first-of-type {
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+
+.new-game fieldset label:last-of-type {
+  border-left: none;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.new-game fieldset label:has(:checked) {
+  border-color: var(--accent);
+  color: var(--on-accent);
+  background: var(--accent);
+}
+
+.new-game fieldset label:has(:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.new-game fieldset input {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
 }
