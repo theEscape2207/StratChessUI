@@ -13,6 +13,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Docs-only PRs skip e2e. Filtering here rather than with paths-ignore keeps ci-result, the
+  # required check, reporting; a skipped need does not fail it.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT" != pull_request ] || git diff --name-only "origin/$BASE...HEAD" | grep -qv '\.md$'; then
+            echo code=true >> "$GITHUB_OUTPUT"
+          else
+            echo code=false >> "$GITHUB_OUTPUT"
+          fi
+
   check:
     name: Lint, typecheck, unit tests (${{ matrix.os }})
     strategy:
@@ -21,6 +43,8 @@ jobs:
         # Windows is the only host platform; Linux is the fast cross-check.
         os: [windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
+    # A green run takes about a minute; the default of 6 h lets a hung step (apt mirror) run on.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -34,7 +58,10 @@ jobs:
 
   e2e:
     name: Playwright
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -42,7 +69,9 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      # No --with-deps: the runner image already has the libraries Chromium needs (it ships
+      # Chrome), and the apt step can stall for minutes on a slow Ubuntu mirror.
+      - run: npx playwright install chromium
       - run: npm run e2e
       - uses: actions/upload-artifact@v7
         if: failure()
@@ -54,8 +83,9 @@ jobs:
   ci-result:
     name: ci-result
     if: always()
-    needs: [check, e2e]
+    needs: [changes, check, e2e]
     runs-on: ubuntu-latest
+    timeout-minutes: 2
     steps:
       - run: exit 1
         if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
