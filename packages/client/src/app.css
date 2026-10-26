@@ -106,13 +106,13 @@ main {
 .board.cg-wrap coords.files {
   bottom: 0;
   left: 0;
-  /* Left-aligned: at a square's right edge a letter reads as the next square's. */
-  text-align: left;
+  /* Bottom right, clear of the rank label in the corner square's top left. */
+  text-align: right;
   text-transform: none;
 }
 
 .board.cg-wrap coords.files coord {
-  padding-left: var(--space-1);
+  padding-right: var(--space-1);
 }
 
 /* Each label in the other square's colour. The first rank and file label sits on a1 or h8, both
