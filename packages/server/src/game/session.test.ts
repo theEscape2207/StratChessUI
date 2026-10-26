@@ -7,7 +7,8 @@ const PROFILES = ['legal', 'normal', 'crash-on-go', 'no-uciok'].map((mode) => ({
   ...fakeProfile(mode),
   id: mode,
 }));
-const TIMEOUTS = { handshakeMs: 300, readyMs: 1000, stopGraceMs: 300 };
+// A cold Node spawn of the fake can take well over 300 ms on a Windows CI runner.
+const TIMEOUTS = { handshakeMs: 2000, readyMs: 1000, stopGraceMs: 300 };
 
 let session: GameSession | undefined;
 afterEach(async () => {
@@ -16,13 +17,13 @@ afterEach(async () => {
 });
 
 /** A session whose messages queue up until a test waits for them. */
-function open() {
+function open(timeouts = TIMEOUTS) {
   const queue: ServerMessage[] = [];
   const waiting: ((m: ServerMessage) => void)[] = [];
   const logged: string[] = [];
   session = new GameSession({
     profiles: PROFILES,
-    timeouts: TIMEOUTS,
+    timeouts,
     log: (text) => logged.push(text),
     send: (msg) => {
       const resolve = waiting.shift();
@@ -59,7 +60,9 @@ describe('GameSession', () => {
     const { session, next, settled } = open();
     void session.newGame(game('legal', 'white'));
     expect(await next()).toMatchObject({ type: 'game', game: { phase: 'starting' } });
-    expect(await settled()).toMatchObject({ phase: 'human', humanColor: 'white' });
+    const started = await settled();
+    expect(started.reason).toBeUndefined();
+    expect(started).toMatchObject({ phase: 'human', humanColor: 'white' });
 
     // The fake answers its first legal move, which never defends f7.
     const replies: string[] = [];
@@ -169,7 +172,7 @@ describe('GameSession', () => {
   });
 
   it('ends the game with a reason when the engine does not start', async () => {
-    const { session, settled } = open();
+    const { session, settled } = open({ ...TIMEOUTS, handshakeMs: 300 });
     void session.newGame(game('no-uciok', 'white'));
     expect((await settled()).reason).toMatch(/failed: timed out .* waiting for uciok/);
   });
