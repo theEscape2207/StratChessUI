@@ -175,6 +175,21 @@ main {
   font: var(--text-result);
 }
 
+.search p {
+  margin: var(--space-2) 0 0;
+  overflow-wrap: anywhere;
+}
+
+.search-stats {
+  font: var(--text-eval);
+  font-variant-numeric: tabular-nums;
+}
+
+.search-pv {
+  font: var(--text-pv);
+  color: var(--muted);
+}
+
 /* A phone stacks the move list between the board and the controls; a wide screen puts it beside
    both. The breakpoint is --board-max + --sidebar-width + the gap and padding. */
 .game {

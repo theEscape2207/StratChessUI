@@ -40,6 +40,25 @@ test('plays white against the engine, with the board locked while it thinks', as
   );
 });
 
+test("shows the engine's search while it thinks, and its last line after", async ({
+  page,
+  hasTouch,
+}) => {
+  // The move-time default: the fake reports its iterations at once, then sleeps out the time.
+  await page.getByRole('button', { name: 'New game' }).click();
+  await expect(page.getByTestId('status')).toHaveText('your move');
+  await expect(page.getByTestId('search')).toBeHidden();
+
+  await playMove(page, 'e2e4', hasTouch);
+  await expect(page.getByTestId('search-stats')).toHaveText('depth 3 · -0.25 · 2.1K nodes');
+  await expect(page.getByTestId('search-pv')).toHaveText('1… a5 2. Na3 a4');
+  await expect(page.getByTestId('status')).toHaveText(THINKING);
+
+  // The final line has a one-move PV, and it stays once the engine has moved.
+  await expect(page.getByTestId('status')).toHaveText('your move');
+  await expect(page.getByTestId('search-pv')).toHaveText('1… a5');
+});
+
 test('plays black: the engine opens and the board is flipped', async ({ page, hasTouch }) => {
   await newGame(page, 'black');
   await expect(page.getByTestId('fen')).toHaveText(

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { WebSocket } from 'ws';
-import { CLOSE_CODES, type ServerMessage } from '@stratchess-ui/shared';
+import { CLOSE_CODES, START_FEN, type ServerMessage } from '@stratchess-ui/shared';
 import { buildApp, type AppOptions } from './app.ts';
 import { Controller } from './game/controller.ts';
 import { memoryStore, Pairings, type PairingStore } from './pairing.ts';
@@ -111,7 +111,7 @@ describe('server', () => {
 
   it('offers its engines and plays a game over the socket', async () => {
     await build();
-    const { ws, next } = await connect(app, await pairedToken());
+    const { ws, next, yourMove } = await connect(app, await pairedToken());
     expect(await next()).toEqual({
       type: 'hello',
       engines: [{ id: 'fake', name: 'StratChess (fake)' }],
@@ -128,7 +128,8 @@ describe('server', () => {
     expect(await next()).toMatchObject({ type: 'game', game: { phase: 'human' } });
     ws.send(JSON.stringify({ type: 'move', uci: 'e2e4' }));
     expect(await next()).toMatchObject({ game: { phase: 'thinking', lastMove: 'e2e4' } });
-    expect(await next()).toMatchObject({ game: { phase: 'human', lastMove: 'a7a5' } });
+    expect(await next()).toMatchObject({ type: 'search', info: { depth: 1 } });
+    expect(await yourMove()).toMatchObject({ lastMove: 'a7a5' });
     ws.terminate();
   });
 
@@ -166,13 +167,19 @@ describe('server', () => {
     await build();
     const token = await pairedToken();
     const first = await connect(app, token);
-    first.ws.send(JSON.stringify(NEW_GAME));
+    first.ws.send(JSON.stringify({ ...NEW_GAME, humanColor: 'black' }));
     await first.yourMove();
 
     const second = await connect(app, token);
     expect(await first.closed).toBe(CLOSE_CODES.replaced);
     expect(await second.next()).toMatchObject({ type: 'hello' });
     expect(await second.next()).toMatchObject({ game: { phase: 'human' } });
+    // The engine's last line about its opening move, still shown on the new socket.
+    expect(await second.next()).toEqual({
+      type: 'search',
+      fen: START_FEN,
+      info: { depth: 3, score: { cp: 25 }, nodes: 2136, pv: ['Nc3'] },
+    });
   });
 
   it('resumes the game when the browser reconnects within the grace period', async () => {

@@ -49,9 +49,26 @@ export type GameState = {
   reason?: string;
 };
 
+export type Score = { cp: number } | { mate: number };
+
+/** One line of the engine's search, from white's perspective; absent fields were not reported. */
+export type SearchReport = {
+  depth?: number;
+  seldepth?: number;
+  score?: Score;
+  /** Set when the score is only a bound from an aspiration fail. */
+  bound?: 'lower' | 'upper';
+  nodes?: number;
+  nps?: number;
+  /** In SAN, cut at the first move that is not legal. */
+  pv?: string[];
+};
+
 export type ServerMessage =
   | { type: 'hello'; engines: EngineChoice[] }
   | { type: 'game'; game: GameState }
+  /** `fen` is the position searched, which the board has left once the engine moves. */
+  | { type: 'search'; fen: string; info: SearchReport }
   | { type: 'error'; reason: string };
 
 /** Why the server closed the game WebSocket; none of them is worth reconnecting for. */
