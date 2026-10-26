@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { START_FEN, type EngineChoice, type GameState } from '@stratchess-ui/shared';
 import { Board } from './Board.tsx';
+import { CopyFen } from './CopyFen.tsx';
 import { MoveList } from './MoveList.tsx';
 import { NewGameForm } from './NewGameForm.tsx';
 import { PairForm } from './PairForm.tsx';
@@ -86,12 +87,13 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
     onUnpaired,
   );
   const humanColor = game?.humanColor ?? 'white';
+  const fen = game?.fen ?? START_FEN;
 
   return (
     <main className="game">
       <div className="play">
         <Board
-          fen={game?.fen ?? START_FEN}
+          fen={fen}
           lastMove={game?.lastMove}
           revision={revision}
           orientation={humanColor}
@@ -112,11 +114,9 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
           </p>
         )}
       </div>
-      <MoveList moves={game?.moves ?? []} />
+      <MoveList startFen={game?.startFen ?? START_FEN} moves={game?.moves ?? []} />
       <div className="controls">
-        <p className="status" data-testid="fen">
-          {game?.fen ?? START_FEN}
-        </p>
+        <CopyFen fen={fen} />
         {engines && link === 'connected' && (
           <NewGameForm
             engines={engines}

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { applyUciMove, legalDests, outcome, START_FEN, turn } from './rules.ts';
+import {
+  applyUciMove,
+  legalDests,
+  outcome,
+  parseStartFen,
+  sanMoves,
+  START_FEN,
+  turn,
+} from './rules.ts';
 
 describe('rules', () => {
   it('lists the twenty opening moves', () => {
@@ -55,6 +63,43 @@ describe('rules', () => {
     const fen = 'r3k3/1P6/8/8/8/8/8/4K3 w - - 0 1';
     expect(applyUciMove(fen, 'b7a8n')).toMatchObject({ ok: true, fen: /^N3k3\//, uci: 'b7a8n' });
     expect(applyUciMove(fen, 'b7a8')).toEqual({ ok: false, reason: 'illegal move: b7a8' });
+  });
+
+  describe('parseStartFen', () => {
+    it('accepts a FEN, filling in missing fields and dropping an unusable en passant square', () => {
+      expect(parseStartFen(START_FEN)).toEqual({ ok: true, fen: START_FEN });
+      expect(parseStartFen(' 4k3/8/8/8/4P3/8/8/4K3 b KQ e3 7 40 ')).toEqual({
+        ok: true,
+        fen: '4k3/8/8/8/4P3/8/8/4K3 b - - 7 40',
+      });
+      expect(parseStartFen('4k3/8/8/8/8/8/8/4K2R b')).toEqual({
+        ok: true,
+        fen: '4k3/8/8/8/8/8/8/4K2R b - - 0 1',
+      });
+    });
+
+    it('rejects a malformed FEN or an illegal position with a reason', () => {
+      for (const [fen, reason] of [
+        ['', 'invalid FEN: empty'],
+        [
+          'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP w KQkq - 0 1',
+          'invalid FEN: the board part is malformed',
+        ],
+        [START_FEN.replace(' w ', ' x '), 'invalid FEN: the side to move must be w or b'],
+        [`${START_FEN} 9`, 'invalid FEN: not a FEN'],
+        ['8/8/8/8/8/8/8/8 w - - 0 1', 'illegal position: the board is empty'],
+        ['4k3/8/8/8/8/8/8/3KK3 w - - 0 1', 'illegal position: each side needs exactly one king'],
+        ['4k3/8/8/8/8/8/8/4RK2 w - - 0 1', 'illegal position: the side not to move is in check'],
+        ['P3k3/8/8/8/8/8/8/4K3 w - - 0 1', 'illegal position: a pawn is on the first or last rank'],
+      ]) {
+        expect(parseStartFen(fen!)).toEqual({ ok: false, reason });
+      }
+    });
+  });
+
+  it('gives SAN from the position a game started in', () => {
+    expect(sanMoves('4k3/8/8/8/4P3/8/8/4K3 b - - 0 40', ['e8d7', 'e4e5'])).toEqual(['Kd7', 'e5']);
+    expect(sanMoves('not a fen', ['e2e4'])).toEqual([]);
   });
 
   describe('outcome', () => {

@@ -1,6 +1,6 @@
-import { castlingSide, Chess } from 'chessops/chess';
+import { castlingSide, Chess, IllegalSetup } from 'chessops/chess';
 import { chessgroundDests } from 'chessops/compat';
-import { makeFen, parseFen } from 'chessops/fen';
+import { InvalidFen, makeFen, parseFen } from 'chessops/fen';
 import { makeSanAndPlay } from 'chessops/san';
 import { makeUci, opposite, parseUci } from 'chessops/util';
 import type { Color, Outcome } from './protocol.ts';
@@ -9,12 +9,46 @@ export const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0
 
 export type MoveResult = { ok: true; fen: string; uci: string } | { ok: false; reason: string };
 
+export type FenResult = { ok: true; fen: string } | { ok: false; reason: string };
+
+// chessops reports error codes; these are for the player.
+const FEN_ERRORS: Record<InvalidFen | IllegalSetup, string> = {
+  [InvalidFen.Fen]: 'not a FEN',
+  [InvalidFen.Board]: 'the board part is malformed',
+  [InvalidFen.Pockets]: 'the board part is malformed',
+  [InvalidFen.Turn]: 'the side to move must be w or b',
+  [InvalidFen.Castling]: 'the castling field is malformed',
+  [InvalidFen.EpSquare]: 'the en passant square is malformed',
+  [InvalidFen.RemainingChecks]: 'not a FEN',
+  [InvalidFen.Halfmoves]: 'the half-move clock is malformed',
+  [InvalidFen.Fullmoves]: 'the move number is malformed',
+  [IllegalSetup.Empty]: 'the board is empty',
+  [IllegalSetup.Kings]: 'each side needs exactly one king',
+  [IllegalSetup.OppositeCheck]: 'the side not to move is in check',
+  [IllegalSetup.PawnsOnBackrank]: 'a pawn is on the first or last rank',
+  [IllegalSetup.Variant]: 'not a standard chess position',
+};
+
 function positionFromFen(fen: string): Chess | string {
   const setup = parseFen(fen);
-  if (setup.isErr) return `invalid FEN: ${setup.error.message}`;
+  if (setup.isErr)
+    return `invalid FEN: ${FEN_ERRORS[setup.error.message as InvalidFen] ?? setup.error.message}`;
   const pos = Chess.fromSetup(setup.value);
-  if (pos.isErr) return `illegal position: ${pos.error.message}`;
+  if (pos.isErr)
+    return `illegal position: ${FEN_ERRORS[pos.error.message as IllegalSetup] ?? pos.error.message}`;
   return pos.value;
+}
+
+/**
+ * Checks a FEN a game may start from and returns it normalised: missing fields filled in,
+ * castling rights without their rooks and an en passant square no pawn can use dropped.
+ */
+export function parseStartFen(fen: string): FenResult {
+  const trimmed = fen.trim();
+  if (!trimmed) return { ok: false, reason: 'invalid FEN: empty' };
+  const pos = positionFromFen(trimmed);
+  if (typeof pos === 'string') return { ok: false, reason: pos };
+  return { ok: true, fen: makeFen(pos.toSetup()) };
 }
 
 /** Legal destinations per origin square, in the shape Chessground's `movable.dests` takes. */
@@ -40,9 +74,10 @@ export function applyUciMove(fen: string, uci: string): MoveResult {
   return { ok: true, fen: makeFen(pos.toSetup()), uci: standard };
 }
 
-/** The SAN of each move of a game from the start position, stopping at any illegal move. */
-export function sanMoves(moves: readonly string[]): string[] {
-  const pos = Chess.default();
+/** The SAN of each move of a game from `startFen`, stopping at any illegal move. */
+export function sanMoves(startFen: string, moves: readonly string[]): string[] {
+  const pos = positionFromFen(startFen);
+  if (typeof pos === 'string') return [];
   const sans: string[] = [];
   for (const uci of moves) {
     const move = parseUci(uci);
@@ -79,4 +114,9 @@ function repetitionKey(fen: string): string {
 
 export function turn(fen: string): Color {
   return fen.split(' ')[1] === 'b' ? 'black' : 'white';
+}
+
+export function moveNumber(fen: string): number {
+  const setup = parseFen(fen);
+  return setup.isOk ? setup.value.fullmoves : 1;
 }

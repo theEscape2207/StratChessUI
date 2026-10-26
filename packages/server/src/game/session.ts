@@ -3,6 +3,7 @@
 import {
   applyUciMove,
   outcome,
+  parseStartFen,
   START_FEN,
   turn,
   type GameState,
@@ -44,24 +45,34 @@ export class GameSession {
     return this.game?.state;
   }
 
-  /** Replaces any current game, starting the profile's engine and asking it to move if it is white. */
+  /**
+   * Replaces any current game, starting the profile's engine and asking it to move if it is to
+   * move. An invalid request leaves the current game as it was.
+   */
   async newGame(request: NewGameRequest): Promise<void> {
     const profile = this.options.profiles.find((p) => p.id === request.engineId);
     if (!profile) return this.error(`unknown engine: ${request.engineId}`);
+    const start = parseStartFen(request.fen ?? START_FEN);
+    if (!start.ok) return this.error(start.reason);
     this.endCurrent();
     const game: Game = {
       state: {
-        fen: START_FEN,
+        startFen: start.fen,
+        fen: start.fen,
         humanColor: request.humanColor,
         engineName: profile.name,
         phase: 'starting',
         moves: [],
       },
-      positions: [START_FEN],
+      positions: [start.fen],
       limit: request.limit,
     };
     this.game = game;
     this.publish(game);
+    // Decided before the engine starts: asked to move in a finished position, it would answer
+    // a null move, or fail to start for nothing.
+    const ended = outcome(game.positions);
+    if (ended) return this.finish(game, ended);
     let engine: UciEngine;
     try {
       engine = await UciEngine.start(profile, this.options.timeouts);
@@ -110,7 +121,7 @@ export class GameSession {
     try {
       // The whole game rather than the position alone, so the engine can see repetitions.
       ({ bestMove } = await game.engine!.search({
-        fen: START_FEN,
+        fen: game.state.startFen,
         moves: game.state.moves,
         limit: game.limit,
       }));

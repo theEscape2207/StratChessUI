@@ -158,3 +158,68 @@ for (const side of ['white', 'black'] as const) {
     }
   });
 }
+
+/** Starts a depth-limited game from `fen`, keeping the side the form picks for it. */
+async function newGameFrom(page: Page, fen: string) {
+  await page.getByLabel('Start position').fill(fen);
+  await page.getByRole('combobox', { name: 'Limit' }).selectOption('depth');
+  await page.getByRole('button', { name: 'New game' }).click();
+}
+
+const ENDING = '4k3/8/8/8/4P3/8/8/4K3 w - - 0 40';
+
+test('starts from a FEN as the side to move, numbering moves from it', async ({
+  page,
+  hasTouch,
+}) => {
+  await page.getByLabel('white').check();
+  await newGameFrom(page, ENDING.replace(' w ', ' b '));
+  await expect(page.getByLabel('black')).toBeChecked();
+  await expect(page.getByTestId('status')).toHaveText('your move');
+
+  await playAndAwaitReply(page, 'e8d7', hasTouch, 'black');
+  const moves = page.getByTestId('moves');
+  await expect(moves.locator('.number')).toHaveText(['40.', '41.']);
+  await expect(moves.locator('li').first()).toHaveText('40.…Kd7');
+  await expect(moves.locator('.white')).toHaveCount(1);
+});
+
+test('refuses an invalid FEN with a reason and keeps the current game', async ({ page }) => {
+  await newGame(page);
+  await newGameFrom(page, '4k3/8/8/8/8/8/8/4RK2 w - - 0 1');
+  await expect(page.getByTestId('fen-error')).toHaveText(
+    'illegal position: the side not to move is in check',
+  );
+  await expect(page.getByTestId('fen')).toHaveText(START);
+  await expect(page.getByTestId('status')).toHaveText('your move');
+});
+
+test('a FEN that is already mate ends the game at once', async ({ page }) => {
+  await newGameFrom(page, 'R5k1/5ppp/8/8/8/8/8/6K1 b - - 0 30');
+  await expect(page.getByTestId('status')).toHaveText('game over: white wins by checkmate');
+});
+
+test('copies the FEN through the Clipboard API', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await newGameFrom(page, ENDING);
+  await expect(page.getByTestId('status')).toHaveText('your move');
+  await page.getByRole('button', { name: 'Copy FEN' }).click();
+  await expect(page.getByTestId('copied')).toHaveText('Copied');
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(ENDING);
+});
+
+test('copies the FEN without the Clipboard API, as over plain HTTP', async ({ page }) => {
+  // localhost counts as a secure context; a LAN address does not, and there the API is missing.
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'isSecureContext', { value: false });
+    addEventListener('copy', (event) => {
+      document.documentElement.dataset.copied = (event.target as HTMLTextAreaElement).value;
+    });
+  });
+  await openSettled(page);
+  await newGameFrom(page, ENDING);
+  await expect(page.getByTestId('status')).toHaveText('your move');
+  await page.getByRole('button', { name: 'Copy FEN' }).click();
+  await expect(page.getByTestId('copied')).toHaveText('Copied');
+  await expect(page.locator('html')).toHaveAttribute('data-copied', ENDING);
+});

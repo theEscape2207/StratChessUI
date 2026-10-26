@@ -232,7 +232,19 @@ main {
   background: var(--row-alt);
 }
 
-.move-list .number {
+.move-list .number,
+.move-list .skipped {
+  color: var(--muted);
+}
+
+/* Selectable in one tap, for a browser that cannot copy on its own. */
+.fen {
+  -webkit-user-select: all;
+  user-select: all;
+}
+
+.copied {
+  margin-left: var(--space-4);
   color: var(--muted);
 }
 
@@ -294,6 +306,16 @@ button:disabled {
   flex-direction: column;
   gap: var(--space-2);
   font-weight: 600;
+}
+
+.new-game .fen-field,
+.new-game .fen-error {
+  flex-basis: 100%;
+}
+
+.new-game .fen-error {
+  margin: 0;
+  font: var(--text-status);
 }
 
 .new-game input,

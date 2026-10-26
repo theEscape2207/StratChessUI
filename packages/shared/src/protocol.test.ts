@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseClientMessage } from './protocol.ts';
+import { MAX_FEN_LENGTH, parseClientMessage } from './protocol.ts';
 
 const newGame = (limit: unknown, humanColor: unknown = 'black') =>
   parseClientMessage(JSON.stringify({ type: 'new-game', humanColor, engineId: 'x', limit }));
@@ -20,5 +20,22 @@ describe('protocol', () => {
       expect(newGame(limit)).toBeUndefined();
     }
     expect(newGame({ depth: 5 }, 'red')).toBeUndefined();
+  });
+
+  it('passes a start FEN on for the server to check, refusing one far too long to be a FEN', () => {
+    const request = (fen: unknown) =>
+      parseClientMessage(
+        JSON.stringify({
+          type: 'new-game',
+          humanColor: 'white',
+          engineId: 'x',
+          limit: { depth: 1 },
+          fen,
+        }),
+      );
+    expect(request('anything')).toMatchObject({ fen: 'anything' });
+    expect(request('x'.repeat(MAX_FEN_LENGTH))).toMatchObject({ fen: 'x'.repeat(MAX_FEN_LENGTH) });
+    expect(request('x'.repeat(MAX_FEN_LENGTH + 1))).toBeUndefined();
+    expect(request(42)).toBeUndefined();
   });
 });

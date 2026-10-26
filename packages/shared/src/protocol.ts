@@ -10,7 +10,16 @@ export const LIMIT_RANGES = {
   movetimeMs: { min: 100, max: 60_000 },
 };
 
-export type NewGameRequest = { humanColor: Color; engineId: string; limit: SearchLimit };
+/** A FEN is about 90 characters at most; anything far longer is not one. */
+export const MAX_FEN_LENGTH = 128;
+
+/** Without a `fen`, the game starts from the standard position. */
+export type NewGameRequest = {
+  humanColor: Color;
+  engineId: string;
+  limit: SearchLimit;
+  fen?: string;
+};
 
 export type ClientMessage = { type: 'move'; uci: string } | ({ type: 'new-game' } & NewGameRequest);
 
@@ -24,8 +33,10 @@ export type Termination =
 export type Outcome = { result: Color | 'draw'; termination: Termination };
 
 export type GameState = {
+  /** The position the game started from, normalised. */
+  startFen: string;
   fen: string;
-  /** The game so far from the start position, in standard UCI. */
+  /** The game so far from `startFen`, in standard UCI. */
   moves: string[];
   lastMove?: string;
   humanColor: Color;
@@ -70,7 +81,10 @@ export function parseClientMessage(raw: string): ClientMessage | undefined {
   const limit = parseLimit(msg.limit);
   if (msg.humanColor !== 'white' && msg.humanColor !== 'black') return undefined;
   if (typeof msg.engineId !== 'string' || !limit) return undefined;
-  return { type: 'new-game', humanColor: msg.humanColor, engineId: msg.engineId, limit };
+  const request: NewGameRequest = { humanColor: msg.humanColor, engineId: msg.engineId, limit };
+  if (msg.fen === undefined) return { type: 'new-game', ...request };
+  if (typeof msg.fen !== 'string' || msg.fen.length > MAX_FEN_LENGTH) return undefined;
+  return { type: 'new-game', ...request, fen: msg.fen };
 }
 
 function parseLimit(value: unknown): SearchLimit | undefined {
