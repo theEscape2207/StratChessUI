@@ -7,7 +7,7 @@ from the clone.
 `--body "..."` run from Bash executes backtick spans and posts the mangled text publicly.
 
 - **Create**: `gh issue create --title "..." --body-file <path>`
-- **Read**: `gh issue view <number> --comments`
+- **Read**: `gh issue view <number> --json title,body,labels,comments`. Outside a terminal, `--comments` prints the comments without the body.
 - **List**: `gh issue list --state open --json number,title,labels` with `--label` filters as needed.
 - **Comment**: `gh issue comment <number> --body-file <path>`
 - **Labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
@@ -29,4 +29,4 @@ Create a GitHub issue.
 
 ## When a skill says "fetch the relevant ticket"
 
-Run `gh issue view <number> --comments`.
+Run `gh issue view <number> --json title,body,labels,comments`.
