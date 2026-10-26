@@ -45,7 +45,9 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      # No --with-deps: the runner image already has the libraries Chromium needs (it ships
+      # Chrome), and the apt step can stall for minutes on a slow Ubuntu mirror.
+      - run: npx playwright install chromium
       - run: npm run e2e
       - uses: actions/upload-artifact@v7
         if: failure()
