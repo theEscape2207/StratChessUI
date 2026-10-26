@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures.ts';
 import {
+  expectMoves,
   newGame,
   openSettled,
   playAndAwaitReply,
@@ -102,6 +103,10 @@ test('en passant, then promotion to a knight after a cancelled choice', async ({
   await expect(page.getByTestId('fen')).toHaveText(
     'Nnbqkbnr/3ppppp/8/8/8/pp3N2/P2PPPPP/RNBQKB1R w KQk - 0 8',
   );
+  await expectMoves(page, [
+    ...['c4', 'a5', 'c5', 'a4', 'b3', 'a3', 'Nf3', 'b5'],
+    ...['cxb6', 'c5', 'b7', 'c4', 'bxa8=N', 'cxb3'],
+  ]);
 });
 
 for (const [side, moves, fen] of [

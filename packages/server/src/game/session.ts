@@ -23,8 +23,6 @@ export type SessionOptions = {
 
 type Game = {
   state: GameState;
-  /** From the start position; the engine is sent the whole game on every search. */
-  moves: string[];
   /** Every position of the game as a FEN, for repetition. */
   positions: string[];
   limit: SearchLimit;
@@ -57,8 +55,8 @@ export class GameSession {
         humanColor: request.humanColor,
         engineName: profile.name,
         phase: 'starting',
+        moves: [],
       },
-      moves: [],
       positions: [START_FEN],
       limit: request.limit,
     };
@@ -93,9 +91,8 @@ export class GameSession {
   }
 
   private play(game: Game, uci: string, fen: string): void {
-    game.moves.push(uci);
     game.positions.push(fen);
-    game.state = { ...game.state, fen, lastMove: uci };
+    game.state = { ...game.state, fen, moves: [...game.state.moves, uci], lastMove: uci };
     this.nextTurn(game);
   }
 
@@ -111,9 +108,10 @@ export class GameSession {
   private async engineMove(game: Game): Promise<void> {
     let bestMove: string;
     try {
+      // The whole game rather than the position alone, so the engine can see repetitions.
       ({ bestMove } = await game.engine!.search({
         fen: START_FEN,
-        moves: game.moves,
+        moves: game.state.moves,
         limit: game.limit,
       }));
     } catch (error) {

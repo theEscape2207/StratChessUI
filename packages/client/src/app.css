@@ -175,6 +175,67 @@ main {
   font: var(--text-result);
 }
 
+/* A phone stacks the move list between the board and the controls; a wide screen puts it beside
+   both. The breakpoint is --board-max + --sidebar-width + the gap and padding. */
+.game {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'play' 'moves' 'controls';
+  align-items: start;
+}
+
+@media (min-width: 1000px) {
+  main.game {
+    max-width: calc(var(--board-max) + var(--space-6) + var(--sidebar-width));
+    grid-template-columns: minmax(0, var(--board-max)) var(--sidebar-width);
+    grid-template-rows: auto 1fr;
+    grid-template-areas: 'play moves' 'controls moves';
+    column-gap: var(--space-6);
+  }
+
+  main.game .move-list {
+    margin-top: 0;
+    max-height: var(--board-max);
+    overflow-y: auto;
+  }
+}
+
+.play {
+  grid-area: play;
+}
+
+.controls {
+  grid-area: controls;
+}
+
+.move-list {
+  grid-area: moves;
+  margin: var(--space-4) 0 0;
+  padding: var(--space-2) 0;
+  list-style: none;
+  font: var(--text-move);
+  background: var(--panel);
+  border-radius: var(--radius-md);
+}
+
+.move-list:empty {
+  display: none;
+}
+
+.move-list li {
+  display: grid;
+  grid-template-columns: 2.5em 1fr 1fr;
+  padding: var(--space-2) var(--space-4);
+}
+
+.move-list li:nth-child(even) {
+  background: var(--row-alt);
+}
+
+.move-list .number {
+  color: var(--muted);
+}
+
 button {
   min-height: var(--control-min-height);
   padding: 0 var(--space-5);

@@ -25,6 +25,8 @@ export type Outcome = { result: Color | 'draw'; termination: Termination };
 
 export type GameState = {
   fen: string;
+  /** The game so far from the start position, in standard UCI. */
+  moves: string[];
   lastMove?: string;
   humanColor: Color;
   engineName: string;

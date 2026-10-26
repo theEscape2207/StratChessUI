@@ -66,3 +66,8 @@ export async function playAndAwaitReply(page: Page, uci: string, touch: boolean,
     .toBe(true);
   await expect(page.getByTestId('status')).toHaveText('your move');
 }
+
+/** The move list shows exactly these moves in SAN, white's and black's in turn. */
+export async function expectMoves(page: Page, sans: string[]) {
+  await expect(page.getByTestId('moves').locator('.white, .black')).toHaveText(sans);
+}

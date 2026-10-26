@@ -1,6 +1,7 @@
 import { castlingSide, Chess } from 'chessops/chess';
 import { chessgroundDests } from 'chessops/compat';
 import { makeFen, parseFen } from 'chessops/fen';
+import { makeSanAndPlay } from 'chessops/san';
 import { makeUci, opposite, parseUci } from 'chessops/util';
 import type { Color, Outcome } from './protocol.ts';
 
@@ -37,6 +38,18 @@ export function applyUciMove(fen: string, uci: string): MoveResult {
   const standard = side ? `${uci.slice(0, 2)}${side === 'h' ? 'g' : 'c'}${uci[1]}` : makeUci(move);
   pos.play(move);
   return { ok: true, fen: makeFen(pos.toSetup()), uci: standard };
+}
+
+/** The SAN of each move of a game from the start position, stopping at any illegal move. */
+export function sanMoves(moves: readonly string[]): string[] {
+  const pos = Chess.default();
+  const sans: string[] = [];
+  for (const uci of moves) {
+    const move = parseUci(uci);
+    if (!move || !pos.isLegal(move)) break;
+    sans.push(makeSanAndPlay(pos, move));
+  }
+  return sans;
 }
 
 /**
