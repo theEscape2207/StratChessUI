@@ -21,6 +21,8 @@ jobs:
         # Windows is the only host platform; Linux is the fast cross-check.
         os: [windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
+    # A green run takes about a minute; the default of 6 h lets a hung step (apt mirror) run on.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -35,6 +37,7 @@ jobs:
   e2e:
     name: Playwright
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -56,6 +59,7 @@ jobs:
     if: always()
     needs: [check, e2e]
     runs-on: ubuntu-latest
+    timeout-minutes: 2
     steps:
       - run: exit 1
         if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
