@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 /**
  * The Clipboard API exists only in a secure context, which plain HTTP on the LAN is not; there the
@@ -33,19 +33,29 @@ async function copyText(text: string): Promise<boolean> {
 
 /** The current position as a FEN, with a button that copies it. */
 export function CopyFen({ fen }: { fen: string }) {
+  const text = useRef<HTMLParagraphElement>(null);
   const [copied, setCopied] = useState<{ fen: string; ok: boolean }>();
   // Feedback belongs to the FEN it was about; a move clears it.
   const feedback = copied?.fen === fen ? copied : undefined;
   return (
     <>
-      <p className="status fen" data-testid="fen">
+      <p className="status fen" data-testid="fen" ref={text}>
         {fen}
       </p>
-      <button type="button" onClick={() => void copyText(fen).then((ok) => setCopied({ fen, ok }))}>
+      <button
+        type="button"
+        onClick={() =>
+          void copyText(fen).then((ok) => {
+            // Left selected, the FEN is one tap on the system's own Copy away.
+            if (!ok && text.current) getSelection()?.selectAllChildren(text.current);
+            setCopied({ fen, ok });
+          })
+        }
+      >
         Copy FEN
       </button>
       <span className="copied" role="status" data-testid="copied">
-        {feedback && (feedback.ok ? 'Copied' : 'Select the FEN above and copy it')}
+        {feedback && (feedback.ok ? 'Copied' : 'Copy the selected FEN')}
       </span>
     </>
   );

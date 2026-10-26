@@ -1,6 +1,6 @@
-import { castlingSide, Chess } from 'chessops/chess';
+import { castlingSide, Chess, IllegalSetup } from 'chessops/chess';
 import { chessgroundDests } from 'chessops/compat';
-import { makeFen, parseFen } from 'chessops/fen';
+import { InvalidFen, makeFen, parseFen } from 'chessops/fen';
 import { makeSanAndPlay } from 'chessops/san';
 import { makeUci, opposite, parseUci } from 'chessops/util';
 import type { Color, Outcome } from './protocol.ts';
@@ -12,27 +12,30 @@ export type MoveResult = { ok: true; fen: string; uci: string } | { ok: false; r
 export type FenResult = { ok: true; fen: string } | { ok: false; reason: string };
 
 // chessops reports error codes; these are for the player.
-const FEN_ERRORS: Record<string, string> = {
-  ERR_FEN: 'not a FEN',
-  ERR_BOARD: 'the board part is malformed',
-  ERR_POCKETS: 'the board part is malformed',
-  ERR_TURN: 'the side to move must be w or b',
-  ERR_CASTLING: 'the castling field is malformed',
-  ERR_EP_SQUARE: 'the en passant square is malformed',
-  ERR_REMAINING_CHECKS: 'not a FEN',
-  ERR_HALFMOVES: 'the half-move clock is malformed',
-  ERR_FULLMOVES: 'the move number is malformed',
-  ERR_EMPTY: 'the board is empty',
-  ERR_KINGS: 'each side needs exactly one king',
-  ERR_OPPOSITE_CHECK: 'the side not to move is in check',
-  ERR_PAWNS_ON_BACKRANK: 'a pawn is on the first or last rank',
+const FEN_ERRORS: Record<InvalidFen | IllegalSetup, string> = {
+  [InvalidFen.Fen]: 'not a FEN',
+  [InvalidFen.Board]: 'the board part is malformed',
+  [InvalidFen.Pockets]: 'the board part is malformed',
+  [InvalidFen.Turn]: 'the side to move must be w or b',
+  [InvalidFen.Castling]: 'the castling field is malformed',
+  [InvalidFen.EpSquare]: 'the en passant square is malformed',
+  [InvalidFen.RemainingChecks]: 'not a FEN',
+  [InvalidFen.Halfmoves]: 'the half-move clock is malformed',
+  [InvalidFen.Fullmoves]: 'the move number is malformed',
+  [IllegalSetup.Empty]: 'the board is empty',
+  [IllegalSetup.Kings]: 'each side needs exactly one king',
+  [IllegalSetup.OppositeCheck]: 'the side not to move is in check',
+  [IllegalSetup.PawnsOnBackrank]: 'a pawn is on the first or last rank',
+  [IllegalSetup.Variant]: 'not a standard chess position',
 };
 
 function positionFromFen(fen: string): Chess | string {
   const setup = parseFen(fen);
-  if (setup.isErr) return `invalid FEN: ${FEN_ERRORS[setup.error.message] ?? setup.error.message}`;
+  if (setup.isErr)
+    return `invalid FEN: ${FEN_ERRORS[setup.error.message as InvalidFen] ?? setup.error.message}`;
   const pos = Chess.fromSetup(setup.value);
-  if (pos.isErr) return `illegal position: ${FEN_ERRORS[pos.error.message] ?? pos.error.message}`;
+  if (pos.isErr)
+    return `illegal position: ${FEN_ERRORS[pos.error.message as IllegalSetup] ?? pos.error.message}`;
   return pos.value;
 }
 
@@ -113,7 +116,7 @@ export function turn(fen: string): Color {
   return fen.split(' ')[1] === 'b' ? 'black' : 'white';
 }
 
-/** The full-move number of a normalised FEN. */
 export function moveNumber(fen: string): number {
-  return Number(fen.split(' ')[5] ?? 1);
+  const setup = parseFen(fen);
+  return setup.isOk ? setup.value.fullmoves : 1;
 }

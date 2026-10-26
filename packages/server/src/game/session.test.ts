@@ -252,6 +252,14 @@ describe('GameSession', () => {
       expect(state.fen).toMatch(/ w - - \d+ 42$/);
     });
 
+    it('sends the engine the FEN normalised, never as typed', async () => {
+      // The fake that crashes on go leaves its transcript, position command included, in the log.
+      const { session, settled, logged } = open();
+      void session.newGame({ ...game('crash-on-go', 'white'), fen: ENDING });
+      expect((await settled()).phase).toBe('over');
+      expect(logged[0]).toContain('> position fen 4k3/8/8/8/4P3/8/8/4K3 b - - 0 40');
+    });
+
     it('refuses an invalid FEN with a reason and keeps the current game', async () => {
       const { session, next, settled } = open();
       void session.newGame(game('legal', 'white'));

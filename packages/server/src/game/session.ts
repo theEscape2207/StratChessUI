@@ -69,7 +69,8 @@ export class GameSession {
     };
     this.game = game;
     this.publish(game);
-    // A position that is already over needs no engine.
+    // Decided before the engine starts: asked to move in a finished position, it would answer
+    // a null move, or fail to start for nothing.
     const ended = outcome(game.positions);
     if (ended) return this.finish(game, ended);
     let engine: UciEngine;
