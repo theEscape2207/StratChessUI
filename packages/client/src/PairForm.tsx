@@ -30,7 +30,9 @@ export function PairForm({ onPaired }: PairFormProps) {
           onChange={(e) => setCode(e.target.value)}
         />
       </label>
-      <button type="submit">Pair</button>
+      <button type="submit" className="primary">
+        Pair
+      </button>
       {notice && (
         <p className="status notice" data-testid="notice">
           {notice}

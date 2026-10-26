@@ -92,7 +92,9 @@ export function NewGameForm({ engines, onStart }: NewGameFormProps) {
           onChange={(e) => setValue(Number(e.target.value))}
         />
       </label>
-      <button type="submit">New game</button>
+      <button type="submit" className="primary">
+        New game
+      </button>
     </form>
   );
 }

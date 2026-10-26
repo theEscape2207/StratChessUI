@@ -15,6 +15,7 @@
   "scripts": {
     "build": "npm run build -w @stratchess-ui/client",
     "start": "npm run start -w @stratchess-ui/server",
+    "tokens": "node scripts/tokens-to-css.ts",
     "probe-engine": "node packages/server/src/tools/probe-engine.ts",
     "dev": "npm run dev -w @stratchess-ui/client",
     "typecheck": "tsc",

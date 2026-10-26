@@ -17,5 +17,5 @@
     "noUnusedParameters": true,
     "isolatedModules": true
   },
-  "include": ["packages/*/src", "packages/*/e2e", "packages/*/*.ts", "*.ts"]
+  "include": ["packages/*/src", "packages/*/e2e", "packages/*/*.ts", "scripts/*.ts", "*.ts"]
 }
