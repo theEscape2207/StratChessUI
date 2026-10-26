@@ -64,11 +64,13 @@ export type SearchReport = {
   pv?: string[];
 };
 
+/** A search line and the position searched, which the board has left once the engine moves. */
+export type SearchUpdate = { fen: string; info: SearchReport };
+
 export type ServerMessage =
   | { type: 'hello'; engines: EngineChoice[] }
   | { type: 'game'; game: GameState }
-  /** `fen` is the position searched, which the board has left once the engine moves. */
-  | { type: 'search'; fen: string; info: SearchReport }
+  | ({ type: 'search' } & SearchUpdate)
   | { type: 'error'; reason: string };
 
 /** Why the server closed the game WebSocket; none of them is worth reconnecting for. */

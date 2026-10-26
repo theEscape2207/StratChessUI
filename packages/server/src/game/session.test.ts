@@ -247,13 +247,20 @@ describe('GameSession', () => {
       expect(reports[0]).toEqual({
         type: 'search',
         fen: START_FEN,
-        info: { depth: 1, score: { cp: 35 }, nodes: 34, pv: ['d4'] },
+        info: { depth: 1, seldepth: 1, score: { cp: 36 }, nodes: 20, nps: 20000, pv: ['e4'] },
       });
       // The final line, sent before the move it led to.
       expect(messages.at(-2)).toEqual({
         type: 'search',
         fen: START_FEN,
-        info: { depth: 3, score: { cp: 25 }, nodes: 2136, pv: ['Nc3'] },
+        info: {
+          depth: 3,
+          seldepth: 7,
+          score: { cp: 29 },
+          nodes: 798,
+          nps: 798000,
+          pv: ['d4', 'd5', 'Nf3'],
+        },
       });
     });
 
@@ -267,12 +274,19 @@ describe('GameSession', () => {
       expect(searches(messages)[0]).toEqual({
         type: 'search',
         fen,
-        info: { depth: 1, score: { cp: -35 }, nodes: 34, pv: ['a5'] },
+        info: { depth: 1, seldepth: 1, score: { cp: -36 }, nodes: 20, nps: 20000, pv: ['a5'] },
       });
       expect(messages.at(-2)).toEqual({
         type: 'search',
         fen,
-        info: { depth: 3, score: { cp: -25 }, nodes: 2136, pv: ['a5'] },
+        info: {
+          depth: 3,
+          seldepth: 7,
+          score: { cp: -29 },
+          nodes: 798,
+          nps: 798000,
+          pv: ['a5', 'Na3', 'a4'],
+        },
       });
     });
 

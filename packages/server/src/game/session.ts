@@ -9,13 +9,14 @@ import {
   type GameState,
   type NewGameRequest,
   type SearchLimit,
-  type SearchReport,
+  type SearchUpdate,
   type ServerMessage,
 } from '@stratchess-ui/shared';
 import type { EngineProfile } from '../engines/profiles.ts';
 import { EngineError, SearchCancelledError, UciEngine, type Timeouts } from '../uci/engine.ts';
 import type { SearchInfo } from '../uci/protocol.ts';
-import { searchReport, Throttle } from './search-report.ts';
+import { searchReport } from './search-report.ts';
+import { Throttle } from './throttle.ts';
 
 export type SessionOptions = {
   profiles: readonly EngineProfile[];
@@ -32,10 +33,8 @@ type Game = {
   limit: SearchLimit;
   engine?: UciEngine;
   /** The last search line sent, resent to a browser that reattaches. */
-  search?: Search;
+  search?: SearchUpdate;
 };
-
-export type Search = { fen: string; info: SearchReport };
 
 const TRANSCRIPT_TAIL = 20;
 const REPORT_INTERVAL_MS = 100;
@@ -53,7 +52,7 @@ export class GameSession {
     return this.game?.state;
   }
 
-  get search(): Search | undefined {
+  get search(): SearchUpdate | undefined {
     return this.game?.search;
   }
 
@@ -140,6 +139,7 @@ export class GameSession {
       ({ bestMove } = await game.engine!.search(
         { fen: game.state.startFen, moves: game.state.moves, limit: game.limit },
         (info) => {
+          // A line without a score (a future currmove line) would blank the display.
           if (info.score) feed.push(info);
         },
       ));

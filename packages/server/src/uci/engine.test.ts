@@ -45,7 +45,7 @@ describe('UciEngine', () => {
     const result = await engine.search({ fen: START_FEN, limit: { depth: 3 } }, (i) =>
       depths.push(i.depth!),
     );
-    expect(result).toMatchObject({ bestMove: 'b1c3', info: { depth: 3, score: { cp: 25 } } });
+    expect(result).toMatchObject({ bestMove: 'b1c3', info: { depth: 3, score: { cp: 29 } } });
     expect(depths).toEqual([1, 2, 3, 3]);
     expect(engine.transcript()).toContain(`> position fen ${START_FEN}`);
     expect(engine.transcript()).toContain('> go depth 3');

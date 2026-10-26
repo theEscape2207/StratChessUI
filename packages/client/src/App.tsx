@@ -3,7 +3,7 @@ import {
   START_FEN,
   type EngineChoice,
   type GameState,
-  type SearchReport,
+  type SearchUpdate,
 } from '@stratchess-ui/shared';
 import { Board } from './Board.tsx';
 import { CopyFen } from './CopyFen.tsx';
@@ -75,7 +75,7 @@ export function App() {
 function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) {
   const [engines, setEngines] = useState<EngineChoice[]>();
   const [game, setGame] = useState<GameState>();
-  const [search, setSearch] = useState<{ fen: string; info: SearchReport }>();
+  const [search, setSearch] = useState<SearchUpdate>();
   const [notice, setNotice] = useState('');
   const [revision, setRevision] = useState(0);
   const { link, send, retry } = useGameSocket(
@@ -91,13 +91,14 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
       }
       setNotice('');
       setGame(msg.game);
+      // The last search stays up until the engine starts on another position.
+      const { phase, fen } = msg.game;
+      if (phase === 'thinking') setSearch((last) => (last?.fen === fen ? last : undefined));
     },
     onUnpaired,
   );
   const humanColor = game?.humanColor ?? 'white';
   const fen = game?.fen ?? START_FEN;
-  // The last search stays up until the engine starts on another position.
-  const stale = game?.phase === 'thinking' && search?.fen !== game.fen;
 
   return (
     <main className="game">
@@ -118,7 +119,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
             {link === 'busy' ? 'Try again' : 'Play here'}
           </button>
         )}
-        {game && search && !stale && <SearchInfo fen={search.fen} info={search.info} />}
+        {game && search && <SearchInfo fen={search.fen} info={search.info} />}
         {notice && (
           <p className="status notice" data-testid="notice">
             {notice}

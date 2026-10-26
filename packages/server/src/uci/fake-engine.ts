@@ -1,4 +1,4 @@
-// A stand-in UCI engine for tests, replaying lines recorded from StratChess (main, 2026-10-25).
+// A stand-in UCI engine for tests, replaying lines recorded from StratChess (main, 2026-10-26).
 // Run as `node fake-engine.ts [--mode=<mode>]`. Modes:
 //   normal          behaves like StratChess
 //   no-uciok        never finishes the handshake
@@ -20,13 +20,13 @@ const HANDSHAKE = [
 ];
 
 const SEARCH = [
-  'info depth 1 score cp 35 nodes 34 hashfull 0 time 0 pv d2d4',
-  'info depth 2 score cp 18 nodes 173 hashfull 0 time 0 pv d2d4 d7d6',
-  'info depth 3 score cp 25 nodes 2136 hashfull 0 time 1 pv b1c3 b8c6 f1c4',
+  'info depth 1 seldepth 1 score cp 36 nodes 20 nps 20000 hashfull 0 time 0 pv e2e4',
+  'info depth 2 seldepth 4 score cp 0 nodes 95 nps 95000 hashfull 0 time 0 pv e2e4 e7e5',
+  'info depth 3 seldepth 7 score cp 29 nodes 798 nps 798000 hashfull 0 time 0 pv d2d4 d7d5 g1f3',
 ];
 const SEARCH_END = [
-  'info depth 3 score cp 25 nodes 2136 hashfull 0 time 1 pv b1c3',
-  'info string treenodes main 1800 qs 336',
+  'info depth 3 seldepth 7 score cp 29 nodes 798 nps 798000 hashfull 0 time 0 pv d2d4 d7d5 g1f3',
+  'info string treenodes main 751 qs 47',
 ];
 
 const STALEMATE = '7k/5Q2/6K1/8/8/8/8/8 b - - 0 1';

@@ -178,7 +178,14 @@ describe('server', () => {
     expect(await second.next()).toEqual({
       type: 'search',
       fen: START_FEN,
-      info: { depth: 3, score: { cp: 25 }, nodes: 2136, pv: ['Nc3'] },
+      info: {
+        depth: 3,
+        seldepth: 7,
+        score: { cp: 29 },
+        nodes: 798,
+        nps: 798000,
+        pv: ['d4', 'd5', 'Nf3'],
+      },
     });
   });
 
