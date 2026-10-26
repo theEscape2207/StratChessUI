@@ -20,7 +20,8 @@ seen to fail. Later commits reach the PR with a plain `git push`.
 
 Wait with `gh pr checks <n> --watch`; right after creation it can report "no checks" before the
 run registers, so ask again. Green means **awaiting merge**: the owner merges on github.com, never
-`gh pr merge`.
+`gh pr merge`. When the owner verifies by hand (a game on the phone), give the worktree's full
+path and the command to run there, usually `npm run build && npm start`.
 
 ## 3. After the merge
 
@@ -28,12 +29,13 @@ Done when the PR reads `MERGED`, `main` is pulled, and the branch and worktree a
 
 1. `gh pr view <n> --json state` reads `MERGED`. Anything else: stop and tell the owner, because
    deleting an open PR's head branch closes the PR.
-2. Remove the worktree, by how it was made:
-   - **Claude-managed** (`.claude/worktrees/…`): `ExitWorktree` with `action: "remove"`. It asks
-     for `discard_changes: true` because the branch has commits its starting point lacks; after
-     step 1 nothing is lost. Do this first: a worktree-isolated session may not run git against
-     the main checkout.
-   - **Sibling** (`git worktree add`): `git worktree remove <path>`, run from the main checkout.
-3. In the main checkout: `git switch main`, `git pull --ff-only`, `git branch -d <branch>`.
-   GitHub deletes the remote branch on merge; `git ls-remote --heads origin <branch>` shows any
-   left over.
+2. Remove the worktree under `.claude/worktrees/`:
+   - **This session entered it:** `ExitWorktree` with `action: "remove"`. It asks for
+     `discard_changes: true` because the branch has commits its starting point lacks; after step 1
+     nothing is lost. Do this first: a worktree-isolated session may not run git against the main
+     checkout.
+   - **Otherwise** (a later session): `git worktree remove .claude/worktrees/<name>` from the main
+     checkout.
+3. In the main checkout: `git switch main`, `git pull --ff-only`, and `git branch -d <branch>` if
+   it is still there. GitHub deletes the remote branch on merge; check for a leftover with
+   `git ls-remote --heads origin <branch>`.
