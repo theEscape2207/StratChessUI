@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { START_FEN, type EngineChoice, type GameState } from '@stratchess-ui/shared';
 import { Board } from './Board.tsx';
+import { MoveList } from './MoveList.tsx';
 import { NewGameForm } from './NewGameForm.tsx';
 import { PairForm } from './PairForm.tsx';
 import { useGameSocket, type Link } from './useGameSocket.ts';
@@ -87,41 +88,46 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
   const humanColor = game?.humanColor ?? 'white';
 
   return (
-    <main>
-      <Board
-        fen={game?.fen ?? START_FEN}
-        lastMove={game?.lastMove}
-        revision={revision}
-        orientation={humanColor}
-        movable={link === 'connected' && game?.phase === 'human' ? humanColor : undefined}
-        onMove={(uci) => send({ type: 'move', uci })}
-      />
-      <p className={game?.phase === 'over' ? 'status result' : 'status'} data-testid="status">
-        {link === 'connected' ? describe(game) : LINK_STATUS[link]}
-      </p>
-      {(link === 'busy' || link === 'replaced') && (
-        <button type="button" onClick={retry}>
-          {link === 'busy' ? 'Try again' : 'Play here'}
-        </button>
-      )}
-      {notice && (
-        <p className="status notice" data-testid="notice">
-          {notice}
-        </p>
-      )}
-      <p className="status" data-testid="fen">
-        {game?.fen ?? START_FEN}
-      </p>
-      {engines && link === 'connected' && (
-        <NewGameForm
-          engines={engines}
-          onStart={(request) => {
-            // Until the new game arrives, the old one's status must not pass for it.
-            setGame(undefined);
-            send({ type: 'new-game', ...request });
-          }}
+    <main className="game">
+      <div className="play">
+        <Board
+          fen={game?.fen ?? START_FEN}
+          lastMove={game?.lastMove}
+          revision={revision}
+          orientation={humanColor}
+          movable={link === 'connected' && game?.phase === 'human' ? humanColor : undefined}
+          onMove={(uci) => send({ type: 'move', uci })}
         />
-      )}
+        <p className={game?.phase === 'over' ? 'status result' : 'status'} data-testid="status">
+          {link === 'connected' ? describe(game) : LINK_STATUS[link]}
+        </p>
+        {(link === 'busy' || link === 'replaced') && (
+          <button type="button" onClick={retry}>
+            {link === 'busy' ? 'Try again' : 'Play here'}
+          </button>
+        )}
+        {notice && (
+          <p className="status notice" data-testid="notice">
+            {notice}
+          </p>
+        )}
+      </div>
+      <MoveList moves={game?.moves ?? []} />
+      <div className="controls">
+        <p className="status" data-testid="fen">
+          {game?.fen ?? START_FEN}
+        </p>
+        {engines && link === 'connected' && (
+          <NewGameForm
+            engines={engines}
+            onStart={(request) => {
+              // Until the new game arrives, the old one's status must not pass for it.
+              setGame(undefined);
+              send({ type: 'new-game', ...request });
+            }}
+          />
+        )}
+      </div>
     </main>
   );
 }

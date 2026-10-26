@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import type { GameState, NewGameRequest, ServerMessage } from '@stratchess-ui/shared';
+import {
+  sanMoves,
+  type GameState,
+  type NewGameRequest,
+  type ServerMessage,
+} from '@stratchess-ui/shared';
 import { fakeProfile } from '../uci/fake-profile.ts';
 import { GameSession } from './session.ts';
 
@@ -133,6 +138,28 @@ describe('GameSession', () => {
     const state = await settled();
     expect(state.phase).toBe('human');
     expect(state.fen).toMatch(/\/RNBQ1RK1 w kq /);
+  });
+
+  it('reports the moves in order, castling, en passant and promotion included', async () => {
+    const { session, settled } = open();
+    void session.newGame(game('legal', 'white'));
+    await settled();
+    // Against the fake's first legal moves: c7c5 lands beside the b5 pawn, which takes it en
+    // passant, and the c-pawn then runs through to b8.
+    const line = ['b2b4', 'b4b5', 'g1f3', 'e2e3', 'f1e2', 'b5c6', 'e1h1', 'c6c7', 'c7b8q'];
+    let state: GameState | undefined;
+    for (const move of line) {
+      session.move(move);
+      state = await settled();
+    }
+    expect(state!.moves).toEqual([
+      ...['b2b4', 'a7a5', 'b4b5', 'a5a4', 'g1f3', 'a4a3', 'e2e3', 'b7b6', 'f1e2', 'c7c5'],
+      ...['b5c6', 'b6b5', 'e1g1', 'b5b4', 'c6c7', 'b4b3', 'c7b8q', 'b3a2'],
+    ]);
+    expect(sanMoves(state!.moves)).toEqual([
+      ...['b4', 'a5', 'b5', 'a4', 'Nf3', 'a3', 'e3', 'b6', 'Be2', 'c5'],
+      ...['bxc6', 'b5', 'O-O', 'b4', 'c7', 'b3', 'cxb8=Q', 'bxa2'],
+    ]);
   });
 
   it('refuses a move out of turn or against the rules', async () => {
