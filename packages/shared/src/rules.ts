@@ -9,12 +9,43 @@ export const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0
 
 export type MoveResult = { ok: true; fen: string; uci: string } | { ok: false; reason: string };
 
+export type FenResult = { ok: true; fen: string } | { ok: false; reason: string };
+
+// chessops reports error codes; these are for the player.
+const FEN_ERRORS: Record<string, string> = {
+  ERR_FEN: 'not a FEN',
+  ERR_BOARD: 'the board part is malformed',
+  ERR_POCKETS: 'the board part is malformed',
+  ERR_TURN: 'the side to move must be w or b',
+  ERR_CASTLING: 'the castling field is malformed',
+  ERR_EP_SQUARE: 'the en passant square is malformed',
+  ERR_REMAINING_CHECKS: 'not a FEN',
+  ERR_HALFMOVES: 'the half-move clock is malformed',
+  ERR_FULLMOVES: 'the move number is malformed',
+  ERR_EMPTY: 'the board is empty',
+  ERR_KINGS: 'each side needs exactly one king',
+  ERR_OPPOSITE_CHECK: 'the side not to move is in check',
+  ERR_PAWNS_ON_BACKRANK: 'a pawn is on the first or last rank',
+};
+
 function positionFromFen(fen: string): Chess | string {
   const setup = parseFen(fen);
-  if (setup.isErr) return `invalid FEN: ${setup.error.message}`;
+  if (setup.isErr) return `invalid FEN: ${FEN_ERRORS[setup.error.message] ?? setup.error.message}`;
   const pos = Chess.fromSetup(setup.value);
-  if (pos.isErr) return `illegal position: ${pos.error.message}`;
+  if (pos.isErr) return `illegal position: ${FEN_ERRORS[pos.error.message] ?? pos.error.message}`;
   return pos.value;
+}
+
+/**
+ * Checks a FEN a game may start from and returns it normalised: missing fields filled in,
+ * castling rights without their rooks and an en passant square no pawn can use dropped.
+ */
+export function parseStartFen(fen: string): FenResult {
+  const trimmed = fen.trim();
+  if (!trimmed) return { ok: false, reason: 'invalid FEN: empty' };
+  const pos = positionFromFen(trimmed);
+  if (typeof pos === 'string') return { ok: false, reason: pos };
+  return { ok: true, fen: makeFen(pos.toSetup()) };
 }
 
 /** Legal destinations per origin square, in the shape Chessground's `movable.dests` takes. */
@@ -40,9 +71,10 @@ export function applyUciMove(fen: string, uci: string): MoveResult {
   return { ok: true, fen: makeFen(pos.toSetup()), uci: standard };
 }
 
-/** The SAN of each move of a game from the start position, stopping at any illegal move. */
-export function sanMoves(moves: readonly string[]): string[] {
-  const pos = Chess.default();
+/** The SAN of each move of a game from `startFen`, stopping at any illegal move. */
+export function sanMoves(startFen: string, moves: readonly string[]): string[] {
+  const pos = positionFromFen(startFen);
+  if (typeof pos === 'string') return [];
   const sans: string[] = [];
   for (const uci of moves) {
     const move = parseUci(uci);
@@ -79,4 +111,9 @@ function repetitionKey(fen: string): string {
 
 export function turn(fen: string): Color {
   return fen.split(' ')[1] === 'b' ? 'black' : 'white';
+}
+
+/** The full-move number of a normalised FEN. */
+export function moveNumber(fen: string): number {
+  return Number(fen.split(' ')[5] ?? 1);
 }

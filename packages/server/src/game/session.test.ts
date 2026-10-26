@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   sanMoves,
+  START_FEN,
   type GameState,
   type NewGameRequest,
   type ServerMessage,
@@ -156,7 +157,7 @@ describe('GameSession', () => {
       ...['b2b4', 'a7a5', 'b4b5', 'a5a4', 'g1f3', 'a4a3', 'e2e3', 'b7b6', 'f1e2', 'c7c5'],
       ...['b5c6', 'b6b5', 'e1g1', 'b5b4', 'c6c7', 'b4b3', 'c7b8q', 'b3a2'],
     ]);
-    expect(sanMoves(state!.moves)).toEqual([
+    expect(sanMoves(START_FEN, state!.moves)).toEqual([
       ...['b4', 'a5', 'b5', 'a4', 'Nf3', 'a3', 'e3', 'b6', 'Be2', 'c5'],
       ...['bxc6', 'b5', 'O-O', 'b4', 'c7', 'b3', 'cxb8=Q', 'bxa2'],
     ]);
@@ -223,5 +224,64 @@ describe('GameSession', () => {
     await next(); // thinking
     // Only the new game's engine answers; the replaced one was stopped with its game.
     expect(await settled()).toMatchObject({ humanColor: 'white', lastMove: 'a7a5' });
+  });
+
+  describe('from a FEN', () => {
+    // A lone white pawn; e3 is no en passant square any black pawn could use.
+    const ENDING = '4k3/8/8/8/4P3/8/8/4K3 b - e3 0 40';
+
+    it('plays on from the position, the engine moving first when it is to move', async () => {
+      const { session, next, settled } = open();
+      void session.newGame({
+        ...game('legal', 'white'),
+        fen: `  ${ENDING}
+`,
+      });
+      expect(await next()).toMatchObject({
+        game: { phase: 'starting', startFen: '4k3/8/8/8/4P3/8/8/4K3 b - - 0 40' },
+      });
+      const started = await settled();
+      expect(started).toMatchObject({ phase: 'human', moves: [started.lastMove] });
+      expect(started.lastMove).toMatch(/^e8/);
+
+      // The fake replays the start FEN and the moves; from the standard position, e4e5 is illegal.
+      session.move('e4e5');
+      const state = await settled();
+      expect(state.phase).toBe('human');
+      expect(state.moves).toHaveLength(3);
+      expect(state.fen).toMatch(/ w - - \d+ 42$/);
+    });
+
+    it('refuses an invalid FEN with a reason and keeps the current game', async () => {
+      const { session, next, settled } = open();
+      void session.newGame(game('legal', 'white'));
+      await settled();
+      for (const [fen, reason] of [
+        ['not/a/fen', 'invalid FEN: the board part is malformed'],
+        ['4k3/8/8/8/8/8/8/8 w - - 0 1', 'illegal position: each side needs exactly one king'],
+        ['4k3/8/8/8/8/8/8/4RK2 w - - 0 1', 'illegal position: the side not to move is in check'],
+        ['', 'invalid FEN: empty'],
+      ]) {
+        void session.newGame({ ...game('legal', 'black'), fen });
+        expect(await next()).toEqual({ type: 'error', reason });
+      }
+      session.move('e2e4');
+      expect(await settled()).toMatchObject({ humanColor: 'white', lastMove: 'a7a5' });
+    });
+
+    it('ends a game that is already decided at once, without starting the engine', async () => {
+      // An engine that never completes its handshake would end the game with a failure instead.
+      const { session, next, logged } = open();
+      for (const [fen, ended] of [
+        ['R5k1/5ppp/8/8/8/8/8/6K1 b - - 0 30', { result: 'white', termination: 'checkmate' }],
+        ['7k/5Q2/6K1/8/8/8/8/8 b - - 0 60', { result: 'draw', termination: 'stalemate' }],
+        ['8/8/8/4k3/8/8/4K3/R7 w - - 100 80', { result: 'draw', termination: 'fifty-move rule' }],
+      ] as const) {
+        void session.newGame({ ...game('no-uciok', 'white'), fen });
+        expect(await next()).toMatchObject({ game: { phase: 'starting' } });
+        expect(await next()).toMatchObject({ game: { phase: 'over', ...ended } });
+      }
+      expect(logged).toEqual([]);
+    });
   });
 });

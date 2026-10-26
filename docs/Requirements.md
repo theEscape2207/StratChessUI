@@ -31,6 +31,8 @@ separate open-source repository, and has no commercial goal.
 - **Playing aids:** legal moves enforced from M1; legal-move highlighting in M2; takebacks and hints
   in M3.
 - **Positions:** standard start in M1; FEN input in M2, including positions copied from puzzle sites.
+  A loaded FEN preselects the side to move for the human (still changeable); an engine to move
+  starts at once.
 - **Distribution:** separate GitHub repository with CI; new dependencies acceptable; GPL-3.0, matching
   the engine.
 
@@ -149,8 +151,7 @@ in build tooling (Vite, ESLint, TypeScript) rather than in the chess or server c
 
 ## Open questions (later milestones)
 
-- **M2:** read-only transcript or manual UCI entry (manual entry can desync the controller)? Does
-  FEN load start engine play immediately? Does the human side default to the side to move? PGN
+- **M2:** read-only transcript or manual UCI entry (manual entry can desync the controller)? PGN
   export (recommended: retains page-bound games without a database).
 - **M3:** hint form (piece, move or line) and its engine/limit; takeback = one ply or back to the
   human's previous turn; resign and draw offers; how difficulty is named.
