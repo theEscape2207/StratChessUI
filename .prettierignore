@@ -4,3 +4,4 @@ test-results
 package-lock.json
 LICENSE
 packages/client/tokens.json
+docs/design/*/
