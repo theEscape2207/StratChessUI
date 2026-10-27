@@ -16,6 +16,7 @@ same design system. Piece images live in the design system and are hidden here.
 | [Transcript](Transcript/README.md)           | UCI transcript, above the toolbar      |
 | [EvalBar](EvalBar/README.md)                 | Evaluation bar beside the board        |
 | [PlayerStrip](PlayerStrip/README.md)         | Rows above and below the board         |
+| [GameOverDialog](GameOverDialog/README.md)   | Over the board when the game ends      |
 
 The design's game lifecycle: each stage shows only its own actions.
 

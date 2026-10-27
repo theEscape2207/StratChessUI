@@ -1,7 +1,7 @@
 import { Chessground } from '@lichess-org/chessground';
 import type { Api } from '@lichess-org/chessground/api';
 import type { Key } from '@lichess-org/chessground/types';
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react';
 import { legalDests, turn, type Color } from '@stratchess-ui/shared';
 
 type BoardProps = {
@@ -13,6 +13,8 @@ type BoardProps = {
   /** The side the user may move now; undefined locks the board. */
   movable?: Color;
   onMove: (uci: string) => void;
+  /** Drawn over the board, such as a dialog. */
+  children?: ReactNode;
 };
 
 /** A pawn move to the last rank, waiting for the user to pick a piece. */
@@ -29,7 +31,15 @@ function lastMoveSquares(uci: string | undefined): [Key, Key] | undefined {
 }
 
 /** Thin wrapper: Chessground is a view of the server's position, never the source of truth. */
-export function Board({ fen, lastMove, revision, orientation, movable, onMove }: BoardProps) {
+export function Board({
+  fen,
+  lastMove,
+  revision,
+  orientation,
+  movable,
+  onMove,
+  children,
+}: BoardProps) {
   const element = useRef<HTMLDivElement>(null);
   const api = useRef<Api | undefined>(undefined);
   const [promotion, setPromotion] = useState<Promotion>();
@@ -93,6 +103,7 @@ export function Board({ fen, lastMove, revision, orientation, movable, onMove }:
           ))}
         </div>
       )}
+      {children}
     </div>
   );
 }

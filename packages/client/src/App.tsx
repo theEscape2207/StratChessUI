@@ -13,6 +13,8 @@ import {
 import { Board } from './Board.tsx';
 import { CopyFen } from './CopyFen.tsx';
 import { EvalBar } from './EvalBar.tsx';
+import { GameOverDialog } from './GameOverDialog.tsx';
+import { gameOverText } from './gameover.ts';
 import { nextEval } from './eval.ts';
 import { MoveList } from './MoveList.tsx';
 import { NewGameForm } from './NewGameForm.tsx';
@@ -134,6 +136,10 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
   const [revision, setRevision] = useState(0);
   // Opened over a game in progress; with no game, or after one, the form shows anyway.
   const [formOpen, setFormOpen] = useState(false);
+  // Whether this page saw the current game in play, so a game already over at load opens no dialog.
+  const inPlay = useRef(false);
+  const [gameOverOpen, setGameOverOpen] = useState(false);
+  const newGameButton = useRef<HTMLButtonElement>(null);
   const fenText = useRef<HTMLParagraphElement>(null);
   const { link, send, retry } = useGameSocket(
     token,
@@ -157,6 +163,8 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
       setGame(msg.game);
       // The last search stays up until the engine starts on another position.
       const { phase, fen } = msg.game;
+      if (phase === 'over' && inPlay.current) setGameOverOpen(true);
+      inPlay.current = phase !== 'over';
       if (phase === 'thinking') setSearch((last) => (last?.fen === fen ? last : undefined));
     },
     onUnpaired,
@@ -182,7 +190,19 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
           orientation={humanColor}
           movable={link === 'connected' && game?.phase === 'human' ? humanColor : undefined}
           onMove={(uci) => send({ type: 'move', uci })}
-        />
+        >
+          {gameOverOpen && game?.phase === 'over' && (
+            <GameOverDialog
+              {...gameOverText(game)}
+              onClose={() => setGameOverOpen(false)}
+              onNewGame={() => {
+                setGameOverOpen(false);
+                // The form shows after a game, keeping the last settings: a rematch is one tap.
+                newGameButton.current?.focus();
+              }}
+            />
+          )}
+        </Board>
         {strips.human}
         <div className="play-info">
           <p className={game?.phase === 'over' ? 'status result' : 'status'} data-testid="status">
@@ -225,9 +245,13 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
               setSearch(undefined);
               setEvalScore(undefined);
               setFormOpen(false);
+              setGameOverOpen(false);
+              // A start position that is already over ends the game in its first state.
+              inPlay.current = true;
               send({ type: 'new-game', ...request });
             }}
             onCancel={playing ? () => setFormOpen(false) : undefined}
+            submitRef={newGameButton}
           />
         )}
         {/* Kept through a new game, so an open panel stays open; the server resets its lines. */}

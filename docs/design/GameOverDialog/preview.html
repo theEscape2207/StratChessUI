@@ -1,0 +1,49 @@
+<!-- @dsCard group="Screens" height=380 subtitle="Over the board when the game ends: result, a short summary, New game or Review" -->
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../../../packages/client/src/tokens.css"><style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: var(--bg); font-family: var(--font-sans); color: var(--ink); }
+  .frame { position: relative; width: min(348px, calc(100vw - 32px)); aspect-ratio: 1;
+    background: conic-gradient(var(--board-dark) 25%, var(--board-light) 0 50%, var(--board-dark) 0 75%, var(--board-light) 0) 0 0 / 25% 25%; }
+  .scrim { position: absolute; inset: 0; background: var(--scrim); display: grid; place-items: center; z-index: var(--z-promotion); }
+  .dialog { width: 88%; background: var(--panel); border-radius: var(--radius-md); overflow: hidden; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); }
+  .top { position: relative; padding: var(--space-5) var(--space-6) var(--space-4); background: var(--panel-raised); text-align: center; }
+  h2 { margin: 0; font-size: 20px; line-height: 26px; font-weight: 800; }
+  .by { margin-top: 2px; font: 400 0.85rem/20px var(--font-mono); color: var(--muted); }
+  .close { position: absolute; top: 4px; right: 4px; width: var(--control-min-height); height: var(--control-min-height); border: 0; background: none; color: var(--muted); border-radius: var(--radius-sm); }
+  .tally { display: grid; grid-template-columns: repeat(3, 1fr); padding: var(--space-4) var(--space-4) var(--space-3); text-align: center; }
+  .tally div { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); font-size: 12px; line-height: 16px; font-weight: 600; color: var(--muted); }
+  .c { display: flex; gap: 6px; align-items: center; color: var(--ink); font-size: 14px; font-weight: 700; }
+  .b { width: 18px; height: 18px; border-radius: var(--radius-full); display: grid; place-items: center; font: 800 10px/1 var(--font-sans); }
+  .best { background: var(--q-best); color: var(--on-accent); }
+  .exc { background: var(--q-excellent); color: var(--q-ink); }
+  .inacc { background: var(--q-inaccuracy); color: var(--q-ink); }
+  .actions { display: grid; gap: var(--space-3); padding: 0 var(--space-4) var(--space-4); }
+  .btn { font: 700 15px/20px var(--font-sans); min-height: var(--control-min-height); padding: 8px; border: 0; border-radius: var(--radius-md); }
+  .primary { background: var(--accent); color: var(--on-accent); box-shadow: var(--shadow-button); font-size: 17px; padding: 10px; margin-bottom: 4px; }
+  .secondary { background: var(--panel-raised); color: var(--ink); box-shadow: var(--shadow-button-secondary); }
+  .btn:focus-visible, .close:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; }
+</style></head>
+<body>
+  <div class="frame">
+    <div class="scrim">
+      <div class="dialog" role="dialog" aria-labelledby="t">
+        <div class="top">
+          <h2 id="t">You beat StratChess</h2>
+          <div class="by">1-0 · by checkmate</div>
+          <button class="close" aria-label="Close and review the game"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <div class="tally">
+          <div><span class="c"><span class="b best">★</span>5</span>Best</div>
+          <div><span class="c"><span class="b exc">!</span>2</span>Excellent</div>
+          <div><span class="c"><span class="b inacc">?!</span>0</span>Inaccuracy</div>
+        </div>
+        <div class="actions">
+          <button class="btn primary">New game</button>
+          <button class="btn secondary">Review game</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</body></html>

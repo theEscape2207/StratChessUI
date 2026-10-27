@@ -1,7 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ServerMessage } from '@stratchess-ui/shared';
 import { expect, test } from './fixtures.ts';
-import { newGame, openSettled, playAndAwaitReply } from './helpers.ts';
+import { newGame, openSettled, playAndAwaitReply, submitNewGame } from './helpers.ts';
 
 // GameScreen's breakpoint, the min-width of app.css's media query.
 const DESKTOP = 960;
@@ -46,7 +46,7 @@ test('during play the form hides behind New game, and comes back after game over
   // Fool's mate against the fake's a-pawn pushes takes too long; a mated start position ends it.
   await reveal(page).click();
   await page.getByLabel('Start position').fill('R5k1/5ppp/8/8/8/8/8/6K1 b - - 0 30');
-  await page.getByRole('button', { name: 'New game' }).click();
+  await submitNewGame(page);
   await expect(page.getByTestId('status')).toHaveText('game over: white wins by checkmate');
   await expect(form(page)).toBeVisible();
   await expect(reveal(page)).toBeHidden();

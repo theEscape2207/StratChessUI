@@ -40,6 +40,11 @@ export async function showNewGameForm(page: Page) {
   if (await reveal.isVisible()) await reveal.click();
 }
 
+/** The form's submit, not the game-over dialog's New game, which only opens the form. */
+export async function submitNewGame(page: Page) {
+  await page.locator('form.new-game').getByRole('button', { name: 'New game' }).click();
+}
+
 /**
  * Opens the app as the paired browser, waits until whatever game it resumes is idle, and opens the
  * new-game form.
@@ -56,7 +61,7 @@ export async function newGame(page: Page, side: 'white' | 'black' = 'white') {
   await showNewGameForm(page);
   await page.getByLabel(side, { exact: true }).check();
   await page.getByRole('combobox', { name: 'Limit' }).selectOption('depth');
-  await page.getByRole('button', { name: 'New game' }).click();
+  await submitNewGame(page);
   await expect(page.getByTestId('status')).toHaveText('your move');
 }
 

@@ -161,6 +161,53 @@ main {
   height: 100%;
 }
 
+.game-over {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-promotion);
+  display: grid;
+  place-items: center;
+  background: var(--scrim);
+}
+
+.game-over-card {
+  width: 88%;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.game-over-top {
+  position: relative;
+  padding: var(--space-5) var(--space-6) var(--space-4);
+  background: var(--panel-raised);
+  text-align: center;
+}
+
+.game-over-top h2 {
+  margin: 0;
+  font: var(--text-result);
+}
+
+.game-over-line {
+  margin: 2px 0 0;
+  font: var(--text-status);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.game-over-top button.icon {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+
+.game-over-actions {
+  display: grid;
+  padding: var(--space-4);
+}
+
 .status {
   margin: var(--space-4) 0 0;
   font: var(--text-status);
