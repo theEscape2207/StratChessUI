@@ -82,8 +82,8 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
   const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
   const [notice, setNotice] = useState('');
   const [revision, setRevision] = useState(0);
-  // The new-game form opened over a game in progress; set-up shows it anyway.
-  const [setUp, setSetUp] = useState(false);
+  // Opened over a game in progress; with no game, or after one, the form shows anyway.
+  const [formOpen, setFormOpen] = useState(false);
   const fenText = useRef<HTMLParagraphElement>(null);
   const { link, send, retry } = useGameSocket(
     token,
@@ -113,6 +113,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
 
   const ready = engines !== undefined && link === 'connected';
   const playing = game !== undefined && game.phase !== 'over';
+  const formHidden = playing && !formOpen;
 
   return (
     <main className="game">
@@ -147,9 +148,9 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
         <h2 className="sidebar-title">{game ? `Play ${game.engineName}` : 'New game'}</h2>
         {game && search && <SearchInfo fen={search.fen} info={search.info} />}
         <MoveList startFen={game?.startFen ?? START_FEN} moves={game?.moves ?? []} />
-        {ready && playing && !setUp && (
+        {ready && formHidden && (
           <div className="actions">
-            <button type="button" data-testid="show-new-game" onClick={() => setSetUp(true)}>
+            <button type="button" data-testid="show-new-game" onClick={() => setFormOpen(true)}>
               New game
             </button>
           </div>
@@ -157,15 +158,15 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
         {ready && (
           <NewGameForm
             engines={engines}
-            hidden={playing && !setUp}
+            hidden={formHidden}
             onStart={(request) => {
               // Until the new game arrives, the old one's status must not pass for it.
               setGame(undefined);
               setSearch(undefined);
-              setSetUp(false);
+              setFormOpen(false);
               send({ type: 'new-game', ...request });
             }}
-            onCancel={playing ? () => setSetUp(false) : undefined}
+            onCancel={playing ? () => setFormOpen(false) : undefined}
           />
         )}
         {/* Kept through a new game, so an open panel stays open; the server resets its lines. */}

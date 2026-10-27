@@ -184,8 +184,13 @@ main {
   overflow-wrap: anywhere;
 }
 
+/* At most two lines on a phone. */
 .search .search-pv {
+  display: -webkit-box;
   margin-top: var(--space-2);
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .search-stats {
@@ -293,7 +298,6 @@ main.game {
 .move-list .white,
 .move-list .black,
 .move-list .skipped {
-  justify-self: start;
   padding: 0 var(--space-2);
   border-radius: var(--radius-sm);
 }
@@ -335,8 +339,8 @@ button.icon svg {
   stroke-linejoin: round;
 }
 
-/* GameScreen: eval bar, board and sidebar side by side. Below --board-max + the other columns,
-   gaps and padding (1016px), the board gives way. The sidebar is as tall as the board column and
+/* GameScreen: eval bar, board and sidebar side by side. Short of --board-max plus the other
+   columns, gaps and padding, the board gives way. The sidebar is as tall as the board column and
    the move list takes what is left, scrolling; set-up's form can make it taller. */
 @media (min-width: 960px) {
   main.game {
@@ -393,6 +397,16 @@ button.icon svg {
 
   .move-list .number {
     margin: 0;
+  }
+
+  .move-list .white,
+  .move-list .black,
+  .move-list .skipped {
+    justify-self: start;
+  }
+
+  .search .search-pv {
+    display: block;
   }
 }
 

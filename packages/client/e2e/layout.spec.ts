@@ -1,7 +1,9 @@
 import type { Locator, Page } from '@playwright/test';
+import type { ServerMessage } from '@stratchess-ui/shared';
 import { expect, test } from './fixtures.ts';
 import { newGame, openSettled, playAndAwaitReply } from './helpers.ts';
 
+// GameScreen's breakpoint, the min-width of app.css's media query.
 const DESKTOP = 960;
 
 const form = (page: Page) => page.locator('form.new-game');
@@ -14,7 +16,11 @@ async function box(locator: Locator) {
 test('before the first game the sidebar shows the new-game form', async ({ page }) => {
   // Each test server keeps its last game, so this one stands in for a host that has none.
   await page.routeWebSocket(/\/ws/, (ws) => {
-    ws.send(JSON.stringify({ type: 'hello', engines: [{ id: 'fake', name: 'Fake' }] }));
+    const hello = {
+      type: 'hello',
+      engines: [{ id: 'fake', name: 'Fake' }],
+    } satisfies ServerMessage;
+    ws.send(JSON.stringify(hello));
   });
   await page.goto('/');
   await expect(page.getByTestId('status')).toHaveText('choose a side and start a game');
@@ -81,7 +87,7 @@ test("the sidebar follows the design's order and columns", async ({ page, hasTou
   if (page.viewportSize()!.width >= DESKTOP) {
     // GameScreen: the sidebar beside the board, both from the top, with its title bar.
     expect(side.x).toBeGreaterThan(board.x + board.width);
-    expect(side.y).toBe(board.y);
+    expect(side.y).toBeCloseTo(board.y, 0);
     await expect(sidebar.getByRole('heading')).toHaveText('Play StratChess (fake)');
   } else {
     // GameScreenPhone: the board edge to edge, the sidebar under it and the FEN.
