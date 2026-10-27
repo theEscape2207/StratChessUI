@@ -1,6 +1,8 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   appendTranscript,
+  capturedPieces,
+  materialBalance,
   START_FEN,
   type EngineChoice,
   type GameState,
@@ -15,7 +17,9 @@ import { nextEval } from './eval.ts';
 import { MoveList } from './MoveList.tsx';
 import { NewGameForm } from './NewGameForm.tsx';
 import { PairForm } from './PairForm.tsx';
+import { PlayerStrip } from './PlayerStrip.tsx';
 import { SearchInfo } from './SearchInfo.tsx';
+import { limitLabel, materialLead, stripChip } from './strip.ts';
 import { Transcript } from './Transcript.tsx';
 import { useGameSocket, type Link } from './useGameSocket.ts';
 
@@ -78,6 +82,47 @@ export function App() {
   return <Game token={token} onUnpaired={() => remember(undefined)} />;
 }
 
+/**
+ * The engine's strip on the far side of the board and the human's on the near side. Without a game
+ * their rows stay empty: the board must not move when one starts, as Chessground keeps its bounds
+ * until a scroll or resize.
+ */
+function playerStrips(game: GameState | undefined) {
+  if (!game) {
+    return {
+      engine: <div className="player-strip engine" />,
+      human: <div className="player-strip human" />,
+    };
+  }
+  const engineColor = game.humanColor === 'white' ? 'black' : 'white';
+  const captured = capturedPieces(game.startFen, game.moves);
+  const balance = materialBalance(game.fen);
+  return {
+    engine: (
+      <PlayerStrip
+        side="engine"
+        name={game.engineName}
+        detail={limitLabel(game.limit)}
+        captured={captured[engineColor]}
+        capturedColor={game.humanColor}
+        lead={materialLead(balance, engineColor)}
+        chip={stripChip(game, 'engine')}
+      />
+    ),
+    human: (
+      <PlayerStrip
+        side="human"
+        name="You"
+        detail={game.humanColor}
+        captured={captured[game.humanColor]}
+        capturedColor={engineColor}
+        lead={materialLead(balance, game.humanColor)}
+        chip={stripChip(game, 'human')}
+      />
+    ),
+  };
+}
+
 function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) {
   const [engines, setEngines] = useState<EngineChoice[]>();
   const [game, setGame] = useState<GameState>();
@@ -122,11 +167,14 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
   const ready = engines !== undefined && link === 'connected';
   const playing = game !== undefined && game.phase !== 'over';
   const formHidden = playing && !formOpen;
+  // Replays the game, so once per game state rather than on each search line.
+  const strips = useMemo(() => playerStrips(game), [game]);
 
   return (
     <main className="game">
       <EvalBar score={evalScore} orientation={humanColor} />
       <div className="play">
+        {strips.engine}
         <Board
           fen={fen}
           lastMove={game?.lastMove}
@@ -135,6 +183,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
           movable={link === 'connected' && game?.phase === 'human' ? humanColor : undefined}
           onMove={(uci) => send({ type: 'move', uci })}
         />
+        {strips.human}
         <div className="play-info">
           <p className={game?.phase === 'over' ? 'status result' : 'status'} data-testid="status">
             {link === 'connected' ? describe(game) : LINK_STATUS[link]}

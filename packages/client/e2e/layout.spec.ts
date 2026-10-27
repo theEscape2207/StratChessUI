@@ -85,9 +85,9 @@ test("the sidebar follows the design's order and columns", async ({ page, hasTou
 
   const side = await box(sidebar);
   if (page.viewportSize()!.width >= DESKTOP) {
-    // GameScreen: the sidebar beside the board, both from the top, with its title bar.
+    // GameScreen: the sidebar beside the board, level with the engine's strip, with its title bar.
     expect(side.x).toBeGreaterThan(board.x + board.width);
-    expect(side.y).toBeCloseTo(board.y, 0);
+    expect(side.y).toBeCloseTo((await box(page.getByTestId('strip-engine'))).y, 0);
     await expect(sidebar.getByRole('heading')).toHaveText('Play StratChess (fake)');
   } else {
     // GameScreenPhone: the board edge to edge, the sidebar under it and the FEN.

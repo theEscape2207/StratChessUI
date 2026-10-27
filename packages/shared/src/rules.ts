@@ -2,8 +2,11 @@ import { castlingSide, Chess, IllegalSetup } from 'chessops/chess';
 import { chessgroundDests } from 'chessops/compat';
 import { InvalidFen, makeFen, parseFen } from 'chessops/fen';
 import { makeSanAndPlay } from 'chessops/san';
-import { makeUci, opposite, parseUci } from 'chessops/util';
+import { isNormal, type Role } from 'chessops/types';
+import { makeUci, opposite, parseUci, squareFile } from 'chessops/util';
 import type { Color, Outcome } from './protocol.ts';
+
+export type { Role };
 
 export const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -85,6 +88,51 @@ export function sanMoves(startFen: string, moves: readonly string[]): string[] {
     sans.push(makeSanAndPlay(pos, move));
   }
   return sans;
+}
+
+/**
+ * The pieces each side took during a game from `startFen`, in the order taken. Replaying the moves
+ * rather than counting against a full set keeps a FEN start's missing pieces out, shows a captured
+ * promoted piece as what it became, and does not count a promoted pawn as taken.
+ */
+export function capturedPieces(startFen: string, moves: readonly string[]): Record<Color, Role[]> {
+  const taken: Record<Color, Role[]> = { white: [], black: [] };
+  const pos = positionFromFen(startFen);
+  if (typeof pos === 'string') return taken;
+  for (const uci of moves) {
+    const move = parseUci(uci);
+    if (!move || !pos.isLegal(move)) break;
+    if (isNormal(move)) {
+      const mover = pos.board.get(move.from);
+      const target = pos.board.get(move.to);
+      if (target && target.color !== pos.turn) taken[pos.turn].push(target.role);
+      // En passant: a pawn moving to another file onto an empty square.
+      else if (!target && mover?.role === 'pawn' && squareFile(move.from) !== squareFile(move.to))
+        taken[pos.turn].push('pawn');
+    }
+    pos.play(move);
+  }
+  return taken;
+}
+
+const PIECE_VALUES: Record<Role, number> = {
+  pawn: 1,
+  knight: 3,
+  bishop: 3,
+  rook: 5,
+  queen: 9,
+  king: 0,
+};
+
+/** White's material minus black's in pawns (1/3/3/5/9); 0 for a FEN that does not parse. */
+export function materialBalance(fen: string): number {
+  const pos = positionFromFen(fen);
+  if (typeof pos === 'string') return 0;
+  let balance = 0;
+  for (const [, piece] of pos.board) {
+    balance += (piece.color === 'white' ? 1 : -1) * PIECE_VALUES[piece.role];
+  }
+  return balance;
 }
 
 /**

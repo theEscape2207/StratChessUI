@@ -245,6 +245,83 @@ main.game {
   margin-inline: var(--space-4);
 }
 
+/* PlayerStrip: tile, name over captures, chip. On a phone the strips keep the page gutter while the
+   board runs edge to edge. */
+.player-strip {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  /* Fixed, so an empty strip before the first game holds the same room. */
+  height: 48px;
+  gap: var(--space-3);
+  align-items: center;
+  padding: 0 var(--space-4);
+}
+
+.strip-tile {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  font: 800 14px / 1 var(--font-sans);
+}
+
+.strip-tile.engine {
+  color: var(--on-accent);
+  background: var(--accent);
+}
+
+.strip-tile.human {
+  color: var(--ink);
+  background: var(--panel-raised);
+}
+
+.strip-name {
+  margin: 0;
+  overflow: hidden;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.strip-name span {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.strip-captures.cg-wrap {
+  display: flex;
+  align-items: center;
+  height: 16px;
+}
+
+/* Overlapping, in place of Chessground's absolute board-square layout. */
+.strip-captures.cg-wrap piece {
+  position: static;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-right: -5px;
+  will-change: auto;
+}
+
+.strip-captures b {
+  margin-left: var(--space-3);
+  font: var(--text-caption);
+  color: var(--muted);
+}
+
+.strip-chip {
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font: var(--text-eval);
+  background: var(--panel);
+}
+
+.strip-chip.raised {
+  background: var(--panel-raised);
+}
+
 /* EvalBar: on a phone an 8px strip above the board, white growing from the human's left. */
 .eval-bar {
   position: relative;
@@ -375,10 +452,12 @@ button.icon svg {
     padding: var(--space-5);
     display: grid;
     grid-template-columns: var(--eval-bar-width) minmax(0, var(--board-max)) var(--sidebar-width);
-    /* The board alone fills the first row, so the eval bar beside it is the board's height. */
-    grid-template-rows: auto 1fr;
+    /* The board alone fills its row, so the eval bar beside it is the board's height. */
+    grid-template-rows: auto auto auto 1fr;
     grid-template-areas:
+      '. far sidebar'
       'eval board sidebar'
+      '. near sidebar'
       '. info sidebar';
     justify-content: center;
     column-gap: var(--space-4);
@@ -390,6 +469,27 @@ button.icon svg {
 
   .play > .board-frame {
     grid-area: board;
+  }
+
+  .player-strip {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    padding: 0;
+  }
+
+  .player-strip.engine {
+    grid-area: far;
+    margin-bottom: var(--space-3);
+  }
+
+  .player-strip.human {
+    grid-area: near;
+    margin-top: var(--space-3);
+  }
+
+  .strip-tile {
+    width: 40px;
+    height: 40px;
+    font-size: 15px;
   }
 
   .play-info {
