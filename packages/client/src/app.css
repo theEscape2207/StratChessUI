@@ -170,8 +170,10 @@ main {
   background: var(--scrim);
 }
 
+/* The design's 88% is of a phone's board; a desktop board would stretch it. */
 .game-over-card {
   width: 88%;
+  max-width: 20rem;
   overflow: hidden;
   border-radius: var(--radius-md);
   background: var(--panel);
