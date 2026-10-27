@@ -5,11 +5,14 @@ import {
   type GameState,
   type NewGameRequest,
   type ServerMessage,
+  MAX_TRANSCRIPT_LINE,
+  TRANSCRIPT_LINES,
+  type TranscriptLine,
 } from '@stratchess-ui/shared';
 import { fakeProfile } from '../uci/fake-profile.ts';
 import { GameSession } from './session.ts';
 
-const PROFILES = ['legal', 'normal', 'crash-on-go', 'no-uciok'].map((mode) => ({
+const PROFILES = ['legal', 'normal', 'crash-on-go', 'no-uciok', 'chatty'].map((mode) => ({
   ...fakeProfile(mode),
   id: mode,
 }));
@@ -22,27 +25,32 @@ afterEach(async () => {
   session = undefined;
 });
 
-/** A session whose messages queue up until a test waits for them. */
+/**
+ * A session whose messages queue up until a test waits for them. `next` skips transcript
+ * messages, which interleave with the rest at the batch interval; `nextAny` does not.
+ */
 function open(timeouts = TIMEOUTS) {
   const queue: ServerMessage[] = [];
-  const waiting: ((m: ServerMessage) => void)[] = [];
+  let wake = () => {};
   const logged: string[] = [];
   session = new GameSession({
     profiles: PROFILES,
     timeouts,
     log: (text) => logged.push(text),
     send: (msg) => {
-      const resolve = waiting.shift();
-      if (resolve) resolve(msg);
-      else queue.push(msg);
+      queue.push(msg);
+      wake();
     },
   });
-  const next = () =>
-    new Promise<ServerMessage>((resolve) => {
-      const msg = queue.shift();
-      if (msg) resolve(msg);
-      else waiting.push(resolve);
-    });
+  const take = async (match: (msg: ServerMessage) => boolean): Promise<ServerMessage> => {
+    for (;;) {
+      const index = queue.findIndex(match);
+      if (index >= 0) return queue.splice(index, 1)[0]!;
+      await new Promise<void>((resolve) => (wake = resolve));
+    }
+  };
+  const next = () => take((msg) => msg.type !== 'transcript');
+  const nextAny = () => take(() => true);
   /** The next game state that has left the starting and thinking phases. */
   const settled = async (): Promise<GameState> => {
     for (;;) {
@@ -62,7 +70,7 @@ function open(timeouts = TIMEOUTS) {
         return messages;
     }
   };
-  return { session, next, settled, untilSettled, logged };
+  return { session, next, nextAny, settled, untilSettled, logged };
 }
 
 const searches = (messages: ServerMessage[]) => messages.filter((m) => m.type === 'search');
@@ -370,6 +378,81 @@ describe('GameSession', () => {
         expect(await next()).toMatchObject({ game: { phase: 'over', ...ended } });
       }
       expect(logged).toEqual([]);
+    });
+  });
+
+  describe('transcript', () => {
+    /** The lines streamed up to the next state the human can move in, which must follow them. */
+    async function linesUntilHumanMove(nextAny: () => Promise<ServerMessage>) {
+      const lines: TranscriptLine[] = [];
+      for (;;) {
+        const msg = await nextAny();
+        if (msg.type === 'error') throw new Error(`unexpected error: ${msg.reason}`);
+        if (msg.type === 'transcript') lines.push(...msg.lines);
+        if (msg.type === 'game' && msg.game.phase === 'human') return lines;
+      }
+    }
+
+    /** Where each expected line first appears, after the one before it. */
+    function positions(lines: TranscriptLine[], expected: [TranscriptLine['dir'], string][]) {
+      let from = 0;
+      return expected.map(([dir, prefix]) => {
+        const index = lines.findIndex(
+          (line, i) => i >= from && line.dir === dir && line.text.startsWith(prefix),
+        );
+        if (index >= 0) from = index + 1;
+        return index;
+      });
+    }
+
+    it('streams the lines sent and received in order, before the state they led to', async () => {
+      const { session, nextAny } = open();
+      void session.newGame(game('legal', 'black'));
+      expect(await nextAny()).toEqual({ type: 'transcript', lines: [], reset: true });
+      const lines = await linesUntilHumanMove(nextAny);
+      const found = positions(lines, [
+        ['sent', 'uci'],
+        ['received', 'id name StratChess'],
+        ['received', 'uciok'],
+        ['sent', `position fen ${START_FEN}`],
+        ['received', 'readyok'],
+        ['sent', 'go depth 3'],
+        ['received', 'info depth 1'],
+        ['received', 'bestmove b1a3'],
+      ]);
+      expect(found).not.toContain(-1);
+      expect(lines[0]).toEqual({ dir: 'sent', text: 'uci' });
+    });
+
+    it('starts over for a new game, with nothing from the old engine after', async () => {
+      const { session, nextAny } = open();
+      void session.newGame(game('legal', 'black'));
+      await linesUntilHumanMove(nextAny);
+      void session.newGame(game('legal', 'black'));
+      for (;;) {
+        const msg = await nextAny();
+        if (msg.type === 'transcript' && msg.reset) break;
+      }
+      const lines = await linesUntilHumanMove(nextAny);
+      expect(lines[0]).toEqual({ dir: 'sent', text: 'uci' });
+      expect(lines.filter((line) => line.text === 'uci')).toHaveLength(1);
+      // The old engine's `quit` is logged as the new one starts; wait out its batch, then move.
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      session.move('e7e5');
+      lines.push(...(await linesUntilHumanMove(nextAny)));
+      expect(lines.some((line) => line.text === 'quit')).toBe(false);
+    });
+
+    it('keeps the newest lines, each cut to the bound, for a browser that reattaches', async () => {
+      const { session, settled } = open();
+      void session.newGame(game('chatty', 'white'));
+      await settled();
+      const lines = session.transcript()!;
+      expect(lines).toHaveLength(TRANSCRIPT_LINES);
+      expect(lines.some((line) => line.text === 'uci')).toBe(false);
+      const long = lines.find((line) => line.text.startsWith('info string xx'))!;
+      expect(long.text).toHaveLength(MAX_TRANSCRIPT_LINE);
+      expect(long.text.endsWith('…')).toBe(true);
     });
   });
 });

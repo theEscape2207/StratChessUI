@@ -67,10 +67,29 @@ export type SearchReport = {
 /** A search line and the position searched, which the board has left once the engine moves. */
 export type SearchUpdate = { fen: string; info: SearchReport };
 
+/** One line to or from the engine; `stderr` lines are received too, on the other stream. */
+export type TranscriptLine = { dir: 'sent' | 'received' | 'stderr'; text: string };
+
+/** Lines kept of a game's transcript, by the server and by the browser alike. */
+export const TRANSCRIPT_LINES = 1000;
+
+/** Longer lines are cut, which bounds a transcript at about a megabyte. */
+export const MAX_TRANSCRIPT_LINE = 1024;
+
+/** The transcript with more lines added, keeping the newest `TRANSCRIPT_LINES`. */
+export function appendTranscript(
+  lines: readonly TranscriptLine[],
+  more: readonly TranscriptLine[],
+): TranscriptLine[] {
+  return [...lines, ...more].slice(-TRANSCRIPT_LINES);
+}
+
 export type ServerMessage =
   | { type: 'hello'; engines: EngineChoice[] }
   | { type: 'game'; game: GameState }
   | ({ type: 'search' } & SearchUpdate)
+  /** New lines of the current game's transcript; with `reset`, all of it, replacing the last. */
+  | { type: 'transcript'; lines: TranscriptLine[]; reset?: true }
   | { type: 'error'; reason: string };
 
 /** Why the server closed the game WebSocket; none of them is worth reconnecting for. */

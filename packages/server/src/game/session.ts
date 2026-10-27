@@ -11,12 +11,14 @@ import {
   type SearchLimit,
   type SearchUpdate,
   type ServerMessage,
+  type TranscriptLine,
 } from '@stratchess-ui/shared';
 import type { EngineProfile } from '../engines/profiles.ts';
 import { EngineError, SearchCancelledError, UciEngine, type Timeouts } from '../uci/engine.ts';
 import type { SearchInfo } from '../uci/protocol.ts';
 import { searchReport } from './search-report.ts';
 import { Throttle } from './throttle.ts';
+import { TranscriptFeed } from './transcript.ts';
 
 export type SessionOptions = {
   profiles: readonly EngineProfile[];
@@ -34,6 +36,7 @@ type Game = {
   engine?: UciEngine;
   /** The last search line sent, resent to a browser that reattaches. */
   search?: SearchUpdate;
+  transcript: TranscriptFeed;
 };
 
 const TRANSCRIPT_TAIL = 20;
@@ -54,6 +57,11 @@ export class GameSession {
 
   get search(): SearchUpdate | undefined {
     return this.game?.search;
+  }
+
+  /** The current game's transcript, for a browser that reattaches. */
+  transcript(): TranscriptLine[] | undefined {
+    return this.game?.transcript.snapshot();
   }
 
   /**
@@ -77,8 +85,13 @@ export class GameSession {
       },
       positions: [start.fen],
       limit: request.limit,
+      // A replaced game's engine still logs its `quit`, which must not reach the browser.
+      transcript: new TranscriptFeed((lines) => {
+        if (this.game === game) this.options.send({ type: 'transcript', lines });
+      }, REPORT_INTERVAL_MS),
     };
     this.game = game;
+    this.options.send({ type: 'transcript', lines: [], reset: true });
     this.publish(game);
     // Decided before the engine starts: asked to move in a finished position, it would answer
     // a null move, or fail to start for nothing.
@@ -86,7 +99,9 @@ export class GameSession {
     if (ended) return this.finish(game, ended);
     let engine: UciEngine;
     try {
-      engine = await UciEngine.start(profile, this.options.timeouts);
+      engine = await UciEngine.start(profile, this.options.timeouts, (dir, text) =>
+        game.transcript.push(dir, text),
+      );
     } catch (error) {
       return this.fail(game, error);
     }
@@ -107,6 +122,7 @@ export class GameSession {
 
   /** Ends the game, stopping its engine. */
   async close(): Promise<void> {
+    this.game?.transcript.cancel();
     const engine = this.game?.engine;
     this.game = undefined;
     await engine?.quit();
@@ -176,6 +192,7 @@ export class GameSession {
   }
 
   private endCurrent(): void {
+    this.game?.transcript.cancel();
     const engine = this.game?.engine;
     this.game = undefined;
     void engine?.quit();
@@ -188,6 +205,8 @@ export class GameSession {
   }
 
   private publish(game: Game): void {
+    // The lines that led to this state, such as a `bestmove`, go out before it.
+    game.transcript.flush();
     this.options.send({ type: 'game', game: game.state });
   }
 

@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import {
+  appendTranscript,
   START_FEN,
   type EngineChoice,
   type GameState,
   type SearchUpdate,
+  type TranscriptLine,
 } from '@stratchess-ui/shared';
 import { Board } from './Board.tsx';
 import { CopyFen } from './CopyFen.tsx';
@@ -11,6 +13,7 @@ import { MoveList } from './MoveList.tsx';
 import { NewGameForm } from './NewGameForm.tsx';
 import { PairForm } from './PairForm.tsx';
 import { SearchInfo } from './SearchInfo.tsx';
+import { Transcript } from './Transcript.tsx';
 import { useGameSocket, type Link } from './useGameSocket.ts';
 
 const TOKEN_KEY = 'pairing-token';
@@ -76,6 +79,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
   const [engines, setEngines] = useState<EngineChoice[]>();
   const [game, setGame] = useState<GameState>();
   const [search, setSearch] = useState<SearchUpdate>();
+  const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
   const [notice, setNotice] = useState('');
   const [revision, setRevision] = useState(0);
   const { link, send, retry } = useGameSocket(
@@ -83,6 +87,10 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
     (msg) => {
       if (msg.type === 'hello') return setEngines(msg.engines);
       if (msg.type === 'search') return setSearch({ fen: msg.fen, info: msg.info });
+      if (msg.type === 'transcript') {
+        const { lines, reset } = msg;
+        return setTranscript((last) => appendTranscript(reset ? [] : last, lines));
+      }
       if (msg.type === 'error') {
         setNotice(msg.reason);
         // Redraw the last server position to undo the board's optimistic move.
@@ -136,10 +144,12 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
               // Until the new game arrives, the old one's status must not pass for it.
               setGame(undefined);
               setSearch(undefined);
+              setTranscript([]);
               send({ type: 'new-game', ...request });
             }}
           />
         )}
+        {game && <Transcript lines={transcript} />}
       </div>
     </main>
   );

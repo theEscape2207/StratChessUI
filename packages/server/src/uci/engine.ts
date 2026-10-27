@@ -1,6 +1,7 @@
 // Controller for one UCI engine process: handshake, options, one search at a time.
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createInterface } from 'node:readline';
+import { TRANSCRIPT_LINES, type TranscriptLine } from '@stratchess-ui/shared';
 import { LIMITS, type EngineProfile } from '../engines/profiles.ts';
 import {
   goCommand,
@@ -33,8 +34,6 @@ export const DEFAULT_TIMEOUTS: Timeouts = {
   maxSearchMs: LIMITS.maxMovetimeMs,
 };
 
-const TRANSCRIPT_LINES = 1000;
-
 export class EngineError extends Error {
   readonly transcript: readonly string[];
   constructor(message: string, transcript: readonly string[]) {
@@ -66,6 +65,10 @@ type Waiter = {
 
 type ActiveSearch = { generation: number; cancelled: boolean; stopSent: boolean };
 
+export type TranscriptListener = (dir: TranscriptLine['dir'], text: string) => void;
+
+const MARKS: Record<TranscriptLine['dir'], string> = { sent: '>', received: '<', stderr: '!' };
+
 export class UciEngine {
   readonly profile: EngineProfile;
   name?: string;
@@ -74,6 +77,7 @@ export class UciEngine {
 
   private readonly child: ChildProcessWithoutNullStreams;
   private readonly timeouts: Timeouts;
+  private readonly onTranscript?: TranscriptListener;
   private readonly lines: string[] = [];
   private readonly waiters: Waiter[] = [];
   private lineListener?: (line: string) => void;
@@ -83,9 +87,14 @@ export class UciEngine {
   private generation = 0;
   private active?: ActiveSearch;
 
-  private constructor(profile: EngineProfile, timeouts: Timeouts) {
+  private constructor(
+    profile: EngineProfile,
+    timeouts: Timeouts,
+    onTranscript?: TranscriptListener,
+  ) {
     this.profile = profile;
     this.timeouts = timeouts;
+    this.onTranscript = onTranscript;
     // No shell: the executable and arguments are passed to the OS as they are.
     this.child = spawn(profile.executable, profile.args, {
       cwd: profile.cwd,
@@ -93,7 +102,7 @@ export class UciEngine {
       windowsHide: true,
     });
     createInterface({ input: this.child.stdout }).on('line', (line) => this.onLine(line));
-    createInterface({ input: this.child.stderr }).on('line', (line) => this.record(`! ${line}`));
+    createInterface({ input: this.child.stderr }).on('line', (line) => this.record('stderr', line));
     this.child.stdin.on('error', () => {}); // a dead engine surfaces through 'exit' instead
     this.exited = new Promise((resolve) => {
       this.child.on('error', (error) => {
@@ -107,9 +116,16 @@ export class UciEngine {
     });
   }
 
-  /** Starts the engine, completes the UCI handshake and applies the profile's options. */
-  static async start(profile: EngineProfile, timeouts: Partial<Timeouts> = {}): Promise<UciEngine> {
-    const engine = new UciEngine(profile, { ...DEFAULT_TIMEOUTS, ...timeouts });
+  /**
+   * Starts the engine, completes the UCI handshake and applies the profile's options.
+   * `onTranscript` sees every line sent and received from the first, `uci`.
+   */
+  static async start(
+    profile: EngineProfile,
+    timeouts: Partial<Timeouts> = {},
+    onTranscript?: TranscriptListener,
+  ): Promise<UciEngine> {
+    const engine = new UciEngine(profile, { ...DEFAULT_TIMEOUTS, ...timeouts }, onTranscript);
     try {
       await engine.handshake();
       return engine;
@@ -290,13 +306,13 @@ export class UciEngine {
 
   private send(command: string): void {
     if (this.exitError) return;
-    this.record(`> ${command}`);
+    this.record('sent', command);
     this.child.stdin.write(`${command}\n`);
   }
 
   private onLine(raw: string): void {
     const line = raw.length > MAX_LINE_LENGTH ? raw.slice(0, MAX_LINE_LENGTH) : raw.trimEnd();
-    this.record(`< ${line}`);
+    this.record('received', line);
     this.lineListener?.(line);
     const index = this.waiters.findIndex((w) => w.match(line));
     if (index >= 0) this.waiters.splice(index, 1)[0]!.resolve(line);
@@ -338,8 +354,9 @@ export class UciEngine {
     return new EngineError(message, this.transcript());
   }
 
-  private record(line: string): void {
-    this.lines.push(line);
+  private record(dir: TranscriptLine['dir'], text: string): void {
+    this.lines.push(`${MARKS[dir]} ${text}`);
     if (this.lines.length > TRANSCRIPT_LINES) this.lines.shift();
+    this.onTranscript?.(dir, text);
   }
 }
