@@ -1,11 +1,11 @@
-import { appendTranscript, MAX_TRANSCRIPT_LINE, type TranscriptLine } from '@stratchess-ui/shared';
+import { MAX_TRANSCRIPT_LINE, TRANSCRIPT_LINES, type TranscriptLine } from '@stratchess-ui/shared';
 
 /**
  * A game's transcript, passing new lines on in batches, at most one per interval. Unlike the
  * search feed, no line is dropped while it fits in the bound.
  */
 export class TranscriptFeed {
-  private all: TranscriptLine[] = [];
+  private readonly all: TranscriptLine[] = [];
   private pending: TranscriptLine[] = [];
   private readonly send: (lines: TranscriptLine[]) => void;
   private readonly intervalMs: number;
@@ -16,13 +16,15 @@ export class TranscriptFeed {
     this.intervalMs = intervalMs;
   }
 
-  push(dir: TranscriptLine['dir'], text: string): void {
+  push({ dir, text }: TranscriptLine): void {
     const line = {
       dir,
       text: text.length > MAX_TRANSCRIPT_LINE ? `${text.slice(0, MAX_TRANSCRIPT_LINE - 1)}…` : text,
     };
-    this.all = appendTranscript(this.all, [line]);
-    this.pending = appendTranscript(this.pending, [line]);
+    for (const lines of [this.all, this.pending]) {
+      lines.push(line);
+      if (lines.length > TRANSCRIPT_LINES) lines.shift();
+    }
     this.timer ??= setTimeout(() => this.flush(), this.intervalMs);
   }
 
@@ -35,10 +37,10 @@ export class TranscriptFeed {
     if (pending.length) this.send(pending);
   }
 
-  /** The whole transcript, which counts the pending lines as sent. */
-  snapshot(): TranscriptLine[] {
+  /** The whole transcript, for sending instead of the pending lines, which are dropped. */
+  takeAll(): TranscriptLine[] {
     this.cancel();
-    return this.all;
+    return [...this.all];
   }
 
   /** Drops the pending lines and stops. */

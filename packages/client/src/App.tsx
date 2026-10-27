@@ -133,6 +133,8 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
             {notice}
           </p>
         )}
+        {/* Kept through a new game, so an open panel stays open; the server resets its lines. */}
+        {(game || transcript.length > 0) && <Transcript lines={transcript} />}
       </div>
       <MoveList startFen={game?.startFen ?? START_FEN} moves={game?.moves ?? []} />
       <div className="controls">
@@ -144,12 +146,10 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
               // Until the new game arrives, the old one's status must not pass for it.
               setGame(undefined);
               setSearch(undefined);
-              setTranscript([]);
               send({ type: 'new-game', ...request });
             }}
           />
         )}
-        {game && <Transcript lines={transcript} />}
       </div>
     </main>
   );

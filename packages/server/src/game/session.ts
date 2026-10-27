@@ -60,8 +60,8 @@ export class GameSession {
   }
 
   /** The current game's transcript, for a browser that reattaches. */
-  transcript(): TranscriptLine[] | undefined {
-    return this.game?.transcript.snapshot();
+  takeTranscript(): TranscriptLine[] | undefined {
+    return this.game?.transcript.takeAll();
   }
 
   /**
@@ -99,8 +99,8 @@ export class GameSession {
     if (ended) return this.finish(game, ended);
     let engine: UciEngine;
     try {
-      engine = await UciEngine.start(profile, this.options.timeouts, (dir, text) =>
-        game.transcript.push(dir, text),
+      engine = await UciEngine.start(profile, this.options.timeouts, (line) =>
+        game.transcript.push(line),
       );
     } catch (error) {
       return this.fail(game, error);

@@ -12,20 +12,15 @@ export function Transcript({ lines }: { lines: readonly TranscriptLine[] }) {
   const list = useRef<HTMLOListElement>(null);
   const following = useRef(true);
 
-  useLayoutEffect(() => {
+  const follow = () => {
     const el = list.current;
     if (el && following.current) el.scrollTop = el.scrollHeight;
-  }, [lines]);
+  };
+  useLayoutEffect(follow, [lines]);
 
   return (
-    <details
-      className="transcript"
-      data-testid="transcript"
-      onToggle={() => {
-        const el = list.current;
-        if (el && following.current) el.scrollTop = el.scrollHeight;
-      }}
-    >
+    // A closed panel has no height to scroll, so it catches up when opened.
+    <details className="transcript" data-testid="transcript" onToggle={follow}>
       <summary>UCI transcript</summary>
       <ol
         ref={list}

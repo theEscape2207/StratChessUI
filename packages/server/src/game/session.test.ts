@@ -447,7 +447,7 @@ describe('GameSession', () => {
       const { session, settled } = open();
       void session.newGame(game('chatty', 'white'));
       await settled();
-      const lines = session.transcript()!;
+      const lines = session.takeTranscript()!;
       expect(lines).toHaveLength(TRANSCRIPT_LINES);
       expect(lines.some((line) => line.text === 'uci')).toBe(false);
       const long = lines.find((line) => line.text.startsWith('info string xx'))!;

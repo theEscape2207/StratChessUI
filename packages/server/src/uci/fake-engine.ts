@@ -115,7 +115,7 @@ createInterface({ input: process.stdin }).on('line', (line) => {
       HANDSHAKE.forEach(out);
       if (mode === 'chatty') {
         for (let i = 0; i < 1100; i++) out(`info string chatter ${i}`);
-        out(`info string ${'x'.repeat(2000 - 12)}`);
+        out(`info string ${'x'.repeat(2000 - 'info string '.length)}`);
       }
       if (mode !== 'no-uciok') out('uciok');
       break;

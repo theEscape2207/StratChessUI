@@ -65,7 +65,7 @@ type Waiter = {
 
 type ActiveSearch = { generation: number; cancelled: boolean; stopSent: boolean };
 
-export type TranscriptListener = (dir: TranscriptLine['dir'], text: string) => void;
+export type TranscriptListener = (line: TranscriptLine) => void;
 
 const MARKS: Record<TranscriptLine['dir'], string> = { sent: '>', received: '<', stderr: '!' };
 
@@ -357,6 +357,6 @@ export class UciEngine {
   private record(dir: TranscriptLine['dir'], text: string): void {
     this.lines.push(`${MARKS[dir]} ${text}`);
     if (this.lines.length > TRANSCRIPT_LINES) this.lines.shift();
-    this.onTranscript?.(dir, text);
+    this.onTranscript?.({ dir, text });
   }
 }
