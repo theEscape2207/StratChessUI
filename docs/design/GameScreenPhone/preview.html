@@ -1,0 +1,153 @@
+<!-- @dsCard group="Screens" height=960 width=390 subtitle="In game at 390px: board edge to edge, sidebar stacked below — search info first, transcript above the toolbar" -->
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../../../packages/client/src/tokens.css"><style>img[src^="/_blob/"] { visibility: hidden; }</style><style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-sans); }
+  .phone { width: 390px; min-height: 844px; display: flex; flex-direction: column; }
+
+  .evalstrip { height: 8px; background: var(--eval-black); position: relative; border-bottom: 1px solid var(--hairline); }
+  .evalstrip .w { position: absolute; top: 0; bottom: 0; left: 0; width: 44%; background: var(--eval-white); }
+
+  .strip { height: 48px; padding: 0 var(--space-4); display: grid; grid-template-columns: 32px 1fr auto; gap: var(--space-3); align-items: center; }
+  .av { width: 32px; height: 32px; border-radius: var(--radius-sm); display: grid; place-items: center; font: 800 14px/1 var(--font-sans); }
+  .av.engine { background: var(--accent); color: var(--on-accent); }
+  .av.you { background: var(--panel-raised); }
+  .name { font-size: 14px; line-height: 18px; font-weight: 700; }
+  .name span { font-weight: 400; color: var(--muted); }
+  .caps { display: flex; align-items: center; height: 14px; }
+  .caps img { width: 14px; height: 14px; margin-right: -4px; }
+  .caps b { margin-left: 8px; font: 600 12px/14px var(--font-sans); color: var(--muted); }
+  .chip { font: 700 13px/16px var(--font-mono); padding: 6px 10px; border-radius: var(--radius-sm); background: var(--panel); }
+  .chip.on { background: var(--panel-raised); }
+
+  .board { position: relative; width: 390px; aspect-ratio: 1; display: grid; grid-template-columns: repeat(8, 1fr); }
+  .sq { position: relative; }
+  .sq.l { background: var(--board-light); color: var(--board-dark); }
+  .sq.d { background: var(--board-dark); color: var(--board-light); }
+  .sq.l.hl { background: var(--highlight-light); }
+  .sq.d.hl { background: var(--highlight-dark); }
+  .sq img { position: absolute; inset: 4% 10% 16%; width: 80%; height: 80%; }
+  .rank, .file { position: absolute; font-size: 10px; line-height: 12px; font-weight: 700; }
+  .rank { top: var(--space-1); left: 3px; }
+  .file { bottom: var(--space-1); right: 3px; }
+  .qb { position: absolute; top: -7px; right: -7px; z-index: var(--z-badge); width: 18px; height: 18px; border-radius: var(--radius-full);
+    display: grid; place-items: center; font: 800 9px/1 var(--font-sans); background: var(--q-inaccuracy); color: var(--q-ink); box-shadow: var(--shadow-badge); }
+
+  /* Stacked sidebar */
+  .fb { margin: var(--space-3) var(--space-4) 0; background: var(--panel); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4);
+    display: grid; grid-template-columns: auto 1fr auto; gap: var(--space-3); align-items: center; }
+  .b { width: var(--badge-size); height: var(--badge-size); border-radius: var(--radius-full); display: grid; place-items: center; font: 800 12px/1 var(--font-sans); }
+  .b.inacc { background: var(--q-inaccuracy); color: var(--q-ink); }
+  .head { font-size: 15px; line-height: 20px; font-weight: 800; }
+  .head span { font-weight: 600; }
+  .best { font-size: 12px; line-height: 16px; color: var(--muted); }
+  .best b { color: var(--ink); }
+  .ev { font: 700 13px/16px var(--font-mono); padding: 4px 8px; border-radius: var(--radius-sm); background: var(--eval-black); color: var(--eval-white); }
+
+  .actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); padding: var(--space-4) var(--space-4) 0; }
+  .btn.stack { flex-direction: column; gap: var(--space-2); padding: 8px 4px; min-height: 56px; font-size: 13px; line-height: 16px; }
+  .btn:disabled { opacity: .45; }
+  .btn { font: 700 15px/20px var(--font-sans); min-height: 44px; padding: 8px 12px; border: 0; border-radius: var(--radius-md);
+    display: inline-flex; gap: var(--space-3); align-items: center; justify-content: center; background: var(--panel-raised); color: var(--ink); box-shadow: var(--shadow-button-secondary); }
+
+  .moves { flex: 1; min-height: 120px; margin: var(--space-4) var(--space-4) 0; background: var(--panel); border-radius: var(--radius-md) var(--radius-md) 0 0; overflow: hidden; }
+  .opening { font-size: 12px; line-height: 16px; color: var(--muted); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--hairline); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row { display: flex; flex-wrap: wrap; gap: 2px 0; padding: var(--space-3) var(--space-4); font-size: 14px; line-height: 24px; font-weight: 700; }
+  .pair { white-space: nowrap; margin-right: 10px; }
+  .row .n { font-size: 12px; font-weight: 600; color: var(--muted); margin-right: 4px; }
+  .m { padding: 0 4px; border-radius: var(--radius-sm); display: inline-flex; gap: 4px; align-items: center; }
+  .m.cur { background: var(--panel-raised); }
+  .q { width: 16px; height: 16px; border-radius: var(--radius-full); display: grid; place-items: center; font: 800 9px/1 var(--font-sans); background: var(--q-inaccuracy); color: var(--q-ink); }
+
+  .tools { height: 56px; display: flex; align-items: center; justify-content: flex-start; gap: var(--space-3); padding: 0 var(--space-3); background: var(--panel); border-top: 1px solid var(--hairline); margin: 0 var(--space-4); }
+  .ic { width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: none; color: var(--muted); border-radius: var(--radius-sm); }
+  .ic:focus-visible, .btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* Search info and transcript (technical view) */
+  .search { padding: var(--space-3) var(--space-4); margin: var(--space-3) var(--space-4) 0; background: var(--panel); border-radius: var(--radius-md); }
+  .search p { margin: 0; overflow-wrap: anywhere; }
+  .search .stats { font: 700 13px/16px var(--font-mono); font-variant-numeric: tabular-nums; }
+  .search .spv { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: var(--space-2); font: 400 12px/16px var(--font-mono); color: var(--muted); }
+  details.uci summary { padding: var(--space-3) var(--space-4); font-size: 12px; line-height: 16px; font-weight: 600; cursor: pointer; }
+  details.uci { margin: 0 var(--space-4); background: var(--panel); border-top: 1px solid var(--hairline); }
+  svg { width: 22px; height: 22px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+</style></head>
+<body>
+<div class="phone">
+  <div class="evalstrip" role="meter" aria-label="Evaluation -0.6 for white"><div class="w"></div></div>
+  <div class="strip">
+    <div class="av engine" aria-hidden="true">S</div>
+    <div><div class="name">StratChess <span>1000 ms</span></div>
+      <div class="caps"><img alt="white pawn" src="/_blob/4c9e00e5fe867c50282a7c8754399ccb"><img alt="white pawn" src="/_blob/4c9e00e5fe867c50282a7c8754399ccb"><img alt="white bishop" src="/_blob/faaa38890928904d4e75dda4ad4e4e1a"></div></div>
+    <span class="chip on">thinking…</span>
+  </div>
+  <div class="board" id="board" role="img" aria-label="Chess position after 12. a3, black to move"></div>
+  <div class="strip">
+    <div class="av you" aria-hidden="true">Y</div>
+    <div><div class="name">You <span>white</span></div>
+      <div class="caps"><img alt="black pawn" src="/_blob/4a9c38d9e825c976c093cbce59ab22e6"><img alt="black pawn" src="/_blob/4a9c38d9e825c976c093cbce59ab22e6"><img alt="black bishop" src="/_blob/c4b4b6529808a49324f8fba489eb0438"><b>=</b></div></div>
+    <span class="chip">waiting</span>
+  </div>
+
+  <div class="search"><p class="stats">depth 14/22 · -0.64 · 3.1M nodes · 2.4M n/s</p><p class="spv">12… O-O 13. O-O Be6</p></div>
+
+  <div class="fb">
+    <span class="b inacc" aria-hidden="true">?!</span>
+    <div><div class="head">a3 <span>is an inaccuracy</span></div><div class="best">Best was <b>O-O</b> (0.00)</div></div>
+    <span class="ev">-0.64</span>
+  </div>
+
+  <div class="actions">
+    <button class="btn stack"><svg viewBox="0 0 24 24"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>Resign</button>
+    <button class="btn stack"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>Undo</button>
+    <button class="btn stack" disabled title="Available on your move"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>Hint</button>
+  </div>
+
+  <div class="moves">
+    <div class="opening">Italian Game: Giuoco Piano</div>
+    <div class="row" id="moves"></div>
+  </div>
+
+  <details class="uci"><summary>UCI transcript</summary></details>
+  <div class="tools">
+    <button class="ic" aria-label="Copy FEN"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg></button>
+    <button class="ic" aria-label="Settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></button>
+  </div>
+</div>
+<script>
+  const P = {
+    K: '8ee2b417de8f454bcb0de92437d73f46', Q: 'e454a306c7810aa9eb869294fa2baccf', R: 'd05dc8105723665a1bfa98259fc0796d',
+    B: 'faaa38890928904d4e75dda4ad4e4e1a', N: 'cf0830de755ba00c4de4aa20326dd360', P: '4c9e00e5fe867c50282a7c8754399ccb',
+    k: '6afdeec8ffc43688dcbc81683287d575', q: '332feac2e807be2365ed6394402d68d6', r: 'e29d90b26527271e01938ea80ccf4705',
+    b: 'c4b4b6529808a49324f8fba489eb0438', n: 'ac6f7b704414b462d811e356f2931755', p: '4a9c38d9e825c976c093cbce59ab22e6',
+  };
+  const fen = 'r1bqk2r/pp3ppp/2p5/n2n4/Q1BP4/P4N2/1P1N1PPP/R3K2R';
+  const hl = ['a2', 'a3'], badge = 'a3';
+  const board = document.getElementById('board');
+  fen.split('/').forEach((row, r) => {
+    let f = 0;
+    for (const ch of row) {
+      if (/\d/.test(ch)) { for (let i = 0; i < +ch; i++) add(r, f++, null); }
+      else add(r, f++, ch);
+    }
+  });
+  function add(r, f, piece) {
+    const sq = 'abcdefgh'[f] + (8 - r);
+    const el = document.createElement('div');
+    el.className = 'sq ' + ((r + f) % 2 ? 'd' : 'l') + (hl.includes(sq) ? ' hl' : '');
+    if (piece) { const img = document.createElement('img'); img.src = '/_blob/' + P[piece]; img.alt = ''; el.append(img); }
+    if (f === 0) el.insertAdjacentHTML('beforeend', '<span class="rank">' + (8 - r) + '</span>');
+    if (r === 7) el.insertAdjacentHTML('beforeend', '<span class="file">' + 'abcdefgh'[f] + '</span>');
+    if (sq === badge) el.insertAdjacentHTML('beforeend', '<span class="qb" aria-label="inaccuracy">?!</span>');
+    board.append(el);
+  }
+  const moves = 'e4 e5 Nf3 Nc6 Bc4 Bc5 c3 Nf6 d4 exd4 cxd4 Bb4+ Bd2 Bxd2+ Nbxd2 d5 exd5 Nxd5 Qb3 Na5 Qa4+ c6 a3'.split(' ');
+  const list = document.getElementById('moves');
+  for (let i = 0; i < moves.length; i += 2) {
+    const pair = moves.slice(i, i + 2).map((m, j) => i + j === moves.length - 1
+      ? '<span class="m cur" aria-current="true"><span class="q" aria-label="inaccuracy">?!</span>' + m + '</span>'
+      : '<span class="m">' + m + '</span>').join('');
+    list.insertAdjacentHTML('beforeend', '<span class="pair"><span class="n">' + (i / 2 + 1) + '.</span>' + pair + '</span>');
+  }
+</script>
+</body></html>

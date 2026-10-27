@@ -1,0 +1,30 @@
+<!-- @dsCard group="Board" height=130 subtitle="Engine above the board, you below; captured material and clock-free limit" -->
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../../../packages/client/src/tokens.css"><style>img[src^="/_blob/"] { visibility: hidden; }</style><style>
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--ink); font-family: var(--font-sans); display: flex; flex-direction: column; gap: var(--space-4); }
+  .strip { width: min(384px, calc(100vw - 32px)); display: grid; grid-template-columns: 40px 1fr auto; gap: var(--space-3); align-items: center; }
+  .av { width: 40px; height: 40px; border-radius: var(--radius-sm); display: grid; place-items: center; font: 800 15px/1 var(--font-sans); }
+  .av.engine { background: var(--accent); color: var(--on-accent); }
+  .av.you { background: var(--panel-raised); color: var(--ink); }
+  .name { font-size: 14px; line-height: 20px; font-weight: 700; }
+  .name span { font-weight: 400; color: var(--muted); }
+  .caps { display: flex; align-items: center; gap: 0; height: 16px; }
+  .caps img { width: 16px; height: 16px; margin-right: -5px; }
+  .caps b { margin-left: 8px; font: 600 12px/16px var(--font-sans); color: var(--muted); }
+  .limit { font: 700 13px/16px var(--font-mono); padding: 6px 10px; border-radius: var(--radius-sm); background: var(--panel); color: var(--ink); }
+  .limit.on { background: var(--panel-raised); }
+</style></head>
+<body>
+  <div class="strip">
+    <div class="av engine" aria-hidden="true">S</div>
+    <div><div class="name">StratChess <span>depth 8</span></div>
+      <div class="caps"><img alt="white pawn" src="/_blob/4c9e00e5fe867c50282a7c8754399ccb"><img alt="white bishop" src="/_blob/faaa38890928904d4e75dda4ad4e4e1a"></div></div>
+    <span class="limit on">thinking</span>
+  </div>
+  <div class="strip">
+    <div class="av you" aria-hidden="true">Y</div>
+    <div><div class="name">You</div>
+      <div class="caps"><img alt="black pawn" src="/_blob/4a9c38d9e825c976c093cbce59ab22e6"><img alt="black pawn" src="/_blob/4a9c38d9e825c976c093cbce59ab22e6"><img alt="black queen" src="/_blob/332feac2e807be2365ed6394402d68d6"><b>+7</b></div></div>
+    <span class="limit">your move</span>
+  </div>
+</body></html>
