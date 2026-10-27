@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type Ref } from 'react';
 import {
   LIMIT_RANGES,
   MAX_FEN_LENGTH,
@@ -24,13 +24,14 @@ type NewGameFormProps = {
   onStart: (request: NewGameRequest) => void;
   /** Offered when the form was opened over a game in progress, to go back to it. */
   onCancel?: () => void;
+  submitRef?: Ref<HTMLButtonElement>;
 };
 
 /**
  * Side, engine, search limit and an optional start position. Limits are shown as what they are,
  * never as Elo. The FEN is checked here for feedback; the server checks it again.
  */
-export function NewGameForm({ engines, hidden, onStart, onCancel }: NewGameFormProps) {
+export function NewGameForm({ engines, hidden, onStart, onCancel, submitRef }: NewGameFormProps) {
   const [humanColor, setHumanColor] = useState<Color>('white');
   const [engineId, setEngineId] = useState(engines[0]?.id ?? '');
   const [kind, setKind] = useState<LimitKind>('movetimeMs');
@@ -136,7 +137,7 @@ export function NewGameForm({ engines, hidden, onStart, onCancel }: NewGameFormP
           {fenError}
         </p>
       )}
-      <button type="submit" className="primary">
+      <button type="submit" className="primary" ref={submitRef}>
         New game
       </button>
       {onCancel && (

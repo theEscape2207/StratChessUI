@@ -31,6 +31,8 @@ const SEARCH_END = [
 ];
 
 const STALEMATE = '7k/5Q2/6K1/8/8/8/8/8 b - - 0 1';
+// In any mode, a game from here crashes the engine on its first search.
+const CRASH = '4k3/8/8/8/8/8/4P3/4K3 w - - 0 1';
 
 const out = (line: string) => process.stdout.write(`${line}\n`);
 
@@ -138,7 +140,7 @@ createInterface({ input: process.stdin }).on('line', (line) => {
       break;
     }
     case 'go': {
-      if (mode === 'crash-on-go') process.exit(3);
+      if (mode === 'crash-on-go' || position.includes(CRASH)) process.exit(3);
       SEARCH.map(withLegalPv).forEach(out);
       searching = {};
       const movetime = /movetime (\d+)/.exec(line);
