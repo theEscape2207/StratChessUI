@@ -128,7 +128,7 @@ describe('server', () => {
 
     const limit = { movetimeMs: 100 };
     ws.send(JSON.stringify({ type: 'new-game', humanColor: 'white', engineId: 'fake', limit }));
-    expect(await next()).toMatchObject({ type: 'game', game: { phase: 'starting' } });
+    expect(await next()).toMatchObject({ type: 'game', game: { phase: 'starting', limit } });
     expect(await next()).toMatchObject({ type: 'game', game: { phase: 'human' } });
     ws.send(JSON.stringify({ type: 'move', uci: 'e2e4' }));
     expect(await next()).toMatchObject({ game: { phase: 'thinking', lastMove: 'e2e4' } });
@@ -216,8 +216,14 @@ describe('server', () => {
 
     const again = await connect(app, token);
     expect(await again.next()).toMatchObject({ type: 'hello' });
+    const resumed = await again.next();
+    expect(resumed).toMatchObject({ type: 'game', game: { limit: { depth: 1 } } });
     // The engine may answer before or after the reconnect; either way the game carries on.
-    expect(await again.yourMove()).toMatchObject({ lastMove: 'a7a5' });
+    const answered =
+      resumed.type === 'game' && resumed.game.phase === 'human'
+        ? resumed.game
+        : await again.yourMove();
+    expect(answered).toMatchObject({ lastMove: 'a7a5' });
     again.ws.send(JSON.stringify({ type: 'move', uci: 'd2d4' }));
     expect(await again.yourMove()).toMatchObject({ lastMove: 'a5a4' });
   });

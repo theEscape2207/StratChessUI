@@ -8,7 +8,6 @@ import {
   turn,
   type GameState,
   type NewGameRequest,
-  type SearchLimit,
   type SearchUpdate,
   type ServerMessage,
   type TranscriptLine,
@@ -32,7 +31,6 @@ type Game = {
   state: GameState;
   /** Every position of the game as a FEN, for repetition. */
   positions: string[];
-  limit: SearchLimit;
   engine?: UciEngine;
   /** The last search line sent, resent to a browser that reattaches. */
   search?: SearchUpdate;
@@ -80,11 +78,11 @@ export class GameSession {
         fen: start.fen,
         humanColor: request.humanColor,
         engineName: profile.name,
+        limit: request.limit,
         phase: 'starting',
         moves: [],
       },
       positions: [start.fen],
-      limit: request.limit,
       // A replaced game's engine still logs its `quit`, which must not reach the browser.
       transcript: new TranscriptFeed((lines) => {
         if (this.game === game) this.options.send({ type: 'transcript', lines });
@@ -153,7 +151,7 @@ export class GameSession {
     try {
       // The whole game rather than the position alone, so the engine can see repetitions.
       ({ bestMove } = await game.engine!.search(
-        { fen: game.state.startFen, moves: game.state.moves, limit: game.limit },
+        { fen: game.state.startFen, moves: game.state.moves, limit: game.state.limit },
         (info) => {
           // A line without a score (a future currmove line) would blank the display.
           if (info.score) feed.push(info);

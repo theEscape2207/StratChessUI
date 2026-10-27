@@ -41,6 +41,7 @@ export type GameState = {
   lastMove?: string;
   humanColor: Color;
   engineName: string;
+  limit: SearchLimit;
   phase: GamePhase;
   /** Set, with how it ended, when the game ended by rule. */
   result?: Color | 'draw';
