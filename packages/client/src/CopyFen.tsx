@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState, type RefObject } from 'react';
 
 /**
  * The Clipboard API exists only in a secure context, which plain HTTP on the LAN is not; there the
@@ -31,19 +31,18 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-/** The current position as a FEN, with a button that copies it. */
-export function CopyFen({ fen }: { fen: string }) {
-  const text = useRef<HTMLParagraphElement>(null);
+/** The toolbar's Copy FEN icon. Where copying fails, it selects `text`, the FEN shown on the page. */
+export function CopyFen({ fen, text }: { fen: string; text: RefObject<HTMLElement | null> }) {
   const [copied, setCopied] = useState<{ fen: string; ok: boolean }>();
   // Feedback belongs to the FEN it was about; a move clears it.
   const feedback = copied?.fen === fen ? copied : undefined;
   return (
     <>
-      <p className="status fen" data-testid="fen" ref={text}>
-        {fen}
-      </p>
       <button
         type="button"
+        className="icon"
+        aria-label="Copy FEN"
+        title="Copy FEN"
         onClick={() =>
           void copyText(fen).then((ok) => {
             // Left selected, the FEN is one tap on the system's own Copy away.
@@ -52,7 +51,10 @@ export function CopyFen({ fen }: { fen: string }) {
           })
         }
       >
-        Copy FEN
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="8" y="8" width="12" height="12" rx="2" />
+          <path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" />
+        </svg>
       </button>
       <span className="copied" role="status" data-testid="copied">
         {feedback && (feedback.ok ? 'Copied' : 'Copy the selected FEN')}

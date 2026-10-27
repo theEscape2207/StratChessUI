@@ -34,15 +34,26 @@ export async function playMove(page: Page, uci: string, touch: boolean, bottom =
   await tapSquare(page, uci.slice(2, 4), touch, bottom);
 }
 
-/** Opens the app as the paired browser and waits until whatever game it resumes is idle. */
+/** During play the new-game form waits behind a button of the same name. */
+export async function showNewGameForm(page: Page) {
+  const reveal = page.getByTestId('show-new-game');
+  if (await reveal.isVisible()) await reveal.click();
+}
+
+/**
+ * Opens the app as the paired browser, waits until whatever game it resumes is idle, and opens the
+ * new-game form.
+ */
 export async function openSettled(page: Page) {
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'New game' })).toBeVisible();
   await expect(page.getByTestId('status')).not.toHaveText(/thinking|starting/);
+  await showNewGameForm(page);
 }
 
 /** Starts a game with a depth limit, which the fake answers at once; it sleeps out a move time. */
 export async function newGame(page: Page, side: 'white' | 'black' = 'white') {
+  await showNewGameForm(page);
   await page.getByLabel(side).check();
   await page.getByRole('combobox', { name: 'Limit' }).selectOption('depth');
   await page.getByRole('button', { name: 'New game' }).click();

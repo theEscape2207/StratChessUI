@@ -7,6 +7,8 @@ import {
   serverURL,
 } from './packages/client/e2e/servers.ts';
 
+const GAME_SPECS = ['board.spec.ts', 'layout.spec.ts'];
+
 // Runs against the built client served by the real server, as a phone on the LAN would see it.
 export default defineConfig({
   testDir: 'packages/client/e2e',
@@ -23,8 +25,8 @@ export default defineConfig({
       testMatch: 'pairing.spec.ts',
       use: { ...devices['Desktop Chrome'], baseURL: pairingURL },
     },
-    { name: 'desktop', testMatch: 'board.spec.ts', use: devices['Desktop Chrome'] },
-    { name: 'phone', testMatch: 'board.spec.ts', use: devices['Pixel 7'] },
+    { name: 'desktop', testMatch: GAME_SPECS, use: devices['Desktop Chrome'] },
+    { name: 'phone', testMatch: GAME_SPECS, use: devices['Pixel 7'] },
   ],
   // Playwright starts these in order, so only the first has to build the client.
   webServer: Array.from({ length: BOARD_SERVERS + 1 }, (_, index) => ({

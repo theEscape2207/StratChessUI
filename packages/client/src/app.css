@@ -175,9 +175,22 @@ main {
   font: var(--text-result);
 }
 
+.search {
+  padding: var(--space-3) var(--space-5);
+}
+
 .search p {
-  margin: var(--space-2) 0 0;
+  margin: 0;
   overflow-wrap: anywhere;
+}
+
+/* At most two lines on a phone. */
+.search .search-pv {
+  display: -webkit-box;
+  margin-top: var(--space-2);
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .search-stats {
@@ -190,14 +203,8 @@ main {
   color: var(--muted);
 }
 
-.transcript {
-  margin: var(--space-4) 0 0;
-  background: var(--panel);
-  border-radius: var(--radius-md);
-}
-
 .transcript summary {
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-3) var(--space-5);
   font: var(--text-caption);
   cursor: pointer;
 }
@@ -205,7 +212,7 @@ main {
 .transcript ol {
   max-height: 16rem;
   margin: 0;
-  padding: 0 var(--space-4) var(--space-3);
+  padding: 0 var(--space-5) var(--space-3);
   overflow-y: auto;
   list-style: none;
   font: var(--text-pv);
@@ -228,47 +235,45 @@ main {
   width: 1.5em;
 }
 
-/* A phone stacks the move list between the board and the controls; a wide screen puts it beside
-   both. The breakpoint is --board-max + --sidebar-width + the gap and padding. */
-.game {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: 'play' 'moves' 'controls';
-  align-items: start;
+/* GameScreenPhone below 960px: the board edge to edge, then the sidebar's sections stacked. */
+main.game {
+  max-width: var(--board-max);
+  padding: 0 0 var(--space-4);
 }
 
-@media (min-width: 1000px) {
-  main.game {
-    max-width: calc(var(--board-max) + var(--space-6) + var(--sidebar-width));
-    grid-template-columns: minmax(0, var(--board-max)) var(--sidebar-width);
-    grid-template-rows: auto 1fr;
-    grid-template-areas: 'play moves' 'controls moves';
-    column-gap: var(--space-6);
-  }
-
-  main.game .move-list {
-    margin-top: 0;
-    max-height: var(--board-max);
-    overflow-y: auto;
-  }
+.play > :not(.board-frame) {
+  margin-inline: var(--space-4);
 }
 
-.play {
-  grid-area: play;
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  margin: var(--space-4) var(--space-4) 0;
+  overflow: hidden;
+  background: var(--panel);
+  border-radius: var(--radius-md);
 }
 
-.controls {
-  grid-area: controls;
+.sidebar > * + * {
+  border-top: 1px solid var(--hairline);
+}
+
+.sidebar-title {
+  display: none;
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
+  font: var(--text-panel-title);
+  text-align: center;
+  background: var(--panel-raised);
 }
 
 .move-list {
-  grid-area: moves;
-  margin: var(--space-4) 0 0;
-  padding: var(--space-2) 0;
+  max-height: 10rem;
+  margin: 0;
+  padding: var(--space-3) var(--space-5);
+  overflow-y: auto;
   list-style: none;
   font: var(--text-move);
-  background: var(--panel);
-  border-radius: var(--radius-md);
 }
 
 .move-list:empty {
@@ -276,13 +281,13 @@ main {
 }
 
 .move-list li {
-  display: grid;
-  grid-template-columns: 2.5em 1fr 1fr;
-  padding: var(--space-2) var(--space-4);
+  display: inline-block;
+  margin-right: var(--space-4);
+  white-space: nowrap;
 }
 
-.move-list li:nth-child(even) {
-  background: var(--row-alt);
+.move-list .number {
+  margin-right: var(--space-2);
 }
 
 .move-list .number,
@@ -290,14 +295,129 @@ main {
   color: var(--muted);
 }
 
-/* Selectable in one tap, for a browser that cannot copy on its own. */
+.move-list .white,
+.move-list .black,
+.move-list .skipped {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.move-list .current {
+  background: var(--panel-raised);
+}
+
+.actions {
+  display: grid;
+  padding: var(--space-4) var(--space-5);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+}
+
+button.icon {
+  display: grid;
+  place-items: center;
+  width: var(--control-min-height);
+  padding: 0;
+  color: var(--muted);
+  background: none;
+  box-shadow: none;
+  border-radius: var(--radius-sm);
+}
+
+button.icon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* GameScreen: eval bar, board and sidebar side by side. Short of --board-max plus the other
+   columns, gaps and padding, the board gives way. The sidebar is as tall as the board column and
+   the move list takes what is left, scrolling; set-up's form can make it taller. */
+@media (min-width: 960px) {
+  main.game {
+    max-width: none;
+    padding: var(--space-5);
+    display: grid;
+    grid-template-columns: var(--eval-bar-width) minmax(0, var(--board-max)) var(--sidebar-width);
+    grid-template-areas: 'eval play sidebar';
+    justify-content: center;
+    column-gap: var(--space-4);
+  }
+
+  .play {
+    grid-area: play;
+  }
+
+  .play > :not(.board-frame) {
+    margin-inline: 0;
+  }
+
+  .sidebar {
+    grid-area: sidebar;
+    max-height: calc(100dvh - 2 * var(--space-5));
+    margin: 0;
+    overflow-y: auto;
+  }
+
+  .sidebar-title {
+    display: block;
+  }
+
+  .move-list {
+    flex: 1 1 0;
+    min-height: 6rem;
+    max-height: none;
+    padding: var(--space-2) 0;
+  }
+
+  .move-list:empty {
+    display: block;
+  }
+
+  .move-list li {
+    display: grid;
+    grid-template-columns: 2.5em 1fr 1fr;
+    align-items: center;
+    margin: 0;
+    padding: var(--space-1) var(--space-5);
+  }
+
+  .move-list li:nth-child(even) {
+    background: var(--row-alt);
+  }
+
+  .move-list .number {
+    margin: 0;
+  }
+
+  .move-list .white,
+  .move-list .black,
+  .move-list .skipped {
+    justify-self: start;
+  }
+
+  .search .search-pv {
+    display: block;
+  }
+}
+
 .fen {
+  color: var(--muted);
   -webkit-user-select: all;
   user-select: all;
 }
 
 .copied {
-  margin-left: var(--space-4);
+  font: var(--text-caption);
   color: var(--muted);
 }
 
@@ -361,9 +481,17 @@ button:disabled {
   font-weight: 600;
 }
 
-.new-game .fen-field,
-.new-game .fen-error {
-  flex-basis: 100%;
+/* Its display would otherwise override the attribute. */
+.new-game[hidden] {
+  display: none;
+}
+
+/* In the sidebar the form is one column of full-width fields. */
+.sidebar .new-game {
+  flex-direction: column;
+  align-items: stretch;
+  margin: 0;
+  border-radius: 0;
 }
 
 .new-game .fen-error {
