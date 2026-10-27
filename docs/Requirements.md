@@ -1,10 +1,10 @@
 # Web chess UI: requirements
 
-Status: requirements agreed 2026-10-25; repository scaffolded. Moved here from the engine repository
-(`theEscape2207/StratChess`, PR 915).
+Status: requirements agreed 2026-10-25; Milestones 1 and 2 done. Moved here from the engine
+repository (`theEscape2207/StratChess`, PR 915).
 
-**Next task:** Milestone 2 (GitHub milestone "M2: Technical"). Engine issues below follow when their milestone needs them; they live in
-the engine repository.
+**Next task:** Milestone 3, starting with its open questions below. Engine issues below follow when
+their milestone needs them; they live in the engine repository.
 
 ## Intent
 
