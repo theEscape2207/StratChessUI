@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyUciMove,
+  capturedPieces,
   legalDests,
+  materialBalance,
   outcome,
   parseStartFen,
   sanMoves,
@@ -154,5 +156,54 @@ describe('rules', () => {
       expect(outcome([START_FEN])).toBeUndefined();
       expect(outcome([])).toBeUndefined();
     });
+  });
+
+  describe('capturedPieces', () => {
+    it('lists what each side took, in order', () => {
+      // 1. e4 d5 2. exd5 Qxd5 3. Nc3 Qxg2 4. Bxg2
+      const moves = ['e2e4', 'd7d5', 'e4d5', 'd8d5', 'b1c3', 'd5g2', 'f1g2'];
+      expect(capturedPieces(START_FEN, moves)).toEqual({
+        white: ['pawn', 'queen'],
+        black: ['pawn', 'pawn'],
+      });
+    });
+
+    it('counts en passant as a pawn taken', () => {
+      const moves = ['e2e4', 'a7a6', 'e4e5', 'd7d5', 'e5d6'];
+      expect(capturedPieces(START_FEN, moves)).toEqual({ white: ['pawn'], black: [] });
+    });
+
+    it('does not take a pawn that promotes, and shows a promoted piece taken as what it became', () => {
+      const fen = '4k3/1P6/8/8/8/8/r7/7K w - - 0 1';
+      // b8=Q, then black's rook takes it on b2.
+      expect(capturedPieces(fen, ['b7b8q', 'e8d7', 'b8b2', 'a2b2'])).toEqual({
+        white: [],
+        black: ['queen'],
+      });
+    });
+
+    it('ignores castling, also given as the king onto its own rook', () => {
+      const fen = 'r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1';
+      expect(capturedPieces(fen, ['e1g1', 'e8c8'])).toEqual({ white: [], black: [] });
+      expect(capturedPieces(fen, ['e1h1', 'e8a8'])).toEqual({ white: [], black: [] });
+    });
+
+    it('shows nothing for pieces missing from a FEN start', () => {
+      const fen = '4k3/8/8/8/8/8/8/R3K3 w - - 0 1';
+      expect(capturedPieces(fen, ['a1a8'])).toEqual({ white: [], black: [] });
+    });
+
+    it('stops at an illegal move and takes nothing from a bad FEN', () => {
+      expect(capturedPieces(START_FEN, ['e2e4', 'e4e5'])).toEqual({ white: [], black: [] });
+      expect(capturedPieces('not a fen', ['e2e4'])).toEqual({ white: [], black: [] });
+    });
+  });
+
+  it('weighs material as white minus black at 1/3/3/5/9', () => {
+    expect(materialBalance(START_FEN)).toBe(0);
+    // White is a queen and a pawn up, black a knight and a bishop.
+    expect(materialBalance('4k3/2nb4/8/8/8/8/P7/3QK3 w - - 0 1')).toBe(4);
+    expect(materialBalance('4k3/8/8/8/8/8/8/r3K3 w - - 0 1')).toBe(-5);
+    expect(materialBalance('not a fen')).toBe(0);
   });
 });
