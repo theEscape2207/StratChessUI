@@ -4,11 +4,14 @@ import {
   START_FEN,
   type EngineChoice,
   type GameState,
+  type Score,
   type SearchUpdate,
   type TranscriptLine,
 } from '@stratchess-ui/shared';
 import { Board } from './Board.tsx';
 import { CopyFen } from './CopyFen.tsx';
+import { EvalBar } from './EvalBar.tsx';
+import { nextEval } from './eval.ts';
 import { MoveList } from './MoveList.tsx';
 import { NewGameForm } from './NewGameForm.tsx';
 import { PairForm } from './PairForm.tsx';
@@ -79,6 +82,8 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
   const [engines, setEngines] = useState<EngineChoice[]>();
   const [game, setGame] = useState<GameState>();
   const [search, setSearch] = useState<SearchUpdate>();
+  // Unlike the search, kept through the engine's turns until a new game.
+  const [evalScore, setEvalScore] = useState<Score>();
   const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
   const [notice, setNotice] = useState('');
   const [revision, setRevision] = useState(0);
@@ -89,7 +94,10 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
     token,
     (msg) => {
       if (msg.type === 'hello') return setEngines(msg.engines);
-      if (msg.type === 'search') return setSearch({ fen: msg.fen, info: msg.info });
+      if (msg.type === 'search') {
+        setEvalScore((last) => nextEval(last, msg.info));
+        return setSearch({ fen: msg.fen, info: msg.info });
+      }
       if (msg.type === 'transcript') {
         const { lines, reset } = msg;
         return setTranscript((last) => appendTranscript(reset ? [] : last, lines));
@@ -117,6 +125,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
 
   return (
     <main className="game">
+      <EvalBar score={evalScore} orientation={humanColor} />
       <div className="play">
         <Board
           fen={fen}
@@ -126,23 +135,25 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
           movable={link === 'connected' && game?.phase === 'human' ? humanColor : undefined}
           onMove={(uci) => send({ type: 'move', uci })}
         />
-        <p className={game?.phase === 'over' ? 'status result' : 'status'} data-testid="status">
-          {link === 'connected' ? describe(game) : LINK_STATUS[link]}
-        </p>
-        {(link === 'busy' || link === 'replaced') && (
-          <button type="button" onClick={retry}>
-            {link === 'busy' ? 'Try again' : 'Play here'}
-          </button>
-        )}
-        {notice && (
-          <p className="status notice" data-testid="notice">
-            {notice}
+        <div className="play-info">
+          <p className={game?.phase === 'over' ? 'status result' : 'status'} data-testid="status">
+            {link === 'connected' ? describe(game) : LINK_STATUS[link]}
           </p>
-        )}
-        {/* Selectable in one tap, for a browser that cannot copy on its own. */}
-        <p className="status fen" data-testid="fen" ref={fenText}>
-          {fen}
-        </p>
+          {(link === 'busy' || link === 'replaced') && (
+            <button type="button" onClick={retry}>
+              {link === 'busy' ? 'Try again' : 'Play here'}
+            </button>
+          )}
+          {notice && (
+            <p className="status notice" data-testid="notice">
+              {notice}
+            </p>
+          )}
+          {/* Selectable in one tap, for a browser that cannot copy on its own. */}
+          <p className="status fen" data-testid="fen" ref={fenText}>
+            {fen}
+          </p>
+        </div>
       </div>
       <aside className="sidebar" aria-label="Game">
         <h2 className="sidebar-title">{game ? `Play ${game.engineName}` : 'New game'}</h2>
@@ -163,6 +174,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
               // Until the new game arrives, the old one's status must not pass for it.
               setGame(undefined);
               setSearch(undefined);
+              setEvalScore(undefined);
               setFormOpen(false);
               send({ type: 'new-game', ...request });
             }}

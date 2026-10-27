@@ -7,7 +7,7 @@ import {
   serverURL,
 } from './packages/client/e2e/servers.ts';
 
-const GAME_SPECS = ['board.spec.ts', 'layout.spec.ts'];
+const GAME_SPECS = ['board.spec.ts', 'eval.spec.ts', 'layout.spec.ts'];
 
 // Runs against the built client served by the real server, as a phone on the LAN would see it.
 export default defineConfig({

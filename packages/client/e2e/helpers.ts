@@ -54,7 +54,7 @@ export async function openSettled(page: Page) {
 /** Starts a game with a depth limit, which the fake answers at once; it sleeps out a move time. */
 export async function newGame(page: Page, side: 'white' | 'black' = 'white') {
   await showNewGameForm(page);
-  await page.getByLabel(side).check();
+  await page.getByLabel(side, { exact: true }).check();
   await page.getByRole('combobox', { name: 'Limit' }).selectOption('depth');
   await page.getByRole('button', { name: 'New game' }).click();
   await expect(page.getByTestId('status')).toHaveText('your move');
