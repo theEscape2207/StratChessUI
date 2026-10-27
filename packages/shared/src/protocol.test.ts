@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_FEN_LENGTH, parseClientMessage } from './protocol.ts';
+import {
+  appendTranscript,
+  MAX_FEN_LENGTH,
+  parseClientMessage,
+  TRANSCRIPT_LINES,
+  type TranscriptLine,
+} from './protocol.ts';
 
 const newGame = (limit: unknown, humanColor: unknown = 'black') =>
   parseClientMessage(JSON.stringify({ type: 'new-game', humanColor, engineId: 'x', limit }));
@@ -37,5 +43,14 @@ describe('protocol', () => {
     expect(request('x'.repeat(MAX_FEN_LENGTH))).toMatchObject({ fen: 'x'.repeat(MAX_FEN_LENGTH) });
     expect(request('x'.repeat(MAX_FEN_LENGTH + 1))).toBeUndefined();
     expect(request(42)).toBeUndefined();
+  });
+
+  it('keeps the newest lines of a transcript', () => {
+    const line = (i: number): TranscriptLine => ({ dir: 'received', text: `${i}` });
+    const lines = Array.from({ length: TRANSCRIPT_LINES - 1 }, (_, i) => line(i));
+    const appended = appendTranscript(lines, [line(-1), line(-2)]);
+    expect(appended).toHaveLength(TRANSCRIPT_LINES);
+    expect(appended[0]).toEqual(line(1));
+    expect(appended.slice(-2)).toEqual([line(-1), line(-2)]);
   });
 });

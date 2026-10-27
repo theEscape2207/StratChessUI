@@ -50,6 +50,8 @@ export class Controller {
     if (game) connection.send({ type: 'game', game });
     const search = this.session.search;
     if (search) connection.send({ type: 'search', ...search });
+    const transcript = this.session.takeTranscript();
+    if (transcript) connection.send({ type: 'transcript', lines: transcript, reset: true });
   }
 
   /** Messages from a connection that has been replaced are dropped. */

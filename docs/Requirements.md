@@ -57,6 +57,7 @@ M2 and M3 are two views of one app, sharing game and engine handling. No configu
 | Transport security  | Plain HTTP/WS, accepted for the home LAN                                        | Self-signed certificates on phones (iOS especially) cost more than the threat they address                                                                                       |
 | Pairing persistence | Browser keeps its token until revoked on the host                               | One code per device, not per game                                                                                                                                                |
 | Disconnect          | Short grace period (e.g. 60 s), then stop the search and end the engine process | Phones drop sockets when locked; page-close events are unreliable                                                                                                                |
+| UCI transcript      | Read-only                                                                       | Typed commands could desync the controller, which owns `position`/`go`/`stop`, and each would need the CR/LF guard and an allowlist                                              |
 
 ## Architecture constraints (independent of stack)
 
@@ -151,8 +152,7 @@ in build tooling (Vite, ESLint, TypeScript) rather than in the chess or server c
 
 ## Open questions (later milestones)
 
-- **M2:** read-only transcript or manual UCI entry (manual entry can desync the controller)? PGN
-  export (recommended: retains page-bound games without a database).
+- **M2:** PGN export (recommended: retains page-bound games without a database).
 - **M3:** hint form (piece, move or line) and its engine/limit; takeback = one ply or back to the
   human's previous turn; resign and draw offers; how difficulty is named.
 - **Analysis:** linear move navigation or variation tree; continuous analysis; multiple engines.

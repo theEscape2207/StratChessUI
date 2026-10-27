@@ -5,6 +5,7 @@
 //   crash-on-go     exits as soon as a search starts
 //   ignore-stop     never answers `stop` (and searches forever)
 //   legal           like normal, but answers the first legal move, so whole games can be played
+//   chatty          like legal, with 1100 info strings in the handshake, the last 2000 characters
 import { createInterface } from 'node:readline';
 import { applyUciMove, legalDests, START_FEN } from '@stratchess-ui/shared';
 
@@ -43,7 +44,7 @@ function finishSearch() {
   SEARCH_END.map(withLegalPv).forEach(out);
   // Encodes the position it searched, so tests can tell which search a bestmove belongs to.
   if (position.includes(STALEMATE)) out('bestmove 0000');
-  else if (mode === 'legal') out(`bestmove ${firstLegalMove(position)}`);
+  else if (mode === 'legal' || mode === 'chatty') out(`bestmove ${firstLegalMove(position)}`);
   else out(`bestmove ${position.includes('moves') ? 'g8f6' : 'b1c3'}`);
 }
 
@@ -112,6 +113,10 @@ createInterface({ input: process.stdin }).on('line', (line) => {
   switch (command) {
     case 'uci':
       HANDSHAKE.forEach(out);
+      if (mode === 'chatty') {
+        for (let i = 0; i < 1100; i++) out(`info string chatter ${i}`);
+        out(`info string ${'x'.repeat(2000 - 'info string '.length)}`);
+      }
       if (mode !== 'no-uciok') out('uciok');
       break;
     case 'isready':

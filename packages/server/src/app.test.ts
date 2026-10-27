@@ -39,15 +39,23 @@ async function pairedToken() {
   return (await pair()).token!;
 }
 
-/** Connects and buffers every message from the first, which the server sends on open. */
+/**
+ * Connects and buffers every message from the first, which the server sends on open. Transcript
+ * messages are read apart from the rest, which they would otherwise interleave unpredictably.
+ */
 async function connect(app: FastifyInstance, token?: string) {
   const queue: ServerMessage[] = [];
-  const waiting: ((m: ServerMessage) => void)[] = [];
+  let wake = () => {};
   const onMessage = (data: Buffer) => {
-    const msg = JSON.parse(data.toString()) as ServerMessage;
-    const resolve = waiting.shift();
-    if (resolve) resolve(msg);
-    else queue.push(msg);
+    queue.push(JSON.parse(data.toString()) as ServerMessage);
+    wake();
+  };
+  const take = async (match: (msg: ServerMessage) => boolean): Promise<ServerMessage> => {
+    for (;;) {
+      const index = queue.findIndex(match);
+      if (index >= 0) return queue.splice(index, 1)[0]!;
+      await new Promise<void>((resolve) => (wake = resolve));
+    }
   };
   let onClose: (code: number) => void;
   const closed = new Promise<number>((resolve) => (onClose = resolve));
@@ -61,12 +69,8 @@ async function connect(app: FastifyInstance, token?: string) {
       },
     },
   );
-  const next = () =>
-    new Promise<ServerMessage>((resolve) => {
-      const msg = queue.shift();
-      if (msg) resolve(msg);
-      else waiting.push(resolve);
-    });
+  const next = () => take((msg) => msg.type !== 'transcript');
+  const transcript = () => take((msg) => msg.type === 'transcript');
   /** The next game state the human can move in. */
   const yourMove = async () => {
     for (;;) {
@@ -74,7 +78,7 @@ async function connect(app: FastifyInstance, token?: string) {
       if (msg.type === 'game' && msg.game.phase === 'human') return msg.game;
     }
   };
-  return { ws, next, yourMove, closed };
+  return { ws, next, transcript, yourMove, closed };
 }
 
 const NEW_GAME = { type: 'new-game', humanColor: 'white', engineId: 'fake', limit: { depth: 1 } };
@@ -186,6 +190,14 @@ describe('server', () => {
         nps: 798000,
         pv: ['d4', 'd5', 'Nf3'],
       },
+    });
+    // The whole transcript so far, replacing whatever the browser showed.
+    expect(await second.transcript()).toMatchObject({
+      reset: true,
+      lines: expect.arrayContaining([
+        { dir: 'sent', text: 'uci' },
+        { dir: 'received', text: 'bestmove b1a3' },
+      ]),
     });
   });
 

@@ -65,6 +65,21 @@ test("shows the engine's search while it thinks, and its last line after", async
   await expect(page.getByTestId('search-pv')).toHaveText('1… a5 2. Na3 a4');
 });
 
+test("shows the engine's UCI lines in a panel that starts collapsed", async ({
+  page,
+  hasTouch,
+}) => {
+  await newGame(page);
+  const transcript = page.getByTestId('transcript');
+  await expect(transcript.getByRole('listitem').first()).toBeHidden();
+
+  await transcript.getByText('UCI transcript').click();
+  await playAndAwaitReply(page, 'e2e4', hasTouch);
+  const lines = transcript.getByRole('listitem');
+  await expect(lines.filter({ hasText: `position fen ${START} moves e2e4` })).toHaveCount(1);
+  await expect(lines.filter({ hasText: 'bestmove a7a5' })).toHaveAttribute('class', 'received');
+});
+
 test('plays black: the engine opens and the board is flipped', async ({ page, hasTouch }) => {
   await newGame(page, 'black');
   await expect(page.getByTestId('fen')).toHaveText(
