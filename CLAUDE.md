@@ -35,6 +35,9 @@ change could fail; a docs-only change needs lint at most.
 - **Prove a new test guards something:** break the code, watch it fail, restore. Drive it through
   the production path (`GameSession`, the WebSocket, the board), not by feeding a value in below
   the code under test.
+- **Client tests:** pure client logic goes in plain functions tested by Vitest (`*.test.ts`);
+  anything layout, Chessground or touch goes through Playwright. No DOM-emulation test stack until
+  something needs one.
 - **Playwright: "your move" does not mean the engine replied.** Right after the human moves, the
   status still reads it, and under a depth limit the fake replies too fast to see "thinking". Wait
   through `playAndAwaitReply` (`e2e/helpers.ts`), which watches the FEN.
