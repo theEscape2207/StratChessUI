@@ -10,13 +10,22 @@ export function MoveList({ startFen, moves }: { startFen: string; moves: readonl
   const first = moveNumber(startFen);
   const rows: [string | undefined, string | undefined][] = [];
   for (let i = 0; i < sans.length; i += 2) rows.push([sans[i], sans[i + 1]]);
+  const last = sans.length - 1;
+  const move = (side: 'white' | 'black', san: string, index: number) =>
+    index === last ? (
+      <span className={`${side} current`} aria-current="true">
+        {san}
+      </span>
+    ) : (
+      <span className={side}>{san}</span>
+    );
   return (
     <ol className="move-list" aria-label="Moves" data-testid="moves">
       {rows.map(([white, black], i) => (
         <li key={i}>
           <span className="number">{first + i}.</span>
-          {white ? <span className="white">{white}</span> : <span className="skipped">…</span>}
-          {black && <span className="black">{black}</span>}
+          {white ? move('white', white, 2 * i) : <span className="skipped">…</span>}
+          {black && move('black', black, 2 * i + 1)}
         </li>
       ))}
     </ol>

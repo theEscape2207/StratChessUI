@@ -19,14 +19,18 @@ const LIMIT_DEFAULTS: Record<LimitKind, number> = { depth: 8, movetimeMs: 1000 }
 
 type NewGameFormProps = {
   engines: EngineChoice[];
+  /** Hidden rather than unmounted during play, so the next game starts from the same settings. */
+  hidden: boolean;
   onStart: (request: NewGameRequest) => void;
+  /** Offered when the form was opened over a game in progress, to go back to it. */
+  onCancel?: () => void;
 };
 
 /**
  * Side, engine, search limit and an optional start position. Limits are shown as what they are,
  * never as Elo. The FEN is checked here for feedback; the server checks it again.
  */
-export function NewGameForm({ engines, onStart }: NewGameFormProps) {
+export function NewGameForm({ engines, hidden, onStart, onCancel }: NewGameFormProps) {
   const [humanColor, setHumanColor] = useState<Color>('white');
   const [engineId, setEngineId] = useState(engines[0]?.id ?? '');
   const [kind, setKind] = useState<LimitKind>('movetimeMs');
@@ -36,7 +40,11 @@ export function NewGameForm({ engines, onStart }: NewGameFormProps) {
   const range = LIMIT_RANGES[kind];
 
   if (engines.length === 0) {
-    return <p className="status">No engines are configured on the host (engines.json).</p>;
+    return (
+      <p className="status" hidden={hidden}>
+        No engines are configured on the host (engines.json).
+      </p>
+    );
   }
 
   const submit = (event: FormEvent) => {
@@ -58,7 +66,7 @@ export function NewGameForm({ engines, onStart }: NewGameFormProps) {
   };
 
   return (
-    <form className="new-game" onSubmit={submit}>
+    <form className="new-game" hidden={hidden} onSubmit={submit}>
       <fieldset>
         <legend>You play</legend>
         {(['white', 'black'] as const).map((color) => (
@@ -131,6 +139,11 @@ export function NewGameForm({ engines, onStart }: NewGameFormProps) {
       <button type="submit" className="primary">
         New game
       </button>
+      {onCancel && (
+        <button type="button" onClick={onCancel}>
+          Cancel
+        </button>
+      )}
     </form>
   );
 }

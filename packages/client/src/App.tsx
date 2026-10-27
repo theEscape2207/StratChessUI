@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   appendTranscript,
   START_FEN,
@@ -82,6 +82,9 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
   const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
   const [notice, setNotice] = useState('');
   const [revision, setRevision] = useState(0);
+  // The new-game form opened over a game in progress; set-up shows it anyway.
+  const [setUp, setSetUp] = useState(false);
+  const fenText = useRef<HTMLParagraphElement>(null);
   const { link, send, retry } = useGameSocket(
     token,
     (msg) => {
@@ -108,6 +111,9 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
   const humanColor = game?.humanColor ?? 'white';
   const fen = game?.fen ?? START_FEN;
 
+  const ready = engines !== undefined && link === 'connected';
+  const playing = game !== undefined && game.phase !== 'over';
+
   return (
     <main className="game">
       <div className="play">
@@ -127,30 +133,47 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
             {link === 'busy' ? 'Try again' : 'Play here'}
           </button>
         )}
-        {game && search && <SearchInfo fen={search.fen} info={search.info} />}
         {notice && (
           <p className="status notice" data-testid="notice">
             {notice}
           </p>
         )}
-        {/* Kept through a new game, so an open panel stays open; the server resets its lines. */}
-        {(game || transcript.length > 0) && <Transcript lines={transcript} />}
+        {/* Selectable in one tap, for a browser that cannot copy on its own. */}
+        <p className="status fen" data-testid="fen" ref={fenText}>
+          {fen}
+        </p>
       </div>
-      <MoveList startFen={game?.startFen ?? START_FEN} moves={game?.moves ?? []} />
-      <div className="controls">
-        <CopyFen fen={fen} />
-        {engines && link === 'connected' && (
+      <aside className="sidebar" aria-label="Game">
+        <h2 className="sidebar-title">{game ? `Play ${game.engineName}` : 'New game'}</h2>
+        {game && search && <SearchInfo fen={search.fen} info={search.info} />}
+        <MoveList startFen={game?.startFen ?? START_FEN} moves={game?.moves ?? []} />
+        {ready && playing && !setUp && (
+          <div className="actions">
+            <button type="button" data-testid="show-new-game" onClick={() => setSetUp(true)}>
+              New game
+            </button>
+          </div>
+        )}
+        {ready && (
           <NewGameForm
             engines={engines}
+            hidden={playing && !setUp}
             onStart={(request) => {
               // Until the new game arrives, the old one's status must not pass for it.
               setGame(undefined);
               setSearch(undefined);
+              setSetUp(false);
               send({ type: 'new-game', ...request });
             }}
+            onCancel={playing ? () => setSetUp(false) : undefined}
           />
         )}
-      </div>
+        {/* Kept through a new game, so an open panel stays open; the server resets its lines. */}
+        {(game || transcript.length > 0) && <Transcript lines={transcript} />}
+        <div className="toolbar">
+          <CopyFen fen={fen} text={fenText} />
+        </div>
+      </aside>
     </main>
   );
 }

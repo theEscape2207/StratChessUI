@@ -6,6 +6,7 @@ import {
   openSettled,
   playAndAwaitReply,
   playMove,
+  showNewGameForm,
   START,
   tapSquare,
   THINKING,
@@ -201,6 +202,7 @@ for (const side of ['white', 'black'] as const) {
 
 /** Starts a depth-limited game from `fen`, keeping the side the form picks for it. */
 async function newGameFrom(page: Page, fen: string) {
+  await showNewGameForm(page);
   await page.getByLabel('Start position').fill(fen);
   await page.getByRole('combobox', { name: 'Limit' }).selectOption('depth');
   await page.getByRole('button', { name: 'New game' }).click();
