@@ -214,9 +214,9 @@ test('starts from a FEN as the side to move, numbering moves from it', async ({
   page,
   hasTouch,
 }) => {
-  await page.getByLabel('white').check();
+  await page.getByLabel('white', { exact: true }).check();
   await newGameFrom(page, ENDING.replace(' w ', ' b '));
-  await expect(page.getByLabel('black')).toBeChecked();
+  await expect(page.getByLabel('black', { exact: true })).toBeChecked();
   await expect(page.getByTestId('status')).toHaveText('your move');
 
   await playAndAwaitReply(page, 'e8d7', hasTouch, 'black');

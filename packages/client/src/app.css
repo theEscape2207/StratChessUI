@@ -241,8 +241,35 @@ main.game {
   padding: 0 0 var(--space-4);
 }
 
-.play > :not(.board-frame) {
+.play-info {
   margin-inline: var(--space-4);
+}
+
+/* EvalBar: on a phone an 8px strip above the board, white growing from the human's left. */
+.eval-bar {
+  position: relative;
+  height: 8px;
+  overflow: hidden;
+  background: var(--eval-black);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.eval-white {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--fill);
+  background: var(--eval-white);
+}
+
+.eval-bar.orientation-black .eval-white {
+  left: auto;
+  right: 0;
+}
+
+.eval-number {
+  display: none;
 }
 
 .sidebar {
@@ -348,17 +375,78 @@ button.icon svg {
     padding: var(--space-5);
     display: grid;
     grid-template-columns: var(--eval-bar-width) minmax(0, var(--board-max)) var(--sidebar-width);
-    grid-template-areas: 'eval play sidebar';
+    /* The board alone fills the first row, so the eval bar beside it is the board's height. */
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      'eval board sidebar'
+      '. info sidebar';
     justify-content: center;
     column-gap: var(--space-4);
   }
 
   .play {
-    grid-area: play;
+    display: contents;
   }
 
-  .play > :not(.board-frame) {
+  .play > .board-frame {
+    grid-area: board;
+  }
+
+  .play-info {
+    grid-area: info;
     margin-inline: 0;
+  }
+
+  /* Vertical, white's edge at the bottom unless the human plays black. */
+  .eval-bar {
+    grid-area: eval;
+    height: auto;
+    border-bottom: none;
+    border-radius: var(--radius-sm);
+    outline: 1px solid var(--hairline);
+  }
+
+  .eval-white {
+    top: auto;
+    right: 0;
+    width: auto;
+    height: var(--fill);
+  }
+
+  .eval-bar.orientation-black .eval-white {
+    top: 0;
+    bottom: auto;
+    left: 0;
+  }
+
+  /* At the leading side's end, in the other side's colour; the eval style, shrunk to the bar. */
+  .eval-number {
+    display: block;
+    position: absolute;
+    left: 0;
+    right: 0;
+    font: var(--text-eval);
+    font-size: 9px;
+    line-height: 1;
+    text-align: center;
+  }
+
+  .eval-number.on-white {
+    color: var(--eval-black);
+  }
+
+  .eval-number.on-black {
+    color: var(--eval-white);
+  }
+
+  .orientation-white .eval-number.on-white,
+  .orientation-black .eval-number.on-black {
+    bottom: var(--space-2);
+  }
+
+  .orientation-white .eval-number.on-black,
+  .orientation-black .eval-number.on-white {
+    top: var(--space-2);
   }
 
   .sidebar {
