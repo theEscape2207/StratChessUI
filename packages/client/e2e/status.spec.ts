@@ -1,7 +1,7 @@
 import type { Page, WebSocketRoute } from '@playwright/test';
 import { CLOSE_CODES, type GameState, type ServerMessage } from '@stratchess-ui/shared';
 import { expect, test } from './fixtures.ts';
-import { expectFenNotShown, expectYourMove, START } from './helpers.ts';
+import { chip, expectFen, expectFenNotShown, expectYourMove, START } from './helpers.ts';
 
 const GAME: GameState = {
   startFen: START,
@@ -30,14 +30,14 @@ function sendGame(ws: WebSocketRoute, game: GameState) {
   for (const msg of messages) ws.send(JSON.stringify(msg));
 }
 
-for (const [phase, side, chip] of [
+for (const [phase, side, text] of [
   ['starting', 'engine', 'starting'],
   ['human', 'human', 'your move'],
   ['thinking', 'engine', 'thinking'],
 ] as const) {
-  test(`while ${chip}, only the chips say so`, async ({ page }) => {
+  test(`while ${text}, only the chips say so`, async ({ page }) => {
     await scriptedServer(page, (ws) => sendGame(ws, { ...GAME, phase }));
-    await expect(page.getByTestId(`strip-${side}`).getByTestId('chip')).toHaveText(chip);
+    await expect(chip(page, side)).toHaveText(text);
     await expect(status(page)).toHaveCount(0);
     await expectFenNotShown(page, START);
   });
@@ -48,7 +48,7 @@ test('a game in progress shows no FEN once a move is on the board', async ({ pag
   await scriptedServer(page, (ws) =>
     sendGame(ws, { ...GAME, fen, moves: ['e2e4'], lastMove: 'e2e4', phase: 'thinking' }),
   );
-  await expect(page.getByTestId('board')).toHaveAttribute('data-fen', fen);
+  await expectFen(page, fen);
   await expectFenNotShown(page, fen);
 });
 

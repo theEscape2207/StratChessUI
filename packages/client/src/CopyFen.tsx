@@ -31,7 +31,6 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-/** The toolbar's Copy FEN icon. */
 export function CopyFen({ fen }: { fen: string }) {
   const [copied, setCopied] = useState<{ fen: string; ok: boolean }>();
   // Feedback belongs to the FEN it was about; a move clears it.

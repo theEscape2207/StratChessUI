@@ -3,7 +3,7 @@ import { expect, type Page } from '@playwright/test';
 // The server runs the fake engine, which answers its first legal move (see playwright.config.ts).
 export const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
-const chip = (page: Page, side: 'engine' | 'human') =>
+export const chip = (page: Page, side: 'engine' | 'human') =>
   page.getByTestId(`strip-${side}`).getByTestId('chip');
 
 export async function expectYourMove(page: Page) {

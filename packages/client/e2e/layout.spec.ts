@@ -86,8 +86,8 @@ test("the sidebar follows the design's order and columns", async ({ page, hasTou
   // The current move sits on a chip.
   await expect(page.getByTestId('moves').locator('[aria-current="true"]')).toHaveText('a5');
   const board = await box(page.getByTestId('board'));
-  const near = await box(page.getByTestId('strip-human'));
-  expect(near.y).toBeGreaterThanOrEqual(board.y + board.height);
+  const humanStrip = await box(page.getByTestId('strip-human'));
+  expect(humanStrip.y).toBeGreaterThanOrEqual(board.y + board.height);
 
   const side = await box(sidebar);
   if (page.viewportSize()!.width >= DESKTOP) {
@@ -98,7 +98,7 @@ test("the sidebar follows the design's order and columns", async ({ page, hasTou
   } else {
     // GameScreenPhone: the board edge to edge, the sidebar under it and the human's strip.
     expect(board.width).toBe(page.viewportSize()!.width);
-    expect(side.y).toBeGreaterThanOrEqual(near.y + near.height);
+    expect(side.y).toBeGreaterThanOrEqual(humanStrip.y + humanStrip.height);
     await expect(sidebar.getByRole('heading')).toBeHidden();
   }
 });

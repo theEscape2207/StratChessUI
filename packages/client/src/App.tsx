@@ -45,8 +45,10 @@ function describeEnd(game: GameState): string {
  * after a game say just "won", "lost", "draw" or "ended".
  */
 function statusLine(link: Link, game: GameState | undefined, dialogOpen: boolean) {
-  if (link !== 'connected') return LINK_STATUS[link];
-  return game?.phase === 'over' && !dialogOpen ? describeEnd(game) : undefined;
+  if (link !== 'connected') return { text: LINK_STATUS[link], className: 'status' };
+  return game?.phase === 'over' && !dialogOpen
+    ? { text: describeEnd(game), className: 'status result' }
+    : undefined;
 }
 
 /** Storage can be unavailable, as in some private windows; the browser then pairs every visit. */
@@ -205,8 +207,8 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
         {strips.human}
         <div className="play-info">
           {status && (
-            <p className={link === 'connected' ? 'status result' : 'status'} data-testid="status">
-              {status}
+            <p className={status.className} data-testid="status">
+              {status.text}
             </p>
           )}
           {(link === 'busy' || link === 'replaced') && (
