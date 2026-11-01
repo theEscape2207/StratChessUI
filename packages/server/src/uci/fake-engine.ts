@@ -6,6 +6,7 @@
 //   ignore-stop     never answers `stop` (and searches forever)
 //   legal           like normal, but answers the first legal move, so whole games can be played
 //   chatty          like legal, with 1100 info strings in the handshake, the last 2000 characters
+//   no-id-name      like normal, but the handshake has no `id name`
 import { createInterface } from 'node:readline';
 import { applyUciMove, legalDests, START_FEN } from '@stratchess-ui/shared';
 
@@ -114,7 +115,7 @@ createInterface({ input: process.stdin }).on('line', (line) => {
   }
   switch (command) {
     case 'uci':
-      HANDSHAKE.forEach(out);
+      HANDSHAKE.filter((l) => mode !== 'no-id-name' || !l.startsWith('id name')).forEach(out);
       if (mode === 'chatty') {
         for (let i = 0; i < 1100; i++) out(`info string chatter ${i}`);
         out(`info string ${'x'.repeat(2000 - 'info string '.length)}`);

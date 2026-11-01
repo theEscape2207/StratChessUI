@@ -30,7 +30,8 @@ export function PlayerStrip({
       </div>
       <div className="strip-who">
         <p className="strip-name">
-          {name} <span>{detail}</span>
+          <span className="strip-name-text">{name}</span>{' '}
+          <span className="strip-detail">{detail}</span>
         </p>
         {/* Pieces are drawn by Chessground's stylesheet, which applies inside a cg-wrap. */}
         <div className="strip-captures cg-wrap" data-testid="captures">

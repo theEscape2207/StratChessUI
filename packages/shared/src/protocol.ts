@@ -40,7 +40,10 @@ export type GameState = {
   moves: string[];
   lastMove?: string;
   humanColor: Color;
+  /** The profile's name, the same throughout the game. */
   engineName: string;
+  /** The engine's own UCI `id name`, once its handshake is done, if it sent one. */
+  engineIdName?: string;
   limit: SearchLimit;
   phase: GamePhase;
   /** Set, with how it ended, when the game ended by rule. */

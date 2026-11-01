@@ -60,7 +60,8 @@ which is also how long a locked phone or a reloaded page has to resume the game.
 
 Engines are configured on the host only, in `engines.json` in the host directory (copy
 `engines.example.json`). Relative paths resolve against the file. Threads and Hash are capped by
-the server. The server logs each engine's `id name` when it starts, so a log shows which build ran.
+the server. The server logs each engine's `id name` when it starts, so a log shows which build ran,
+and the engine's strip shows it during a game.
 
 Run StratChess from a [release](https://github.com/theEscape2207/StratChess/releases), not a local
 build. Download it next to `engines.json` (PowerShell), then point the profile's `executable` and

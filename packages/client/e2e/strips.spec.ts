@@ -23,7 +23,7 @@ for (const side of ['white', 'black'] as const) {
     await openSettled(page);
     await newGame(page, side);
 
-    await expect(engine(page).locator('.strip-name')).toHaveText('StratChess (fake) depth 8');
+    await expect(engine(page).locator('.strip-name')).toHaveText('StratChess depth 8');
     await expect(human(page).locator('.strip-name')).toHaveText(`You ${side}`);
     const board = (await page.getByTestId('board').boundingBox())!;
     const far = (await engine(page).boundingBox())!;
@@ -59,6 +59,15 @@ test('the chips follow the game through a move and the reply', async ({ page, ha
   expect(await chips(page)).toEqual(['waiting', '*your move']);
 });
 
+test("the engine's id name is still on its strip after a reload", async ({ page }) => {
+  await openSettled(page);
+  await newGame(page);
+  await page.reload();
+  await expect(page.getByTestId('status')).toHaveText('your move');
+  await expect(engine(page).locator('.strip-name')).toHaveText('StratChess depth 8');
+  await expect(engine(page).locator('.strip-tile')).toHaveText('S');
+});
+
 const GAME: GameState = {
   startFen: START,
   fen: START,
@@ -79,6 +88,7 @@ test('each phase has its chips, and the limit shows as move time', async ({ page
   });
   await page.goto('/');
   await expect(engine(page).locator('.strip-name')).toHaveText('Fake 1000 ms');
+  await expect(engine(page).locator('.strip-tile')).toHaveText('F');
 
   const phases: [Partial<GameState>, string[]][] = [
     [{}, ['*starting', 'waiting']],
@@ -93,4 +103,38 @@ test('each phase has its chips, and the limit shows as move time', async ({ page
     send(game);
     await expect.poll(() => chips(page)).toEqual(expected);
   }
+});
+
+test('the id name replaces the profile name, its tile following', async ({ page }) => {
+  await page.routeWebSocket(/\/ws/, (ws) => {
+    ws.send(JSON.stringify({ type: 'hello', engines: [] } satisfies ServerMessage));
+    const game = { ...GAME, phase: 'human', engineIdName: 'Delta 2.1' } satisfies GameState;
+    ws.send(JSON.stringify({ type: 'game', game } satisfies ServerMessage));
+  });
+  await page.goto('/');
+  await expect(engine(page).locator('.strip-name')).toHaveText('Delta 2.1 1000 ms');
+  await expect(engine(page).locator('.strip-tile')).toHaveText('D');
+});
+
+test('a long id name truncates, leaving the limit whole and the strip unbroken', async ({
+  page,
+}) => {
+  await page.routeWebSocket(/\/ws/, (ws) => {
+    ws.send(JSON.stringify({ type: 'hello', engines: [] } satisfies ServerMessage));
+    const game = { ...GAME, phase: 'human', engineIdName: 'Long'.repeat(50) } satisfies GameState;
+    ws.send(JSON.stringify({ type: 'game', game } satisfies ServerMessage));
+  });
+  await page.goto('/');
+  const text = engine(page).locator('.strip-name-text');
+  await expect(text).toHaveText('Long'.repeat(50));
+
+  const [line, detail, chip] = await Promise.all([
+    engine(page).locator('.strip-name').boundingBox(),
+    engine(page).locator('.strip-detail').boundingBox(),
+    engine(page).getByTestId('chip').boundingBox(),
+  ]);
+  expect(detail!.x + detail!.width).toBeLessThanOrEqual(line!.x + line!.width);
+  expect(line!.x + line!.width).toBeLessThanOrEqual(chip!.x);
+  expect(await text.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

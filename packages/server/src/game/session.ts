@@ -106,6 +106,7 @@ export class GameSession {
     if (this.game !== game) return void engine.quit(); // replaced or closed while starting
     game.engine = engine;
     this.options.log(`${profile.name}: running ${engine.name ?? 'an engine with no id name'}`);
+    if (engine.name) game.state = { ...game.state, engineIdName: engine.name };
     this.nextTurn(game);
   }
 

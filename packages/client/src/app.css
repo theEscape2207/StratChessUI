@@ -326,14 +326,21 @@ main.game {
 }
 
 .strip-name {
+  display: flex;
+  gap: var(--space-2);
   margin: 0;
-  overflow: hidden;
   font-weight: 700;
   white-space: nowrap;
+}
+
+/* A long name gives way, not the limit beside it. */
+.strip-name-text {
+  overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.strip-name span {
+.strip-detail {
+  flex: none;
   font-weight: 400;
   color: var(--muted);
 }
