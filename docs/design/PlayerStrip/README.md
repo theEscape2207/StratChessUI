@@ -12,7 +12,7 @@ phase and result.
 
 **Anatomy** a 40px tile with the shown name's initial (`accent` for the engine, `panel-raised` for
 the human; 32px on phones; no avatar images), name in `body` 700 with the limit (engine) or colour
-(you) in `muted` (a long name truncates with an ellipsis; the limit stays whole), captured cburnett pieces at 16px overlapping, material lead as `+N` `caption` on the side ahead
+(you) in `muted` (a long name truncates with an ellipsis; the limit stays whole), captured cburnett pieces at 16px overlapping (black ones on the dark theme with a 0.5px `muted` outline, since pure black all but vanishes on `bg`; on light it only smudges them), material lead as `+N` `caption` on the side ahead
 only; a status chip on the right in the `eval` style.
 
 **Captures** count against the position the game started from, not a full set: a game loaded from

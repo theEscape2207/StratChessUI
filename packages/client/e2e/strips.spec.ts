@@ -51,6 +51,41 @@ test('a capture shows on the side that made it, with its lead', async ({ page, h
   await expect(engine(page).getByTestId('lead')).toHaveCount(0);
 });
 
+test('a captured black piece is outlined in muted on the dark theme only', async ({
+  page,
+  hasTouch,
+}) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await openSettled(page);
+  await page.getByLabel('Start position').fill('4k3/8/8/8/8/8/3p4/3QK3 w - - 0 1');
+  await newGame(page);
+  await playAndAwaitReply(page, 'd1d2', hasTouch);
+
+  // The limit beside the engine's name is in muted too, which keeps the token's value out of here.
+  const muted = await engine(page)
+    .locator('.strip-detail')
+    .evaluate((el) => getComputedStyle(el).color);
+  const outline = ['0px -0.5px', '0px 0.5px', '-0.5px 0px', '0.5px 0px']
+    .map((offset) => `drop-shadow(${muted} ${offset} 0px)`)
+    .join(' ');
+  const pawn = human(page).getByRole('img', { name: 'black pawn' });
+  await expect(pawn).toHaveCSS('filter', outline);
+
+  await page.emulateMedia({ colorScheme: 'light' });
+  await expect(pawn).toHaveCSS('filter', 'none');
+});
+
+test('a captured white piece has no outline', async ({ page, hasTouch }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await openSettled(page);
+  // The pawn gives check, and black to move takes it.
+  await page.getByLabel('Start position').fill('3qk3/3P4/8/8/8/8/8/4K3 b - - 0 1');
+  await newGame(page, 'black');
+  await playAndAwaitReply(page, 'd8d7', hasTouch, 'black');
+
+  await expect(human(page).getByRole('img', { name: 'white pawn' })).toHaveCSS('filter', 'none');
+});
+
 test('the chips follow the game through a move and the reply', async ({ page, hasTouch }) => {
   await openSettled(page);
   await newGame(page);

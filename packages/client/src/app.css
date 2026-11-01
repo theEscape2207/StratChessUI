@@ -361,6 +361,14 @@ main.game {
   will-change: auto;
 }
 
+/* Pure black all but vanishes on the dark --bg; on the light one this edge only smudges it. */
+@media (prefers-color-scheme: dark) {
+  .strip-captures.cg-wrap piece.black {
+    filter: drop-shadow(0 -0.5px 0 var(--muted)) drop-shadow(0 0.5px 0 var(--muted))
+      drop-shadow(-0.5px 0 0 var(--muted)) drop-shadow(0.5px 0 0 var(--muted));
+  }
+}
+
 .strip-captures b {
   margin-left: var(--space-3);
   font: var(--text-caption);
