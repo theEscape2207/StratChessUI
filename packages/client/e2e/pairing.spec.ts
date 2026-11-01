@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { expectMoves, newGame, playAndAwaitReply } from './helpers.ts';
+import { expectFen, expectMoves, expectYourMove, newGame, playAndAwaitReply } from './helpers.ts';
 
 test('pairs, plays, and resumes the game after a reload', async ({ page }) => {
   // A revoked token, like any unknown one, sends the browser back to pairing.
@@ -20,12 +20,12 @@ test('pairs, plays, and resumes the game after a reload', async ({ page }) => {
   await newGame(page);
   await playAndAwaitReply(page, 'e2e4', false);
   const fen = 'rnbqkbnr/1ppppppp/8/p7/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2';
-  await expect(page.getByTestId('fen')).toHaveText(fen);
+  await expectFen(page, fen);
   await expectMoves(page, ['e4', 'a5']);
 
   await page.reload();
-  await expect(page.getByTestId('status')).toHaveText('your move');
-  await expect(page.getByTestId('fen')).toHaveText(fen);
+  await expectYourMove(page);
+  await expectFen(page, fen);
   await expectMoves(page, ['e4', 'a5']);
   await playAndAwaitReply(page, 'd2d4', false);
 });

@@ -83,7 +83,7 @@ export function Board({
 
   return (
     <div className="board-frame">
-      <div ref={element} className="board" data-testid="board" />
+      <div ref={element} className="board" data-testid="board" data-fen={fen} />
       {choosing && (
         // Pieces are drawn by Chessground's stylesheet, which applies inside a cg-wrap.
         <div className="promotion cg-wrap" onClick={cancel}>

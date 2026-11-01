@@ -34,20 +34,19 @@ const LINK_STATUS: Record<Exclude<Link, 'connected'>, string> = {
   replaced: 'opened in another tab',
 };
 
-function describe(game: GameState | undefined): string {
-  if (!game) return 'choose a side and start a game';
-  switch (game.phase) {
-    case 'starting':
-      return `starting ${game.engineName}`;
-    case 'human':
-      return 'your move';
-    case 'thinking':
-      return `${game.engineName} thinking`;
-    case 'over':
-      if (game.reason) return `game over: ${game.reason}`;
-      if (game.result === 'draw') return `game over: draw by ${game.termination}`;
-      return `game over: ${game.result} wins by ${game.termination}`;
-  }
+function describeEnd(game: GameState): string {
+  if (game.reason) return `game over: ${game.reason}`;
+  if (game.result === 'draw') return `game over: draw by ${game.termination}`;
+  return `game over: ${game.result} wins by ${game.termination}`;
+}
+
+/**
+ * Only what the strips' chips and the dialog cannot say: chips go stale without a connection, and
+ * after a game say just "won", "lost", "draw" or "ended".
+ */
+function statusLine(link: Link, game: GameState | undefined, dialogOpen: boolean) {
+  if (link !== 'connected') return LINK_STATUS[link];
+  return game?.phase === 'over' && !dialogOpen ? describeEnd(game) : undefined;
 }
 
 /** Storage can be unavailable, as in some private windows; the browser then pairs every visit. */
@@ -140,7 +139,6 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
   const inPlay = useRef(false);
   const [gameOverOpen, setGameOverOpen] = useState(false);
   const newGameButton = useRef<HTMLButtonElement>(null);
-  const fenText = useRef<HTMLParagraphElement>(null);
   const { link, send, retry } = useGameSocket(
     token,
     (msg) => {
@@ -177,6 +175,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
   const formHidden = playing && !formOpen;
   // Replays the game, so once per game state rather than on each search line.
   const strips = useMemo(() => playerStrips(game), [game]);
+  const status = statusLine(link, game, gameOverOpen);
 
   return (
     <main className="game">
@@ -205,9 +204,11 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
         </Board>
         {strips.human}
         <div className="play-info">
-          <p className={game?.phase === 'over' ? 'status result' : 'status'} data-testid="status">
-            {link === 'connected' ? describe(game) : LINK_STATUS[link]}
-          </p>
+          {status && (
+            <p className={link === 'connected' ? 'status result' : 'status'} data-testid="status">
+              {status}
+            </p>
+          )}
           {(link === 'busy' || link === 'replaced') && (
             <button type="button" onClick={retry}>
               {link === 'busy' ? 'Try again' : 'Play here'}
@@ -218,10 +219,6 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
               {notice}
             </p>
           )}
-          {/* Selectable in one tap, for a browser that cannot copy on its own. */}
-          <p className="status fen" data-testid="fen" ref={fenText}>
-            {fen}
-          </p>
         </div>
       </div>
       <aside className="sidebar" aria-label="Game">
@@ -257,7 +254,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
         {/* Kept through a new game, so an open panel stays open; the server resets its lines. */}
         {(game || transcript.length > 0) && <Transcript lines={transcript} />}
         <div className="toolbar">
-          <CopyFen fen={fen} text={fenText} />
+          <CopyFen fen={fen} />
         </div>
       </aside>
     </main>

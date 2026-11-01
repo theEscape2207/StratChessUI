@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import type { GameState, ServerMessage } from '@stratchess-ui/shared';
 import { expect, test } from './fixtures.ts';
-import { newGame, openSettled, playAndAwaitReply, START } from './helpers.ts';
+import { expectYourMove, newGame, openSettled, playAndAwaitReply, START } from './helpers.ts';
 
 const engine = (page: Page) => page.getByTestId('strip-engine');
 const human = (page: Page) => page.getByTestId('strip-human');
@@ -98,7 +98,7 @@ test("the engine's id name is still on its strip after a reload", async ({ page 
   await openSettled(page);
   await newGame(page);
   await page.reload();
-  await expect(page.getByTestId('status')).toHaveText('your move');
+  await expectYourMove(page);
   await expect(engine(page).locator('.strip-name')).toHaveText('StratChess depth 8');
   await expect(engine(page).locator('.strip-tile')).toHaveText('S');
 });

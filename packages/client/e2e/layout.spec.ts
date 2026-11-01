@@ -1,7 +1,13 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ServerMessage } from '@stratchess-ui/shared';
 import { expect, test } from './fixtures.ts';
-import { newGame, openSettled, playAndAwaitReply, submitNewGame } from './helpers.ts';
+import {
+  expectYourMove,
+  newGame,
+  openSettled,
+  playAndAwaitReply,
+  submitNewGame,
+} from './helpers.ts';
 
 // GameScreen's breakpoint, the min-width of app.css's media query.
 const DESKTOP = 960;
@@ -23,8 +29,8 @@ test('before the first game the sidebar shows the new-game form', async ({ page 
     ws.send(JSON.stringify(hello));
   });
   await page.goto('/');
-  await expect(page.getByTestId('status')).toHaveText('choose a side and start a game');
   await expect(form(page)).toBeVisible();
+  await expect(page.getByTestId('status')).toHaveCount(0);
   await expect(reveal(page)).toBeHidden();
   await expect(page.getByRole('button', { name: 'Cancel' })).toBeHidden();
 });
@@ -41,13 +47,13 @@ test('during play the form hides behind New game, and comes back after game over
   await expect(form(page)).toBeVisible();
   await page.getByRole('button', { name: 'Cancel' }).click();
   await expect(form(page)).toBeHidden();
-  await expect(page.getByTestId('status')).toHaveText('your move');
+  await expectYourMove(page);
 
   // Fool's mate against the fake's a-pawn pushes takes too long; a mated start position ends it.
   await reveal(page).click();
   await page.getByLabel('Start position').fill('R5k1/5ppp/8/8/8/8/8/6K1 b - - 0 30');
   await submitNewGame(page);
-  await expect(page.getByTestId('status')).toHaveText('game over: white wins by checkmate');
+  await expect(page.getByTestId('game-over-line')).toHaveText('1-0 · by checkmate');
   await expect(form(page)).toBeVisible();
   await expect(reveal(page)).toBeHidden();
   await expect(page.getByRole('button', { name: 'Cancel' })).toBeHidden();
@@ -77,11 +83,11 @@ test("the sidebar follows the design's order and columns", async ({ page, hasTou
     expect(y).toBeGreaterThan(above);
     above = y;
   }
-  // The current move sits on a chip; the FEN is the line under the board.
+  // The current move sits on a chip.
   await expect(page.getByTestId('moves').locator('[aria-current="true"]')).toHaveText('a5');
   const board = await box(page.getByTestId('board'));
-  const fen = await box(page.getByTestId('fen'));
-  expect(fen.y).toBeGreaterThan(board.y + board.height);
+  const near = await box(page.getByTestId('strip-human'));
+  expect(near.y).toBeGreaterThanOrEqual(board.y + board.height);
 
   const side = await box(sidebar);
   if (page.viewportSize()!.width >= DESKTOP) {
@@ -90,9 +96,9 @@ test("the sidebar follows the design's order and columns", async ({ page, hasTou
     expect(side.y).toBeCloseTo((await box(page.getByTestId('strip-engine'))).y, 0);
     await expect(sidebar.getByRole('heading')).toHaveText('Play StratChess (fake)');
   } else {
-    // GameScreenPhone: the board edge to edge, the sidebar under it and the FEN.
+    // GameScreenPhone: the board edge to edge, the sidebar under it and the human's strip.
     expect(board.width).toBe(page.viewportSize()!.width);
-    expect(side.y).toBeGreaterThan(fen.y + fen.height);
+    expect(side.y).toBeGreaterThanOrEqual(near.y + near.height);
     await expect(sidebar.getByRole('heading')).toBeHidden();
   }
 });

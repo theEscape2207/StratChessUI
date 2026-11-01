@@ -1,6 +1,9 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures.ts';
 import {
+  currentFen,
+  expectFen,
+  expectYourMove,
   newGame,
   openSettled,
   playAndAwaitReply,
@@ -39,11 +42,13 @@ test('opens when the human mates, and × leaves the final position and the form'
   for (const move of ['e2e4', 'f1c4', 'd1h5']) await playAndAwaitReply(page, move, hasTouch);
   await playMove(page, 'h5f7', hasTouch);
   await expectDialog(page, 'You beat StratChess (fake)', '1-0 · by checkmate');
-  const fen = await page.getByTestId('fen').textContent();
+  await expect(page.getByTestId('status')).toHaveCount(0);
+  const fen = await currentFen(page);
 
   await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(page.getByTestId('fen')).toHaveText(fen!);
+  await expectFen(page, fen!);
+  await expect(page.getByTestId('status')).toHaveText('game over: white wins by checkmate');
   await expect(page.locator('form.new-game')).toBeVisible();
 });
 
@@ -52,21 +57,23 @@ test("stops with the server's reason when the engine fails, and a scrim tap clos
   hasTouch,
 }) => {
   await newGameFrom(page, CRASH);
-  await expect(page.getByTestId('status')).toHaveText('your move');
+  await expectYourMove(page);
   await playMove(page, 'e2e4', hasTouch);
   await expectDialog(page, 'Game stopped', /^StratChess \(fake\) failed: /);
   const line = await page.getByTestId('game-over-line').textContent();
-  await expect(page.getByTestId('status')).toHaveText(`game over: ${line}`);
+  await expect(page.getByTestId('status')).toHaveCount(0);
 
   const scrim = page.getByTestId('game-over-scrim');
   if (hasTouch) await scrim.tap({ position: { x: 4, y: 4 } });
   else await scrim.click({ position: { x: 4, y: 4 } });
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByTestId('status')).toHaveText(`game over: ${line}`);
 });
 
 test('does not open again when a finished game is reloaded', async ({ page }) => {
   await newGameFrom(page, MATED);
   await expectDialog(page, 'StratChess (fake) wins', '1-0 · by checkmate');
+  await expect(page.getByTestId('status')).toHaveCount(0);
 
   await page.reload();
   await expect(page.getByTestId('status')).toHaveText('game over: white wins by checkmate');
