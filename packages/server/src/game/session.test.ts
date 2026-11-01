@@ -12,10 +12,9 @@ import {
 import { fakeProfile } from '../uci/fake-profile.ts';
 import { GameSession } from './session.ts';
 
-const PROFILES = ['legal', 'normal', 'crash-on-go', 'no-uciok', 'chatty'].map((mode) => ({
-  ...fakeProfile(mode),
-  id: mode,
-}));
+const PROFILES = ['legal', 'normal', 'crash-on-go', 'no-uciok', 'chatty', 'no-id-name'].map(
+  (mode) => ({ ...fakeProfile(mode), id: mode }),
+);
 // A cold Node spawn of the fake can take well over 300 ms on a Windows CI runner.
 const TIMEOUTS = { handshakeMs: 2000, readyMs: 1000, stopGraceMs: 300 };
 
@@ -224,6 +223,26 @@ describe('GameSession', () => {
     void session.newGame(game('legal', 'white'));
     await settled();
     expect(logged).toEqual(['StratChess (fake): running StratChess']);
+  });
+
+  it("carries the engine's id name once the handshake is done, keeping the profile name", async () => {
+    const { session, next, settled } = open();
+    void session.newGame(game('legal', 'white'));
+    const starting = await next();
+    expect(starting).toMatchObject({ type: 'game', game: { phase: 'starting' } });
+    expect((starting as { game: GameState }).game.engineIdName).toBeUndefined();
+    const state = await settled();
+    expect(state.engineIdName).toBe('StratChess');
+    expect(state.engineName).toBe('StratChess (fake)');
+  });
+
+  it('has no id name to carry from an engine that sends none', async () => {
+    const { session, settled, logged } = open();
+    void session.newGame(game('no-id-name', 'white'));
+    const state = await settled();
+    expect(state.phase).toBe('human');
+    expect(state.engineIdName).toBeUndefined();
+    expect(logged).toEqual(['StratChess (fake): running an engine with no id name']);
   });
 
   it('ends the game with a reason when the engine does not start', async () => {

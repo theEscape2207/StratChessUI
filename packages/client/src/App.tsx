@@ -103,7 +103,7 @@ function playerStrips(game: GameState | undefined) {
     engine: (
       <PlayerStrip
         side="engine"
-        name={game.engineName}
+        name={game.engineIdName ?? game.engineName}
         detail={limitLabel(game.limit)}
         captured={captured[engineColor]}
         capturedColor={game.humanColor}
