@@ -3,8 +3,8 @@
     {
       "id": "stratchess",
       "name": "StratChess",
-      "executable": "C:/Users/you/source/repos/StratChessEvolved/build/windows-clang-cl/StratChessEvolved.exe",
-      "cwd": "C:/Users/you/source/repos/StratChessEvolved/StratChessEvolved",
+      "executable": "engines/stratchess-0.8.0/StratChess-0.8.0-windows-x64.exe",
+      "cwd": "engines/stratchess-0.8.0",
       "options": { "Threads": 2, "Hash": 256 }
     }
   ]

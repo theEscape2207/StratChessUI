@@ -23,7 +23,7 @@ export type SessionOptions = {
   profiles: readonly EngineProfile[];
   send: (msg: ServerMessage) => void;
   timeouts?: Partial<Timeouts>;
-  /** Where engine failures and their transcripts are reported. */
+  /** Where the build each game runs against, and engine failures with transcripts, are reported. */
   log: (text: string) => void;
 };
 
@@ -105,6 +105,7 @@ export class GameSession {
     }
     if (this.game !== game) return void engine.quit(); // replaced or closed while starting
     game.engine = engine;
+    this.options.log(`${profile.name}: running ${engine.name ?? 'an engine with no id name'}`);
     this.nextTurn(game);
   }
 

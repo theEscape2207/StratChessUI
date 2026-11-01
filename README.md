@@ -60,11 +60,24 @@ which is also how long a locked phone or a reloaded page has to resume the game.
 
 Engines are configured on the host only, in `engines.json` in the host directory (copy
 `engines.example.json`). Relative paths resolve against the file. Threads and Hash are capped by
-the server. Check a profile against the real engine with:
+the server. The server logs each engine's `id name` when it starts, so a log shows which build ran.
+
+Run StratChess from a [release](https://github.com/theEscape2207/StratChess/releases), not a local
+build. Download it next to `engines.json` (PowerShell), then point the profile's `executable` and
+`cwd` at that folder; the release is one `.exe` that needs nothing else there:
+
+```powershell
+gh release download v0.8.0 -R theEscape2207/StratChess -D "$env:APPDATA\StratChessUI\engines\stratchess-0.8.0"
+```
+
+Check a profile against the real engine with:
 
 ```sh
 npm run probe-engine -- stratchess
 ```
+
+To adopt a new release, repeat this and re-check `docs/Requirements.md` → StratChess UCI behaviour,
+which names the release it was checked against.
 
 ## Play from a phone
 

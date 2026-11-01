@@ -216,7 +216,14 @@ describe('GameSession', () => {
     const state = await settled();
     expect(state.phase).toBe('over');
     expect(state.reason).toMatch(/^StratChess \(fake\) failed: engine exited \(code 3\)/);
-    expect(logged[0]).toContain('> go depth 3');
+    expect(logged.at(-1)).toContain('> go depth 3');
+  });
+
+  it("logs the engine's own id name when it starts", async () => {
+    const { session, settled, logged } = open();
+    void session.newGame(game('legal', 'white'));
+    await settled();
+    expect(logged).toEqual(['StratChess (fake): running StratChess']);
   });
 
   it('ends the game with a reason when the engine does not start', async () => {
@@ -345,7 +352,7 @@ describe('GameSession', () => {
       const { session, settled, logged } = open();
       void session.newGame({ ...game('crash-on-go', 'white'), fen: ENDING });
       expect((await settled()).phase).toBe('over');
-      expect(logged[0]).toContain('> position fen 4k3/8/8/8/4P3/8/8/4K3 b - - 0 40');
+      expect(logged.at(-1)).toContain('> position fen 4k3/8/8/8/4P3/8/8/4K3 b - - 0 40');
     });
 
     it('refuses an invalid FEN with a reason and keeps the current game', async () => {
