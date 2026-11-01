@@ -141,7 +141,7 @@ engine profiles.
 The JavaScript ecosystem changes faster than this repo's C++ dependencies. The churn sits mostly
 in build tooling (Vite, ESLint, TypeScript) rather than in the chess or server code.
 
-- **Updates:** Dependabot opens one grouped minor/patch PR per month; merge it when CI is green.
+- **Updates:** Dependabot opens one grouped minor/patch PR per week; merge it when CI is green.
   Take majors deliberately, one at a time. Expect two or three small migrations a year.
 - **Urgency is low.** The app is LAN-only, has no accounts and no internet exposure, so a skipped
   month costs nothing. Quarterly is fine; `npm audit` findings are informational unless they affect

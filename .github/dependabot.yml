@@ -1,10 +1,10 @@
 version: 2
 updates:
-  # One grouped minor/patch PR a month; majors arrive one PR each, taken deliberately.
+  # One grouped minor/patch PR a week; majors arrive one PR each, taken deliberately.
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: monthly
+      interval: weekly
     groups:
       npm-minor-patch:
         update-types: [minor, patch]
@@ -20,7 +20,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: monthly
+      interval: weekly
     groups:
       actions:
         patterns: ['*']
