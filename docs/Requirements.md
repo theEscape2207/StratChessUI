@@ -20,7 +20,7 @@ separate open-source repository, and has no commercial goal.
 - **Integration:** UCI only; no coupling to engine code.
 - **Control:** one active game, controlled by one browser; other devices cannot take it over. No
   user accounts. A browser pairs through a code shown on the host. This is an accepted, clunky
-  compromise; revisit for Play.
+  compromise; revisit for Play (#16, #67).
 - **Session:** a game lives only while its page is open. Saved games, and timed games that survive
   a reconnect, are backlog.
 - **Priority:** human vs engine, then analysis/statistics, then engine vs engine (single
@@ -29,7 +29,7 @@ separate open-source repository, and has no commercial goal.
   never presented as Elo levels.
 - **Statistics:** standard UCI output first, StratChess-specific statistics later.
 - **Playing aids:** legal moves enforced from M1; legal-move highlighting in M2; takebacks and hints
-  in M3.
+  in M3. A takeback returns to the human's previous turn, not one ply (#69).
 - **Positions:** standard start in M1; FEN input in M2, including positions copied from puzzle sites.
   A loaded FEN preselects the side to move for the human (still changeable); an engine to move
   starts at once.
@@ -152,15 +152,20 @@ in build tooling (Vite, ESLint, TypeScript) rather than in the chess or server c
 
 ## Open questions (later milestones)
 
-- **PGN export:** #65 (recommended: retains page-bound games without a database).
-- **M3:** hint form (piece, move or line) and its engine/limit; takeback = one ply or back to the
-  human's previous turn; resign and draw offers; how difficulty is named.
+- **M3:** hint form (piece, move or line) and its engine/limit (#68); resign and draw offers (#70);
+  how difficulty is named (#71); whether Play needs its own view (#76); how long a game survives a
+  lost connection (#73). A real game with the target player closes the milestone (#74).
+- **After M3:** PGN export, #65 (recommended: retains page-bound games without a database). M3 holds
+  only what serves beginners.
+- **Several users:** one server holds one game for one browser, which will not serve even two
+  players. It needs rearchitecting at some point; no milestone yet.
 - **Analysis:** linear move navigation or variation tree; continuous analysis; multiple engines;
   when to build the engine option forms, as profiles on the host set options until then.
 - **Engine vs engine:** per-side profiles and limits; bundled Stockfish (GPL source obligations) or
   user-supplied binary.
-- **Delivery:** documented developer launcher first; installer is a separate requirement.
-- **Accessibility and keyboard** requirements.
+- **Delivery:** documented developer launcher first; installer is a separate requirement. The owner
+  starts the server through M3.
+- **Accessibility and keyboard** requirements, after M3.
 - **CI:** integration tests need a StratChess binary; pin a released build or use a fake engine
   replaying recorded transcripts (recommended for unit tests anyway).
 
