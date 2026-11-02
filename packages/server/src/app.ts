@@ -23,7 +23,7 @@ export type AppOptions = {
   /** Engines a browser may choose from. */
   profiles?: EngineProfile[];
   engineTimeouts?: Partial<Timeouts>;
-  /** Where engine failures are reported; defaults to stderr. */
+  /** Where engine failures and client lifecycle events are reported; defaults to stderr. */
   log?: (text: string) => void;
   /** Defaults to an in-memory store that prints its codes to stdout. */
   pairings?: Pairings;
@@ -70,7 +70,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   app.get('/api/health', async () => ({ ok: true }));
 
-  const log = options.log ?? ((text) => console.error(text));
+  const write = options.log ?? ((text) => console.error(text));
+  const log = (text: string) => write(`${new Date().toISOString()} ${text}`);
   const pairings =
     options.pairings ?? new Pairings({ store: memoryStore(), announce: (t) => console.log(t) });
   const controller = new Controller({
@@ -93,10 +94,15 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   app.get<{ Querystring: { token?: string } }>('/ws', { websocket: true }, (socket, request) => {
     // Refused after the upgrade: a browser cannot tell a refused upgrade from a network drop.
+    // The token is a credential and the log may be pasted publicly: keep it, and `request.url` which
+    // carries it, out of every line.
     const token = request.query.token;
-    if (!token || !pairings.isPaired(token))
+    if (!token || !pairings.isPaired(token)) {
+      log(`${request.ip} refused: not paired`);
       return socket.close(CLOSE_CODES.notPaired, 'not paired');
+    }
     const connection: Connection = {
+      address: request.ip,
       send: (msg: ServerMessage) => {
         if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(msg));
       },
