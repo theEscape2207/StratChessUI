@@ -90,6 +90,8 @@ export class Controller {
     await Promise.all(
       browsers.map((browser) => {
         clearTimeout(browser.graceTimer);
+        // A socket still closing must not start an engine that nothing would stop.
+        browser.connection = undefined;
         return browser.session.close();
       }),
     );
@@ -112,11 +114,11 @@ export class Controller {
   }
 
   private attachOutcome(browser?: Browser): string {
-    if (!browser) return 'connected, took control';
+    if (!browser) return 'connected, no game started';
     return browser.session.state ? 'reconnected, resumed the game' : 'reconnected, no game started';
   }
 
-  /** Logged here and not in `release`, which runs when the server shuts down. */
+  /** Ends this browser's game alone. */
   private async expire(browser: Browser, address: string): Promise<void> {
     const outcome = browser.session.state ? 'game ended' : 'no game to end';
     this.options.log(`${address} grace period ran out, ${outcome}`);

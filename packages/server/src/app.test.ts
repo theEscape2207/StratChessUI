@@ -1,7 +1,13 @@
 import type { FastifyInstance } from 'fastify';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import type { WebSocket } from 'ws';
-import { CLOSE_CODES, START_FEN, type ServerMessage } from '@stratchess-ui/shared';
+import {
+  CLOSE_CODES,
+  START_FEN,
+  type ClientMessage,
+  type GamePhase,
+  type ServerMessage,
+} from '@stratchess-ui/shared';
 import { buildApp, type AppOptions } from './app.ts';
 import { Controller } from './game/controller.ts';
 import { memoryStore, Pairings, type PairingStore } from './pairing.ts';
@@ -115,11 +121,24 @@ function engineLimitError(limit: number) {
 async function startOnceSlotFree(client: Client, limit: number) {
   for (;;) {
     client.send(NEW_GAME);
-    const msg = await client.next();
+    const msg = await untilGameOrError(client, 'starting');
     if (msg.type === 'game') return msg;
     expect(msg).toEqual(engineLimitError(limit));
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
+}
+
+/** The next error, or the next game state in `phase`. */
+async function untilGameOrError(client: Client, phase: GamePhase) {
+  for (;;) {
+    const msg = await client.next();
+    if (msg.type === 'error' || (msg.type === 'game' && msg.game.phase === phase)) return msg;
+  }
+}
+
+/** The engines started so far, through a spy on `UciEngine.start`. */
+function startedEngines(start: MockInstance<typeof UciEngine.start>) {
+  return Promise.all(start.mock.results.map((result) => result.value as Promise<UciEngine>));
 }
 
 describe('server', () => {
@@ -202,7 +221,7 @@ describe('server', () => {
     black.send({ ...NEW_GAME, humanColor: 'black' });
     await black.yourMove();
     expect(start).toHaveBeenCalledTimes(2);
-    const [one, two] = await Promise.all(start.mock.results.map((r) => r.value as UciEngine));
+    const [one, two] = await startedEngines(start);
     expect(one).not.toBe(two);
 
     await playAndExpect(white, 'e2e4', 'a7a5');
@@ -221,7 +240,7 @@ describe('server', () => {
     const start = vi.spyOn(UciEngine, 'start');
     const leaver = await browserInGame();
     const stayer = await browserInGame();
-    const [gone, kept] = await Promise.all(start.mock.results.map((r) => r.value as UciEngine));
+    const [gone, kept] = await startedEngines(start);
     leaver.ws.terminate();
 
     await vi.waitFor(() => expect(gone!.alive).toBe(false));
@@ -236,13 +255,9 @@ describe('server', () => {
     // The fake crashes on its first search of this position.
     const fen = '4k3/8/8/8/8/8/4P3/4K3 w - - 0 1';
     failing.send({ ...NEW_GAME, humanColor: 'black', fen });
-    for (;;) {
-      const msg = await failing.next();
-      if (msg.type === 'game' && msg.game.phase === 'over') {
-        expect(msg.game.reason).toContain('failed');
-        break;
-      }
-    }
+    expect(await untilGameOrError(failing, 'over')).toMatchObject({
+      game: { reason: expect.stringContaining('failed') as string },
+    });
     await playAndExpect(fine, 'e2e4', 'a7a5');
   });
 
@@ -251,7 +266,7 @@ describe('server', () => {
     const start = vi.spyOn(UciEngine, 'start');
     await browserInGame();
     await browserInGame();
-    const engines = await Promise.all(start.mock.results.map((r) => r.value as UciEngine));
+    const engines = await startedEngines(start);
     expect(engines.map((engine) => engine.alive)).toEqual([true, true]);
 
     await app.close();
@@ -270,10 +285,32 @@ describe('server', () => {
     fifth.send(NEW_GAME);
     expect(await fifth.next()).toEqual(engineLimitError(4));
     playing.send(NEW_GAME);
+    // The browser blanks its game on asking for a new one, so the game comes back, then the reason.
+    expect(await playing.next()).toMatchObject({
+      type: 'game',
+      game: { phase: 'human', moves: ['e2e4', 'a7a5'] },
+    });
+    expect(await playing.next()).toMatchObject({ type: 'search' });
     expect(await playing.next()).toEqual(engineLimitError(4));
     expect(start).toHaveBeenCalledTimes(4);
 
     await playAndExpect(playing, 'd2d4', 'a5a4');
+  });
+
+  it('starts no engine for a message that arrives after shutdown', async () => {
+    const start = vi.spyOn(UciEngine, 'start');
+    const controller = new Controller({
+      profiles: [fakeProfile('legal')],
+      graceMs: 60_000,
+      engineLimit: 1,
+      log: () => {},
+    });
+    const connection = { address: ADDRESS, send: () => {}, close: () => {} };
+    controller.attach('token', connection);
+    await controller.release();
+
+    controller.receive(connection, NEW_GAME as ClientMessage);
+    expect(start).not.toHaveBeenCalled();
   });
 
   it('starts no engine, so needs no slot, for a game that is already over', async () => {
@@ -324,10 +361,7 @@ describe('server', () => {
     const client = await connect(app, await pairedToken());
     expect(await client.next()).toMatchObject({ type: 'hello' });
     client.send({ ...NEW_GAME, engineId: 'broken' });
-    for (;;) {
-      const msg = await client.next();
-      if (msg.type === 'game' && msg.game.phase === 'over') break;
-    }
+    expect(await untilGameOrError(client, 'over')).toMatchObject({ type: 'game' });
     expect(await startOnceSlotFree(client, 1)).toMatchObject({ game: { phase: 'starting' } });
     expect(await client.yourMove()).toMatchObject({ phase: 'human' });
   });
@@ -427,10 +461,10 @@ describe('lifecycle log', () => {
       ),
     );
 
-  it('logs a browser taking control', async () => {
+  it('logs a browser connecting', async () => {
     const lines = await buildLogged();
     await connect(app, await pairedToken());
-    await logged(lines, `${ADDRESS} connected, took control`);
+    await logged(lines, `${ADDRESS} connected, no game started`);
   });
 
   it('logs a browser refused for not being paired', async () => {

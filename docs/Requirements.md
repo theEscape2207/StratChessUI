@@ -21,7 +21,8 @@ separate open-source repository, and has no commercial goal.
 - **Control:** one game per paired browser, so no device blocks another and two people can play at
   once. A game cannot move between devices, and two people sharing a browser share a game. At most
   4 engines run at once, as each can hold many threads and much memory; past that a new game is
-  refused with a reason. No user accounts. A browser pairs through a code shown on the host.
+  refused with a reason. No user accounts. A browser pairs through a code shown on the host. This
+  is an accepted, clunky compromise; revisit for Play (#16).
 - **Session:** a game lives only while its page is open. Saved games, and timed games that survive
   a reconnect, are backlog.
 - **Priority:** human vs engine, then analysis/statistics, then engine vs engine (single

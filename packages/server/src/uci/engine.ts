@@ -108,7 +108,8 @@ export class UciEngine {
     this.exited = new Promise((resolve) => {
       this.child.on('error', (error) => {
         this.fail(`cannot start ${profile.executable}: ${error.message}`);
-        resolve();
+        // 'error' also fires for a failed kill, when the process is still running.
+        if (this.child.pid === undefined) resolve();
       });
       this.child.on('exit', (code, signal) => {
         this.fail(`engine exited (${signal ?? `code ${code}`})`);

@@ -1,7 +1,15 @@
 import type { Page, WebSocketRoute } from '@playwright/test';
 import { CLOSE_CODES, type GameState, type ServerMessage } from '@stratchess-ui/shared';
 import { expect, test } from './fixtures.ts';
-import { chip, expectFen, expectFenNotShown, expectYourMove, START } from './helpers.ts';
+import {
+  chip,
+  expectFen,
+  expectFenNotShown,
+  expectYourMove,
+  showNewGameForm,
+  START,
+  submitNewGame,
+} from './helpers.ts';
 
 const GAME: GameState = {
   startFen: START,
@@ -84,6 +92,28 @@ test('says "opened in another tab", and Play here takes the game back', async ({
   await expectYourMove(page);
   await expect(status(page)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Play here' })).toHaveCount(0);
+});
+
+test('a refused new game brings the current game back, with the reason', async ({ page }) => {
+  const fen = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1';
+  const game: GameState = { ...GAME, fen, moves: ['e2e4'], lastMove: 'e2e4', phase: 'human' };
+  await scriptedServer(page, (ws) => {
+    sendGame(ws, game);
+    ws.onMessage(() => {
+      ws.send(JSON.stringify({ type: 'game', game } satisfies ServerMessage));
+      const reason = 'limit of 4 engines reached, try again later';
+      ws.send(JSON.stringify({ type: 'error', reason } satisfies ServerMessage));
+    });
+  });
+  await expectFen(page, fen);
+
+  await showNewGameForm(page);
+  await submitNewGame(page);
+  await expect(page.getByTestId('notice')).toHaveText(
+    'limit of 4 engines reached, try again later',
+  );
+  await expectFen(page, fen);
+  await expectYourMove(page);
 });
 
 test('a rejected move shows its notice until the next game state', async ({ page }) => {

@@ -222,6 +222,12 @@ export class GameSession {
 
   private refuse(reason: string): void {
     this.options.refused(reason);
+    // The browser blanks its game when it asks for a new one, so it needs this one back. The
+    // error comes last, as a game state clears the browser's notice.
+    if (this.game) {
+      this.options.send({ type: 'game', game: this.game.state });
+      if (this.game.search) this.options.send({ type: 'search', ...this.game.search });
+    }
     this.error(`${reason}, try again later`);
   }
 
