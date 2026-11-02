@@ -113,7 +113,7 @@ Fixed in the engine rather than worked around in the UI:
 | theEscape2207/StratChess#912           | Full PV on the final info line                                                                                  | M2                                       |
 | theEscape2207/StratChess#94 (reopened) | MultiPV                                                                                                         | M3: hint alternatives, weakened opponent |
 | theEscape2207/StratChess#913           | Beginner strength: probe depth 1-2 and small `nodes` budgets, then a skill option if needed. Largest risk to M3 | M3                                       |
-| theEscape2207/StratChess#914           | `currmove`/`currmovenumber` (optional)                                                                          | M2                                       |
+| theEscape2207/StratChess#914           | `currmove`/`currmovenumber` (optional)                                                                          | No milestone; M2 closed without it       |
 
 ## External dependencies
 
@@ -127,7 +127,6 @@ All npm packages, pinned by a committed lockfile. Runtime licenses are GPL-compa
 | chessops                                                                                   | Rules on server and browser                                            | GPL-3.0+   | Slow, stable                                   |
 | Chessground (`@lichess-org/chessground`; the unscoped `chessground` package is deprecated) | Board                                                                  | GPL-3.0+   | Slow, stable (Lichess-maintained)              |
 | React                                                                                      | UI                                                                     | MIT        | Major every ~1-2 years                         |
-| Mantine                                                                                    | Controls, dialogs, forms                                               | MIT        | Major ~yearly                                  |
 | _Dev:_ Vite                                                                                | Build, dev server                                                      | MIT        | Major ~yearly                                  |
 | _Dev:_ Vitest                                                                              | Unit tests, fake-engine transcripts                                    | MIT        | Tracks Vite                                    |
 | _Dev:_ Playwright                                                                          | Browser and touch tests                                                | Apache-2.0 | Monthly; bundles browsers                      |
@@ -153,10 +152,11 @@ in build tooling (Vite, ESLint, TypeScript) rather than in the chess or server c
 
 ## Open questions (later milestones)
 
-- **M2:** PGN export (recommended: retains page-bound games without a database).
+- **PGN export:** #65 (recommended: retains page-bound games without a database).
 - **M3:** hint form (piece, move or line) and its engine/limit; takeback = one ply or back to the
   human's previous turn; resign and draw offers; how difficulty is named.
-- **Analysis:** linear move navigation or variation tree; continuous analysis; multiple engines.
+- **Analysis:** linear move navigation or variation tree; continuous analysis; multiple engines;
+  when to build the engine option forms, as profiles on the host set options until then.
 - **Engine vs engine:** per-side profiles and limits; bundled Stockfish (GPL source obligations) or
   user-supplied binary.
 - **Delivery:** documented developer launcher first; installer is a separate requirement.

@@ -6,8 +6,9 @@ Stockfish and others later.
 
 Requirements, decisions and milestones: [`docs/Requirements.md`](docs/Requirements.md).
 
-Status: M1 in progress. A paired browser plays white or black against an engine profile, limited
-by depth or move time, through to a result the server decides, automatic draws included.
+A paired browser plays white or black against an engine profile, limited by depth or move time,
+from the standard start or any FEN, through to a result the server decides, automatic draws
+included. It shows the engine's live search and its UCI transcript.
 
 ## Layout
 
