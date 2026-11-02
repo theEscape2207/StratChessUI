@@ -809,3 +809,69 @@ button:disabled {
   opacity: 0;
   cursor: pointer;
 }
+
+/* The design's phone column, kept at every width: the page has one form. */
+main.pair-screen {
+  box-sizing: border-box;
+  max-width: 390px;
+}
+
+.wordmark {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  margin-bottom: var(--space-6);
+  font: var(--text-panel-title);
+}
+
+.wordmark-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: repeating-conic-gradient(var(--board-dark) 0 25%, var(--board-light) 0 50%);
+}
+
+.pair-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-6) var(--space-5);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+}
+
+.pair-card h1 {
+  margin: 0;
+  font: 800 20px / 26px var(--font-sans);
+}
+
+.pair-hint {
+  margin: 0;
+  color: var(--muted);
+}
+
+.pair-card .notice {
+  margin: 0;
+}
+
+.pair-card label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-weight: 600;
+}
+
+/* The indent balances the spacing after the last digit, which would push the code off centre. */
+.pair-card input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 56px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-sm);
+  font: 700 28px var(--font-mono);
+  letter-spacing: 0.35em;
+  text-align: center;
+  text-indent: 0.35em;
+  color: var(--ink);
+  background: var(--bg);
+}

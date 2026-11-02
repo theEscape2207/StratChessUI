@@ -77,7 +77,7 @@ export function App() {
   };
   if (!token) {
     return (
-      <main>
+      <main className="pair-screen">
         <PairForm onPaired={remember} />
       </main>
     );
