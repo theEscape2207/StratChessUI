@@ -3,7 +3,7 @@ import { dirname } from 'node:path';
 import { BOARD_SERVERS, PAIRING_CODE, pairedState, serverURL } from './servers.ts';
 
 // Pairs each board server once per run rather than once per worker, so a worker restarted after
-// a failure does not leave an engine behind until its grace period runs out.
+// a failure does not leave an engine or a held game behind.
 export default async function pairServers() {
   for (let index = 0; index < BOARD_SERVERS; index++) {
     const origin = serverURL(index);

@@ -27,7 +27,7 @@ export type AppOptions = {
   log?: (text: string) => void;
   /** Defaults to an in-memory store that prints its codes to stdout. */
   pairings?: Pairings;
-  /** How long a game waits for its browser to reconnect. */
+  /** How long an engine outlives its browser's socket; the game itself is held regardless. */
   graceMs?: number;
   /** How many engine processes may run at once. */
   engineLimit?: number;
