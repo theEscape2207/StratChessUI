@@ -9,6 +9,8 @@ import { UciEngine } from './uci/engine.ts';
 import { fakeProfile } from './uci/fake-profile.ts';
 
 const CODE = '123456';
+const ADDRESS = '192.0.2.1';
+const OTHER_ADDRESS = '192.0.2.2';
 
 let app: FastifyInstance;
 afterEach(async () => {
@@ -43,7 +45,7 @@ async function pairedToken() {
  * Connects and buffers every message from the first, which the server sends on open. Transcript
  * messages are read apart from the rest, which they would otherwise interleave unpredictably.
  */
-async function connect(app: FastifyInstance, token?: string) {
+async function connect(app: FastifyInstance, token?: string, remoteAddress = ADDRESS) {
   const queue: ServerMessage[] = [];
   let wake = () => {};
   const onMessage = (data: Buffer) => {
@@ -61,7 +63,8 @@ async function connect(app: FastifyInstance, token?: string) {
   const closed = new Promise<number>((resolve) => (onClose = resolve));
   const ws: WebSocket = await app.injectWS(
     token === undefined ? '/ws' : `/ws?token=${token}`,
-    { headers: { host: 'localhost' } },
+    // `injectWS` builds a request with no socket of its own, which would leave `request.ip` undefined.
+    { headers: { host: 'localhost' }, socket: { remoteAddress } } as object,
     {
       onInit: (socket) => {
         socket.on('message', onMessage);
@@ -242,5 +245,117 @@ describe('server', () => {
     expect(await other.next()).toMatchObject({ type: 'hello' });
     other.ws.send(JSON.stringify({ type: 'move', uci: 'e2e4' }));
     expect(await other.next()).toEqual({ type: 'error', reason: 'no game in progress' });
+  });
+});
+
+describe('lifecycle log', () => {
+  /** An app whose log lines land in the returned array. */
+  async function buildLogged(options: Partial<AppOptions> = {}) {
+    const lines: string[] = [];
+    await build({ log: (text) => lines.push(text), ...options });
+    return lines;
+  }
+
+  /** Waits for an entry reading `text` after its timestamp. */
+  const logged = (lines: string[], text: string) =>
+    vi.waitFor(() =>
+      expect(lines.map((line) => /^\d{4}-\d\d-\d\dT[\d:.]+Z (.*)$/s.exec(line)?.[1])).toContain(
+        text,
+      ),
+    );
+
+  it('logs a browser taking control', async () => {
+    const lines = await buildLogged();
+    await connect(app, await pairedToken());
+    await logged(lines, `${ADDRESS} connected, took control`);
+  });
+
+  it('logs a browser refused for not being paired', async () => {
+    const lines = await buildLogged();
+    await (
+      await connect(app, 'guess')
+    ).closed;
+    await logged(lines, `${ADDRESS} refused: not paired`);
+  });
+
+  it('logs a browser refused because another device holds the game', async () => {
+    const lines = await buildLogged();
+    await connect(app, await pairedToken());
+    await (
+      await connect(app, await pairedToken(), OTHER_ADDRESS)
+    ).closed;
+    await logged(lines, `${OTHER_ADDRESS} refused: another device controls the game`);
+  });
+
+  it('logs a replaced connection, with no close line for the old socket', async () => {
+    const lines = await buildLogged();
+    const token = await pairedToken();
+    const first = await connect(app, token);
+    await connect(app, token, OTHER_ADDRESS);
+    await first.closed;
+    await logged(lines, `${ADDRESS} replaced by ${OTHER_ADDRESS}`);
+    expect(lines.join('\n')).not.toContain('socket closed');
+  });
+
+  it('logs a close and a reconnect, without claiming a game that never started', async () => {
+    const lines = await buildLogged();
+    const token = await pairedToken();
+    const first = await connect(app, token);
+    first.ws.terminate();
+    await logged(lines, `${ADDRESS} socket closed, grace period of 60000 ms started`);
+    await connect(app, token);
+    await logged(lines, `${ADDRESS} reconnected, no game started`);
+  });
+
+  it('logs a reconnect that resumes a game', async () => {
+    const lines = await buildLogged();
+    const token = await pairedToken();
+    const first = await connect(app, token);
+    first.ws.send(JSON.stringify(NEW_GAME));
+    await first.yourMove();
+    first.ws.terminate();
+    await logged(lines, `${ADDRESS} socket closed, grace period of 60000 ms started`);
+    await connect(app, token);
+    await logged(lines, `${ADDRESS} reconnected, resumed the game`);
+  });
+
+  it('logs the grace period running out', async () => {
+    const lines = await buildLogged({ graceMs: 20 });
+    const first = await connect(app, await pairedToken());
+    first.ws.send(JSON.stringify(NEW_GAME));
+    await first.yourMove();
+    first.ws.terminate();
+    await logged(lines, `${ADDRESS} grace period ran out, game ended`);
+  });
+
+  it('does not claim the grace period ran out when the server shuts down', async () => {
+    const lines = await buildLogged({ graceMs: 20 });
+    const first = await connect(app, await pairedToken());
+    first.ws.send(JSON.stringify(NEW_GAME));
+    await first.yourMove();
+    await app.close();
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(lines.join('\n')).not.toContain('grace period ran out');
+  });
+
+  it('never logs the token', async () => {
+    const lines = await buildLogged({ graceMs: 20 });
+    const token = await pairedToken();
+    const first = await connect(app, token);
+    first.ws.send(JSON.stringify(NEW_GAME));
+    await first.yourMove();
+    await (
+      await connect(app, await pairedToken(), OTHER_ADDRESS)
+    ).closed;
+    const second = await connect(app, token);
+    await first.closed;
+    await (
+      await connect(app, 'guess-at-a-token')
+    ).closed;
+    second.ws.terminate();
+    await logged(lines, `${ADDRESS} grace period ran out, game ended`);
+    const output = lines.join('\n');
+    expect(output).not.toContain(token);
+    expect(output).not.toContain('guess-at-a-token');
   });
 });

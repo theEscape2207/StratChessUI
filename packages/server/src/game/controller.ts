@@ -6,6 +6,8 @@ import type { Timeouts } from '../uci/engine.ts';
 import { GameSession } from './session.ts';
 
 export type Connection = {
+  /** The browser's remote address, for the log. */
+  address: string;
   send(msg: ServerMessage): void;
   close(code: number, reason: string): void;
 };
@@ -32,10 +34,15 @@ export class Controller {
   /** Gives the game to the controlling browser's new connection, or refuses any other browser. */
   attach(token: string, connection: Connection): void {
     if (this.token !== undefined && this.token !== token) {
+      this.options.log(`${connection.address} refused: another device controls the game`);
       return connection.close(CLOSE_CODES.busy, 'another device controls the game');
     }
     clearTimeout(this.graceTimer);
-    this.connection?.close(CLOSE_CODES.replaced, 'opened elsewhere');
+    if (this.connection) {
+      this.options.log(`${this.connection.address} replaced by ${connection.address}`);
+      this.connection.close(CLOSE_CODES.replaced, 'opened elsewhere');
+    }
+    this.options.log(`${connection.address} ${this.attachOutcome()}`);
     this.token = token;
     this.connection = connection;
     this.session ??= new GameSession({
@@ -64,7 +71,11 @@ export class Controller {
   detach(connection: Connection): void {
     if (connection !== this.connection) return;
     this.connection = undefined;
-    this.graceTimer = setTimeout(() => void this.release(), this.options.graceMs);
+    const { address } = connection;
+    this.options.log(
+      `${address} socket closed, grace period of ${this.options.graceMs} ms started`,
+    );
+    this.graceTimer = setTimeout(() => void this.expire(address), this.options.graceMs);
   }
 
   /** Ends the game, stopping its engine, and frees the server for any paired browser. */
@@ -74,5 +85,17 @@ export class Controller {
     this.session = undefined;
     this.token = undefined;
     await session?.close();
+  }
+
+  private attachOutcome(): string {
+    if (!this.session) return 'connected, took control';
+    return this.session.state ? 'reconnected, resumed the game' : 'reconnected, no game started';
+  }
+
+  /** Logged here and not in `release`, which also runs when the server shuts down. */
+  private async expire(address: string): Promise<void> {
+    const outcome = this.session?.state ? 'game ended' : 'no game to end';
+    this.options.log(`${address} grace period ran out, ${outcome}`);
+    await this.release();
   }
 }
