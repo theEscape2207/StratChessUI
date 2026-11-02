@@ -38,8 +38,8 @@ change could fail; a docs-only change needs lint at most.
 - **Client tests:** pure client logic goes in plain functions tested by Vitest (`*.test.ts`);
   anything layout, Chessground or touch goes through Playwright. No DOM-emulation test stack until
   something needs one.
-- **Playwright: "your move" does not mean the engine replied.** Right after the human moves, the
-  status still reads it, and under a depth limit the fake replies too fast to see "thinking". Wait
+- **Playwright: "your move" does not mean the engine replied.** Right after the human moves, their
+  chip still reads it, and under a depth limit the fake replies too fast to see "thinking". Wait
   through `playAndAwaitReply` (`e2e/helpers.ts`), which watches the FEN.
 - **Chessground caches the board's bounds** until it sees a scroll event; after anything that
   scrolls the page, wait for that event before clicking squares (`board.spec.ts`).

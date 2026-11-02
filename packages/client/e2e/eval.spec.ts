@@ -1,7 +1,14 @@
 import type { Page } from '@playwright/test';
 import type { GameState, SearchReport, ServerMessage } from '@stratchess-ui/shared';
 import { expect, test } from './fixtures.ts';
-import { newGame, openSettled, START, THINKING } from './helpers.ts';
+import {
+  expectFen,
+  expectThinking,
+  expectYourMove,
+  newGame,
+  openSettled,
+  START,
+} from './helpers.ts';
 
 // GameScreen's breakpoint, the min-width of app.css's media query.
 const DESKTOP = 960;
@@ -33,7 +40,7 @@ async function scriptedServer(page: Page) {
     send({ type: 'game', game: GAME });
   });
   await page.goto('/');
-  await expect(page.getByTestId('status')).toHaveText('Fake thinking');
+  await expectThinking(page);
   return {
     game: (game: Partial<GameState>) => send({ type: 'game', game: { ...GAME, ...game } }),
     search: (fen: string, info: SearchReport) => send({ type: 'search', fen, info }),
@@ -64,7 +71,7 @@ test('only exact scores move the bar, and a new game resets it', async ({ page }
   // SearchInfo empties when the engine starts on another position; the bar holds.
   const after = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1';
   server.game({ fen: after, moves: ['e2e4'], lastMove: 'e2e4' });
-  await expect(page.getByTestId('fen')).toHaveText(after);
+  await expectFen(page, after);
   await expect(page.getByTestId('search')).toBeHidden();
   await expect(bar(page)).toHaveAccessibleName('Evaluation -3.2 for white');
 
@@ -76,7 +83,7 @@ test('only exact scores move the bar, and a new game resets it', async ({ page }
   await page.getByRole('button', { name: 'New game' }).click();
   await expect.poll(() => server.newGames.length).toBe(1);
   server.game({ phase: 'human', humanColor: 'white' });
-  await expect(page.getByTestId('status')).toHaveText('your move');
+  await expectYourMove(page);
   await expect(bar(page)).toHaveAttribute('aria-valuenow', '50');
   await expect(number(page)).toHaveCount(0);
 });
@@ -93,7 +100,7 @@ for (const side of ['white', 'black'] as const) {
     } else {
       await expect(bar(page)).toHaveAccessibleName('Evaluation not yet known');
     }
-    await expect(page.getByTestId('status')).not.toHaveText(THINKING);
+    await expectYourMove(page);
 
     const board = (await page.getByTestId('board').boundingBox())!;
     const strip = (await bar(page).boundingBox())!;

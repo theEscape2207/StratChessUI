@@ -662,12 +662,6 @@ button.icon svg {
   }
 }
 
-.fen {
-  color: var(--muted);
-  -webkit-user-select: all;
-  user-select: all;
-}
-
 .copied {
   font: var(--text-caption);
   color: var(--muted);

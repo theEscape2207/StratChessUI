@@ -12,6 +12,7 @@ const GAME_SPECS = [
   'eval.spec.ts',
   'gameover.spec.ts',
   'layout.spec.ts',
+  'status.spec.ts',
   'strips.spec.ts',
 ];
 

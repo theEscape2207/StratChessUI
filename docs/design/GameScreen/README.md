@@ -1,8 +1,8 @@
 # GameScreen
 
 The play screen at desktop width while a game is in progress (lifecycle stage 2), composed only
-from this system's parts: EvalBar, two PlayerStrips around the Board, the FEN StatusLine, and the
-sidebar (SearchInfo, MoveFeedback, MoveList, the in-game actions, Transcript and an icon toolbar).
+from this system's parts: EvalBar, two PlayerStrips around the Board, and the sidebar (SearchInfo,
+MoveFeedback, MoveList, the in-game actions, Transcript and an icon toolbar).
 
 **Layout** three columns centred on `bg`: `eval-bar-width`, `board-max`, `sidebar-width`, `space-4`
 apart, `space-5` page padding. The eval bar lines up with the board, not the strips. The sidebar is
@@ -12,6 +12,10 @@ and the move list takes whatever height is left.
 **Sidebar order, top to bottom** title bar · SearchInfo · MoveFeedback · MoveList · actions ·
 Transcript (closed) · toolbar. SearchInfo and Transcript belong to the technical view (milestone 2)
 and are hidden in the Play view (milestone 3).
+
+**Under the board** nothing during play: the strips' chips carry the turn, and the FEN is only ever
+copied, never shown. A StatusLine appears here for a connection problem or an ended game with its
+dialog closed, and a `notice` line when the server rejects something.
 
 **Actions** exactly three secondary buttons, icon over label: **Resign**, **Undo**, **Hint**. No
 primary button during play. Hint is disabled while the engine is thinking; Undo stays available. The

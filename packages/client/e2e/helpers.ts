@@ -2,7 +2,30 @@ import { expect, type Page } from '@playwright/test';
 
 // The server runs the fake engine, which answers its first legal move (see playwright.config.ts).
 export const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
-export const THINKING = 'StratChess (fake) thinking';
+
+export const chip = (page: Page, side: 'engine' | 'human') =>
+  page.getByTestId(`strip-${side}`).getByTestId('chip');
+
+export async function expectYourMove(page: Page) {
+  await expect(chip(page, 'human')).toHaveText('your move');
+}
+
+export async function expectThinking(page: Page) {
+  await expect(chip(page, 'engine')).toHaveText('thinking');
+}
+
+export async function expectFen(page: Page, fen: string) {
+  await expect(page.getByTestId('board')).toHaveAttribute('data-fen', fen);
+}
+
+export async function currentFen(page: Page) {
+  return page.getByTestId('board').getAttribute('data-fen');
+}
+
+/** The FEN shows nowhere: the closed transcript quotes it, unseen, once the engine has searched. */
+export async function expectFenNotShown(page: Page, fen: string) {
+  await expect(page.getByText(fen).filter({ visible: true })).toHaveCount(0);
+}
 
 /** Clicks (or taps, on touch devices) a square on the board, seen from `bottom`'s side. */
 export async function tapSquare(page: Page, sq: string, touch: boolean, bottom = 'white') {
@@ -52,7 +75,8 @@ export async function submitNewGame(page: Page) {
 export async function openSettled(page: Page) {
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'New game' })).toBeVisible();
-  await expect(page.getByTestId('status')).not.toHaveText(/thinking|starting/);
+  // With no game to resume there is no chip, which not.toHaveText would wait for in vain.
+  await expect(chip(page, 'engine').filter({ hasText: /thinking|starting/ })).toHaveCount(0);
   await showNewGameForm(page);
 }
 
@@ -62,7 +86,7 @@ export async function newGame(page: Page, side: 'white' | 'black' = 'white') {
   await page.getByLabel(side, { exact: true }).check();
   await page.getByRole('combobox', { name: 'Limit' }).selectOption('depth');
   await submitNewGame(page);
-  await expect(page.getByTestId('status')).toHaveText('your move');
+  await expectYourMove(page);
 }
 
 /**
@@ -71,16 +95,15 @@ export async function newGame(page: Page, side: 'white' | 'black' = 'white') {
  * must differ from before the move and have `side` to move again.
  */
 export async function playAndAwaitReply(page: Page, uci: string, touch: boolean, side = 'white') {
-  const fen = page.getByTestId('fen');
-  const before = await fen.textContent();
+  const before = await currentFen(page);
   await playMove(page, uci, touch, side);
   await expect
     .poll(async () => {
-      const now = await fen.textContent();
+      const now = await currentFen(page);
       return now !== before && now?.split(' ')[1] === side[0];
     })
     .toBe(true);
-  await expect(page.getByTestId('status')).toHaveText('your move');
+  await expectYourMove(page);
 }
 
 /** The move list shows exactly these moves in SAN, white's and black's in turn. */
