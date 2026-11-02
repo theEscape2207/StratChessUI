@@ -23,7 +23,6 @@ export type ControllerOptions = {
   log: (text: string) => void;
 };
 
-/** A paired browser's game and current socket. */
 type Browser = {
   token: string;
   connection?: Connection;

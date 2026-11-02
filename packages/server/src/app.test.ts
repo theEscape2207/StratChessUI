@@ -6,6 +6,7 @@ import {
   START_FEN,
   type ClientMessage,
   type GamePhase,
+  type GameState,
   type ServerMessage,
 } from '@stratchess-ui/shared';
 import { buildApp, type AppOptions } from './app.ts';
@@ -117,15 +118,19 @@ function engineLimitError(limit: number) {
   return { type: 'error', reason: `limit of ${limit} engines reached, try again later` };
 }
 
-/** Starts a new game with the server sending refusals until an engine has exited and freed a slot. */
-async function startOnceSlotFree(client: Client, limit: number) {
+/** Sends `request` until an engine has exited and freed a slot, the server refusing it till then. */
+async function sendOnceSlotFree(client: Client, request: object, phase: GamePhase, limit: number) {
   for (;;) {
-    client.send(NEW_GAME);
-    const msg = await untilGameOrError(client, 'starting');
+    client.send(request);
+    const msg = await untilGameOrError(client, phase);
     if (msg.type === 'game') return msg;
     expect(msg).toEqual(engineLimitError(limit));
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
+}
+
+function startOnceSlotFree(client: Client, limit: number) {
+  return sendOnceSlotFree(client, NEW_GAME, 'starting', limit);
 }
 
 /** The next error, or the next game state in `phase`. */
@@ -142,7 +147,7 @@ function startedEngines(start: MockInstance<typeof UciEngine.start>) {
 }
 
 /** A paired browser in a game on `limit`, its turn to move, with its token for reconnecting. */
-async function tokenInGame(limit: object, fen?: string) {
+async function tokenInGame(limit: GameState['limit'], fen?: string) {
   const token = await pairedToken();
   const client = await connect(app, token);
   client.send({ ...NEW_GAME, limit, fen });
@@ -166,8 +171,13 @@ async function reconnect(token: string) {
   return { client, game: msg.game };
 }
 
+/** Waits out a search on SLOW_LIMIT, and the process exiting after it. */
+function engineStopped(engine: UciEngine) {
+  return vi.waitFor(() => expect(engine.alive).toBe(false), { timeout: 5000 });
+}
+
 /** Longer than the grace periods below, so a test can act while the engine is still searching. */
-const SLOW = { movetimeMs: 500 };
+const SLOW_LIMIT = { movetimeMs: 500 };
 /** Black's first legal move is Ra1, which mates, once White has made any quiet move. */
 const BACK_RANK_FEN = 'r6k/8/8/8/8/1P6/5PPP/6K1 w - - 0 1';
 /** White mates with Ra8. */
@@ -275,7 +285,7 @@ describe('server', () => {
     const [gone, kept] = await startedEngines(start);
     leaver.ws.terminate();
 
-    await vi.waitFor(() => expect(gone!.alive).toBe(false));
+    await engineStopped(gone!);
     expect(kept!.alive).toBe(true);
     await playAndExpect(stayer, 'e2e4', 'a7a5');
   });
@@ -466,7 +476,7 @@ describe('server', () => {
     await playAndExpect(client, 'e2e4', 'a7a5');
     const [stopped] = await startedEngines(start);
     client.ws.terminate();
-    await vi.waitFor(() => expect(stopped!.alive).toBe(false));
+    await engineStopped(stopped!);
 
     const { client: again, game } = await reconnect(token);
     expect(game).toMatchObject({ phase: 'human', moves: ['e2e4', 'a7a5'] });
@@ -491,10 +501,10 @@ describe('server', () => {
   it('lets a search finish when the grace period runs out during it, then stops the engine', async () => {
     await build({ graceMs: 20 });
     const start = vi.spyOn(UciEngine, 'start');
-    const { token, client } = await tokenInGame(SLOW);
+    const { token, client } = await tokenInGame(SLOW_LIMIT);
     const [engine] = await startedEngines(start);
     await moveAndLeave(client, 'e2e4');
-    await vi.waitFor(() => expect(engine!.alive).toBe(false), { timeout: 5000 });
+    await engineStopped(engine!);
 
     const { client: again, game } = await reconnect(token);
     expect(game).toMatchObject({ phase: 'human', moves: ['e2e4', 'a7a5'] });
@@ -505,7 +515,7 @@ describe('server', () => {
     const lines: string[] = [];
     await build({ graceMs: 20, log: (text) => lines.push(text) });
     const start = vi.spyOn(UciEngine, 'start');
-    const { token, client } = await tokenInGame(SLOW);
+    const { token, client } = await tokenInGame(SLOW_LIMIT);
     await moveAndLeave(client, 'e2e4');
     await vi.waitFor(() => expect(lines.join()).toContain('grace period ran out'));
 
@@ -520,10 +530,10 @@ describe('server', () => {
   it('shows the result of a game the engine finished while the browser was away', async () => {
     await build({ graceMs: 20 });
     const start = vi.spyOn(UciEngine, 'start');
-    const { token, client } = await tokenInGame(SLOW, BACK_RANK_FEN);
+    const { token, client } = await tokenInGame(SLOW_LIMIT, BACK_RANK_FEN);
     const [engine] = await startedEngines(start);
     await moveAndLeave(client, 'b3b4');
-    await vi.waitFor(() => expect(engine!.alive).toBe(false), { timeout: 5000 });
+    await engineStopped(engine!);
 
     const { game } = await reconnect(token);
     expect(game).toMatchObject({
@@ -541,7 +551,7 @@ describe('server', () => {
     const { token, client } = await tokenInGame({ depth: 1 });
     const [engine] = await startedEngines(start);
     client.ws.terminate();
-    await vi.waitFor(() => expect(engine!.alive).toBe(false));
+    await engineStopped(engine!);
     const executable = profile.executable;
     profile.executable = 'no-such-engine-executable';
 
@@ -565,7 +575,7 @@ describe('server', () => {
       const { token, client } = await tokenInGame({ depth: 1 }, fen);
       const [stopped] = await startedEngines(start);
       client.ws.terminate();
-      await vi.waitFor(() => expect(stopped!.alive).toBe(false));
+      await engineStopped(stopped!);
       const blocker = await connect(app, await pairedToken());
       expect(await startOnceSlotFree(blocker, 1)).toMatchObject({ game: { phase: 'starting' } });
       await blocker.yourMove();
@@ -584,13 +594,7 @@ describe('server', () => {
       expect(await held.next()).toEqual(engineLimitError(1));
 
       blocker.ws.terminate();
-      for (;;) {
-        held.send({ type: 'move', uci: 'e2e4' });
-        const msg = await untilGameOrError(held, 'thinking');
-        if (msg.type === 'game') break;
-        expect(msg).toEqual(engineLimitError(1));
-        await new Promise((resolve) => setTimeout(resolve, 20));
-      }
+      await sendOnceSlotFree(held, { type: 'move', uci: 'e2e4' }, 'thinking', 1);
       expect(await held.yourMove()).toMatchObject({ moves: ['e2e4', 'a7a5'] });
     });
 
@@ -687,7 +691,7 @@ describe('lifecycle log', () => {
 
   it('logs the grace period running out during a search', async () => {
     const lines = await buildLogged({ graceMs: 20 });
-    const { client } = await tokenInGame(SLOW);
+    const { client } = await tokenInGame(SLOW_LIMIT);
     await moveAndLeave(client, 'e2e4');
     await logged(lines, `${ADDRESS} grace period ran out, engine stops once idle, game held`);
   });

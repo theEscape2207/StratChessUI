@@ -156,9 +156,10 @@ in build tooling (Vite, ESLint, TypeScript) rather than in the chess or server c
 ## Open questions (later milestones)
 
 - **M3:** hint form (piece, move or line) and its engine/limit (#68); resign and draw offers (#70);
-  how difficulty is named (#71); whether Play needs its own view (#76). A real game with the target player closes the milestone (#74).
-- **After M3:** PGN export, #65 (recommended: retains games without a database). M3 holds
-  only what serves beginners.
+  how difficulty is named (#71); whether Play needs its own view (#76). A real game with the target
+  player closes the milestone (#74).
+- **After M3:** PGN export, #65 (recommended: retains games without a database). M3 holds only what
+  serves beginners.
 - **Several users:** one game per paired browser serves a household. Accounts, or a game that moves
   between a player's devices, have no milestone.
 - **Analysis:** linear move navigation or variation tree; continuous analysis; multiple engines;

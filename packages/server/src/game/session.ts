@@ -37,10 +37,10 @@ type Game = {
   profile: EngineProfile;
   /** Every position of the game as a FEN, for repetition. */
   positions: string[];
-  /** Absent while a held game's engine is stopped, until its next search restarts it. */
+  /** Absent while starting, and while a held game's engine is stopped until its next search. */
   engine?: UciEngine;
   /** Nobody is connected and the grace period has run out: stop the engine at its next idle. */
-  stopEngineWhenIdle: boolean;
+  engineUnwanted: boolean;
   /** The last search line sent, resent to a browser that reattaches. */
   search?: SearchUpdate;
   transcript: TranscriptFeed;
@@ -88,7 +88,7 @@ export class GameSession {
     this.endCurrent();
     const game: Game = {
       profile,
-      stopEngineWhenIdle: false,
+      engineUnwanted: false,
       state: {
         startFen: start.fen,
         fen: start.fen,
@@ -134,7 +134,7 @@ export class GameSession {
   stopEngineWhenIdle(): boolean {
     const game = this.game;
     if (!game) return true;
-    game.stopEngineWhenIdle = true;
+    game.engineUnwanted = true;
     const busy = game.state.phase === 'starting' || game.state.phase === 'thinking';
     if (!busy) this.stopEngine(game);
     return !busy;
@@ -142,7 +142,7 @@ export class GameSession {
 
   /** Someone is connected again, so an engine not yet stopped stays. */
   keepEngine(): void {
-    if (this.game) this.game.stopEngineWhenIdle = false;
+    if (this.game) this.game.engineUnwanted = false;
   }
 
   /** Ends the game, stopping its engine. */
@@ -166,7 +166,7 @@ export class GameSession {
     game.state = { ...game.state, phase: humanToMove ? 'human' : 'thinking' };
     this.publish(game);
     if (!humanToMove) void this.engineMove(game);
-    else if (game.stopEngineWhenIdle) this.stopEngine(game);
+    else if (game.engineUnwanted) this.stopEngine(game);
   }
 
   /** Starts the game's engine in a slot the caller has taken; false if the game has moved on. */
