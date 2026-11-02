@@ -40,6 +40,25 @@ test('plays white against the engine, with the board locked while it thinks', as
   await expectFen(page, 'rnbqkbnr/1ppppppp/8/8/p2PP3/8/PPP2PPP/RNBQKBNR w KQkq - 0 3');
 });
 
+test('highlights the legal moves of the selected piece', async ({ page, hasTouch }) => {
+  // Chessground keeps each square's name on the element, as `cgKey`, and draws it by position alone.
+  const highlighted = () =>
+    page
+      .locator('cg-board square.move-dest:visible')
+      .evaluateAll((squares) =>
+        squares.map((el) => (el as HTMLElement & { cgKey: string }).cgKey).sort(),
+      );
+  await page.getByRole('button', { name: 'New game' }).click();
+  await expectYourMove(page);
+  expect(await highlighted()).toEqual([]);
+
+  await tapSquare(page, 'e2', hasTouch);
+  await expect.poll(highlighted).toEqual(['e3', 'e4']);
+
+  await tapSquare(page, 'b1', hasTouch);
+  await expect.poll(highlighted).toEqual(['a3', 'c3']);
+});
+
 test("shows the engine's search while it thinks, and its last line after", async ({
   page,
   hasTouch,
