@@ -91,6 +91,7 @@ export class UciEngine {
     profile: EngineProfile,
     timeouts: Timeouts,
     onTranscript?: TranscriptListener,
+    onExit?: () => void,
   ) {
     this.profile = profile;
     this.timeouts = timeouts;
@@ -114,18 +115,28 @@ export class UciEngine {
         resolve();
       });
     });
+    if (onExit) void this.exited.then(onExit);
   }
 
   /**
    * Starts the engine, completes the UCI handshake and applies the profile's options.
-   * `onTranscript` sees every line sent and received from the first, `uci`.
+   * `onTranscript` sees every line sent and received from the first, `uci`. `onExit` is called
+   * once when the process has gone, or could not start, even if this rejects.
    */
   static async start(
     profile: EngineProfile,
     timeouts: Partial<Timeouts> = {},
     onTranscript?: TranscriptListener,
+    onExit?: () => void,
   ): Promise<UciEngine> {
-    const engine = new UciEngine(profile, { ...DEFAULT_TIMEOUTS, ...timeouts }, onTranscript);
+    let engine: UciEngine;
+    try {
+      engine = new UciEngine(profile, { ...DEFAULT_TIMEOUTS, ...timeouts }, onTranscript, onExit);
+    } catch (error) {
+      // `spawn` throws, rather than emitting 'error', for some bad executables.
+      onExit?.();
+      throw error;
+    }
     try {
       await engine.handshake();
       return engine;

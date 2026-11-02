@@ -18,9 +18,10 @@ separate open-source repository, and has no commercial goal.
 - **Platform:** local server on Windows only; engines run on the host; devices use a browser over
   the LAN.
 - **Integration:** UCI only; no coupling to engine code.
-- **Control:** one active game, controlled by one browser; other devices cannot take it over. No
-  user accounts. A browser pairs through a code shown on the host. This is an accepted, clunky
-  compromise; revisit for Play (#16, #67).
+- **Control:** one game per paired browser, so no device blocks another and two people can play at
+  once. A game cannot move between devices, and two people sharing a browser share a game. At most
+  4 engines run at once, as each can hold many threads and much memory; past that a new game is
+  refused with a reason. No user accounts. A browser pairs through a code shown on the host.
 - **Session:** a game lives only while its page is open. Saved games, and timed games that survive
   a reconnect, are backlog.
 - **Priority:** human vs engine, then analysis/statistics, then engine vs engine (single
@@ -157,8 +158,8 @@ in build tooling (Vite, ESLint, TypeScript) rather than in the chess or server c
   lost connection (#73). A real game with the target player closes the milestone (#74).
 - **After M3:** PGN export, #65 (recommended: retains page-bound games without a database). M3 holds
   only what serves beginners.
-- **Several users:** one server holds one game for one browser, which will not serve even two
-  players. It needs rearchitecting at some point; no milestone yet.
+- **Several users:** one game per paired browser serves a household. Accounts, or a game that moves
+  between a player's devices, have no milestone.
 - **Analysis:** linear move navigation or variation tree; continuous analysis; multiple engines;
   when to build the engine option forms, as profiles on the host set options until then.
 - **Engine vs engine:** per-side profiles and limits; bundled Stockfish (GPL source obligations) or

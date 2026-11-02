@@ -10,6 +10,7 @@ import {
   type TranscriptLine,
 } from '@stratchess-ui/shared';
 import { fakeProfile } from '../uci/fake-profile.ts';
+import { EngineSlots } from './engine-slots.ts';
 import { GameSession } from './session.ts';
 
 const PROFILES = ['legal', 'normal', 'crash-on-go', 'no-uciok', 'chatty', 'no-id-name'].map(
@@ -34,6 +35,8 @@ function open(timeouts = TIMEOUTS) {
   const logged: string[] = [];
   session = new GameSession({
     profiles: PROFILES,
+    slots: new EngineSlots(Number.MAX_SAFE_INTEGER),
+    refused: () => {},
     timeouts,
     log: (text) => logged.push(text),
     send: (msg) => {

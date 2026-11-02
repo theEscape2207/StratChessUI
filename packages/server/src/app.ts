@@ -29,9 +29,12 @@ export type AppOptions = {
   pairings?: Pairings;
   /** How long a game waits for its browser to reconnect. */
   graceMs?: number;
+  /** How many engine processes may run at once. */
+  engineLimit?: number;
 };
 
 const DEFAULT_GRACE_MS = 60_000;
+const DEFAULT_ENGINE_LIMIT = 4;
 
 /** Host names the server answers to. Anything else is a DNS-rebinding attempt or a typo. */
 export function defaultHosts(): string[] {
@@ -77,6 +80,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   const controller = new Controller({
     profiles: options.profiles ?? [],
     graceMs: options.graceMs ?? DEFAULT_GRACE_MS,
+    engineLimit: options.engineLimit ?? DEFAULT_ENGINE_LIMIT,
     timeouts: options.engineTimeouts,
     log,
   });

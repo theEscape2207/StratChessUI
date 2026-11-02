@@ -7,6 +7,7 @@
 //   legal           like normal, but answers the first legal move, so whole games can be played
 //   chatty          like legal, with 1100 info strings in the handshake, the last 2000 characters
 //   no-id-name      like normal, but the handshake has no `id name`
+//   ignore-quit     like legal, but stays up after `quit` until it is killed
 import { createInterface } from 'node:readline';
 import { applyUciMove, legalDests, START_FEN } from '@stratchess-ui/shared';
 
@@ -47,7 +48,8 @@ function finishSearch() {
   SEARCH_END.map(withLegalPv).forEach(out);
   // Encodes the position it searched, so tests can tell which search a bestmove belongs to.
   if (position.includes(STALEMATE)) out('bestmove 0000');
-  else if (mode === 'legal' || mode === 'chatty') out(`bestmove ${firstLegalMove(position)}`);
+  else if (mode === 'legal' || mode === 'chatty' || mode === 'ignore-quit')
+    out(`bestmove ${firstLegalMove(position)}`);
   else out(`bestmove ${position.includes('moves') ? 'g8f6' : 'b1c3'}`);
 }
 
@@ -154,6 +156,6 @@ createInterface({ input: process.stdin }).on('line', (line) => {
       if (mode !== 'ignore-stop') finishSearch();
       break;
     case 'quit':
-      process.exit(0);
+      if (mode !== 'ignore-quit') process.exit(0);
   }
 });

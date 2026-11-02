@@ -2,9 +2,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { BOARD_SERVERS, PAIRING_CODE, pairedState, serverURL } from './servers.ts';
 
-// Pairs each board server once per run rather than once per worker: a worker restarted after a
-// failure would mint a new token, which the server refuses while the old one's game waits out its
-// grace period.
+// Pairs each board server once per run rather than once per worker, so a worker restarted after
+// a failure does not leave an engine behind until its grace period runs out.
 export default async function pairServers() {
   for (let index = 0; index < BOARD_SERVERS; index++) {
     const origin = serverURL(index);

@@ -73,23 +73,18 @@ test('says when the socket dropped, and clears once it is back', async ({ page }
   await expect(status(page)).toHaveCount(0);
 });
 
-for (const [code, text, button] of [
-  [CLOSE_CODES.busy, 'another device is playing', 'Try again'],
-  [CLOSE_CODES.replaced, 'opened in another tab', 'Play here'],
-] as const) {
-  test(`says "${text}", and ${button} takes the game back`, async ({ page }) => {
-    await scriptedServer(page, (ws, n) => {
-      if (n === 1) void ws.close({ code });
-      else sendGame(ws, GAME);
-    });
-    await expect(status(page)).toHaveText(text);
-
-    await page.getByRole('button', { name: button }).click();
-    await expectYourMove(page);
-    await expect(status(page)).toHaveCount(0);
-    await expect(page.getByRole('button', { name: button })).toHaveCount(0);
+test('says "opened in another tab", and Play here takes the game back', async ({ page }) => {
+  await scriptedServer(page, (ws, n) => {
+    if (n === 1) void ws.close({ code: CLOSE_CODES.replaced });
+    else sendGame(ws, GAME);
   });
-}
+  await expect(status(page)).toHaveText('opened in another tab');
+
+  await page.getByRole('button', { name: 'Play here' }).click();
+  await expectYourMove(page);
+  await expect(status(page)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Play here' })).toHaveCount(0);
+});
 
 test('a rejected move shows its notice until the next game state', async ({ page }) => {
   let server: WebSocketRoute;

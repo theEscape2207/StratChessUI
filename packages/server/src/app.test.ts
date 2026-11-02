@@ -47,9 +47,13 @@ async function pairedToken() {
  */
 async function connect(app: FastifyInstance, token?: string, remoteAddress = ADDRESS) {
   const queue: ServerMessage[] = [];
+  /** Every message so far, transcript included, whether or not a test has taken it. */
+  const seen: ServerMessage[] = [];
   let wake = () => {};
   const onMessage = (data: Buffer) => {
-    queue.push(JSON.parse(data.toString()) as ServerMessage);
+    const msg = JSON.parse(data.toString()) as ServerMessage;
+    queue.push(msg);
+    seen.push(msg);
     wake();
   };
   const take = async (match: (msg: ServerMessage) => boolean): Promise<ServerMessage> => {
@@ -81,10 +85,42 @@ async function connect(app: FastifyInstance, token?: string, remoteAddress = ADD
       if (msg.type === 'game' && msg.game.phase === 'human') return msg.game;
     }
   };
-  return { ws, next, transcript, yourMove, closed };
+  const send = (msg: object) => ws.send(JSON.stringify(msg));
+  return { ws, next, transcript, yourMove, closed, seen, send };
 }
 
 const NEW_GAME = { type: 'new-game', humanColor: 'white', engineId: 'fake', limit: { depth: 1 } };
+
+type Client = Awaited<ReturnType<typeof connect>>;
+
+/** A newly paired browser with a game started, its turn to move. */
+async function browserInGame(remoteAddress = ADDRESS): Promise<Client> {
+  const client = await connect(app, await pairedToken(), remoteAddress);
+  client.send(NEW_GAME);
+  await client.yourMove();
+  return client;
+}
+
+/** Plays a move, expecting the given reply from that browser's engine. */
+async function playAndExpect(client: Client, uci: string, reply: string) {
+  client.send({ type: 'move', uci });
+  expect(await client.yourMove()).toMatchObject({ lastMove: reply });
+}
+
+function engineLimitError(limit: number) {
+  return { type: 'error', reason: `limit of ${limit} engines reached, try again later` };
+}
+
+/** Starts a new game with the server sending refusals until an engine has exited and freed a slot. */
+async function startOnceSlotFree(client: Client, limit: number) {
+  for (;;) {
+    client.send(NEW_GAME);
+    const msg = await client.next();
+    if (msg.type === 'game') return msg;
+    expect(msg).toEqual(engineLimitError(limit));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}
 
 describe('server', () => {
   it('answers on localhost', async () => {
@@ -158,16 +194,142 @@ describe('server', () => {
     expect(await (await connect(app, token)).closed).toBe(CLOSE_CODES.notPaired);
   });
 
-  it('refuses a second paired browser while the first controls the game', async () => {
+  it('plays two browsers at once with separate engines, keeping their games apart', async () => {
     await build();
-    const first = await connect(app, await pairedToken());
-    first.ws.send(JSON.stringify(NEW_GAME));
-    await first.yourMove();
+    const start = vi.spyOn(UciEngine, 'start');
+    const white = await browserInGame();
+    const black = await connect(app, await pairedToken());
+    black.send({ ...NEW_GAME, humanColor: 'black' });
+    await black.yourMove();
+    expect(start).toHaveBeenCalledTimes(2);
+    const [one, two] = await Promise.all(start.mock.results.map((r) => r.value as UciEngine));
+    expect(one).not.toBe(two);
 
-    const second = await connect(app, await pairedToken());
-    expect(await second.closed).toBe(CLOSE_CODES.busy);
-    first.ws.send(JSON.stringify({ type: 'move', uci: 'e2e4' }));
-    expect(await first.yourMove()).toMatchObject({ lastMove: 'a7a5' });
+    await playAndExpect(white, 'e2e4', 'a7a5');
+    await playAndExpect(black, 'd7d5', 'a1b1');
+    await playAndExpect(white, 'd2d4', 'a5a4');
+
+    const games = (client: Client) => client.seen.flatMap((m) => (m.type === 'game' ? m.game : []));
+    expect(games(white).every((game) => game.humanColor === 'white')).toBe(true);
+    expect(games(black).every((game) => game.humanColor === 'black')).toBe(true);
+    expect(games(white).at(-1)!.moves).toEqual(['e2e4', 'a7a5', 'd2d4', 'a5a4']);
+    expect(games(black).at(-1)!.moves).toEqual(['b1a3', 'd7d5', 'a1b1']);
+  });
+
+  it("leaves one browser's game alone when another's grace period runs out", async () => {
+    await build({ graceMs: 50 });
+    const start = vi.spyOn(UciEngine, 'start');
+    const leaver = await browserInGame();
+    const stayer = await browserInGame();
+    const [gone, kept] = await Promise.all(start.mock.results.map((r) => r.value as UciEngine));
+    leaver.ws.terminate();
+
+    await vi.waitFor(() => expect(gone!.alive).toBe(false));
+    expect(kept!.alive).toBe(true);
+    await playAndExpect(stayer, 'e2e4', 'a7a5');
+  });
+
+  it("leaves one browser's game alone when another's engine fails", async () => {
+    await build();
+    const failing = await connect(app, await pairedToken());
+    const fine = await browserInGame();
+    // The fake crashes on its first search of this position.
+    const fen = '4k3/8/8/8/8/8/4P3/4K3 w - - 0 1';
+    failing.send({ ...NEW_GAME, humanColor: 'black', fen });
+    for (;;) {
+      const msg = await failing.next();
+      if (msg.type === 'game' && msg.game.phase === 'over') {
+        expect(msg.game.reason).toContain('failed');
+        break;
+      }
+    }
+    await playAndExpect(fine, 'e2e4', 'a7a5');
+  });
+
+  it('stops every engine when the server shuts down', async () => {
+    await build();
+    const start = vi.spyOn(UciEngine, 'start');
+    await browserInGame();
+    await browserInGame();
+    const engines = await Promise.all(start.mock.results.map((r) => r.value as UciEngine));
+    expect(engines.map((engine) => engine.alive)).toEqual([true, true]);
+
+    await app.close();
+    expect(engines.map((engine) => engine.alive)).toEqual([false, false]);
+  });
+
+  it('refuses a new game at the limit of 4 engines, leaving the current game as it was', async () => {
+    await build();
+    const start = vi.spyOn(UciEngine, 'start');
+    const playing = await browserInGame();
+    await playAndExpect(playing, 'e2e4', 'a7a5');
+    for (let i = 0; i < 3; i++) await browserInGame();
+    const fifth = await connect(app, await pairedToken());
+    expect(await fifth.next()).toMatchObject({ type: 'hello' });
+
+    fifth.send(NEW_GAME);
+    expect(await fifth.next()).toEqual(engineLimitError(4));
+    playing.send(NEW_GAME);
+    expect(await playing.next()).toEqual(engineLimitError(4));
+    expect(start).toHaveBeenCalledTimes(4);
+
+    await playAndExpect(playing, 'd2d4', 'a5a4');
+  });
+
+  it('starts no engine, so needs no slot, for a game that is already over', async () => {
+    await build({ engineLimit: 1 });
+    await browserInGame();
+    const other = await connect(app, await pairedToken());
+    other.send({ ...NEW_GAME, fen: '7k/5Q2/6K1/8/8/8/8/8 b - - 0 1' });
+    expect(await other.next()).toMatchObject({ type: 'hello' });
+    expect(await other.next()).toMatchObject({ type: 'game', game: { phase: 'starting' } });
+    expect(await other.next()).toMatchObject({ type: 'game', game: { phase: 'over' } });
+  });
+
+  it('holds a slot until the engine has exited, not just been told to quit', async () => {
+    await build({
+      engineLimit: 1,
+      graceMs: 20,
+      profiles: [fakeProfile('ignore-quit')],
+      engineTimeouts: { stopGraceMs: 1000 },
+    });
+    const start = vi.spyOn(UciEngine, 'start');
+    const quit = vi.spyOn(UciEngine.prototype, 'quit');
+    const leaver = await browserInGame();
+    const engine = (await start.mock.results[0]!.value) as UciEngine;
+    const waiting = await connect(app, await pairedToken());
+    expect(await waiting.next()).toMatchObject({ type: 'hello' });
+    leaver.ws.terminate();
+    await vi.waitFor(() => expect(quit).toHaveBeenCalledOnce());
+
+    expect(engine.alive).toBe(true);
+    waiting.send(NEW_GAME);
+    expect(await waiting.next()).toEqual(engineLimitError(1));
+
+    expect(await startOnceSlotFree(waiting, 1)).toMatchObject({ game: { phase: 'starting' } });
+    expect(engine.alive).toBe(false);
+  });
+
+  it.each([
+    ['cannot be found', { executable: 'no-such-engine-executable' }],
+    // Node's `spawn` throws for this rather than emitting 'error'.
+    ['cannot be spawned at all', { executable: 'bad\0name' }],
+    ['never finishes its handshake', fakeProfile('no-uciok')],
+  ])('frees the slot of an engine that %s', async (_name, broken) => {
+    await build({
+      engineLimit: 1,
+      engineTimeouts: { handshakeMs: 200 },
+      profiles: [fakeProfile('legal'), { ...fakeProfile('legal'), ...broken, id: 'broken' }],
+    });
+    const client = await connect(app, await pairedToken());
+    expect(await client.next()).toMatchObject({ type: 'hello' });
+    client.send({ ...NEW_GAME, engineId: 'broken' });
+    for (;;) {
+      const msg = await client.next();
+      if (msg.type === 'game' && msg.game.phase === 'over') break;
+    }
+    expect(await startOnceSlotFree(client, 1)).toMatchObject({ game: { phase: 'starting' } });
+    expect(await client.yourMove()).toMatchObject({ phase: 'human' });
   });
 
   it('hands the game to the same browser on a new socket, closing the old one', async () => {
@@ -231,20 +393,21 @@ describe('server', () => {
     expect(await again.yourMove()).toMatchObject({ lastMove: 'a5a4' });
   });
 
-  it('ends the engine and frees the game when the grace period runs out', async () => {
+  it('ends the engine and the game when the grace period runs out', async () => {
     await build({ graceMs: 50 });
     const quit = vi.spyOn(UciEngine.prototype, 'quit');
-    const first = await connect(app, await pairedToken());
+    const token = await pairedToken();
+    const first = await connect(app, token);
     first.ws.send(JSON.stringify(NEW_GAME));
     await first.yourMove();
     first.ws.terminate();
 
     await vi.waitFor(() => expect(quit).toHaveBeenCalledOnce());
     await quit.mock.results[0]!.value;
-    const other = await connect(app, await pairedToken());
-    expect(await other.next()).toMatchObject({ type: 'hello' });
-    other.ws.send(JSON.stringify({ type: 'move', uci: 'e2e4' }));
-    expect(await other.next()).toEqual({ type: 'error', reason: 'no game in progress' });
+    const again = await connect(app, token);
+    expect(await again.next()).toMatchObject({ type: 'hello' });
+    again.ws.send(JSON.stringify({ type: 'move', uci: 'e2e4' }));
+    expect(await again.next()).toEqual({ type: 'error', reason: 'no game in progress' });
   });
 });
 
@@ -278,13 +441,13 @@ describe('lifecycle log', () => {
     await logged(lines, `${ADDRESS} refused: not paired`);
   });
 
-  it('logs a browser refused because another device holds the game', async () => {
-    const lines = await buildLogged();
-    await connect(app, await pairedToken());
-    await (
-      await connect(app, await pairedToken(), OTHER_ADDRESS)
-    ).closed;
-    await logged(lines, `${OTHER_ADDRESS} refused: another device controls the game`);
+  it('logs a browser refused at the engine limit', async () => {
+    const lines = await buildLogged({ engineLimit: 2 });
+    await browserInGame();
+    await browserInGame();
+    const refused = await connect(app, await pairedToken(), OTHER_ADDRESS);
+    refused.send(NEW_GAME);
+    await logged(lines, `${OTHER_ADDRESS} refused: limit of 2 engines reached`);
   });
 
   it('logs a replaced connection, with no close line for the old socket', async () => {
@@ -339,14 +502,15 @@ describe('lifecycle log', () => {
   });
 
   it('never logs the token', async () => {
-    const lines = await buildLogged({ graceMs: 20 });
+    const lines = await buildLogged({ graceMs: 20, engineLimit: 1 });
     const token = await pairedToken();
     const first = await connect(app, token);
     first.ws.send(JSON.stringify(NEW_GAME));
     await first.yourMove();
-    await (
-      await connect(app, await pairedToken(), OTHER_ADDRESS)
-    ).closed;
+    const otherToken = await pairedToken();
+    const refused = await connect(app, otherToken, OTHER_ADDRESS);
+    refused.send(NEW_GAME);
+    await logged(lines, `${OTHER_ADDRESS} refused: limit of 1 engines reached`);
     const second = await connect(app, token);
     await first.closed;
     await (
@@ -356,6 +520,7 @@ describe('lifecycle log', () => {
     await logged(lines, `${ADDRESS} grace period ran out, game ended`);
     const output = lines.join('\n');
     expect(output).not.toContain(token);
+    expect(output).not.toContain(otherToken);
     expect(output).not.toContain('guess-at-a-token');
   });
 });
