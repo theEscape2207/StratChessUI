@@ -1,7 +1,15 @@
 import type { Page, WebSocketRoute } from '@playwright/test';
 import { CLOSE_CODES, type GameState, type ServerMessage } from '@stratchess-ui/shared';
 import { expect, test } from './fixtures.ts';
-import { chip, expectFen, expectFenNotShown, expectYourMove, START } from './helpers.ts';
+import {
+  chip,
+  expectFen,
+  expectFenNotShown,
+  expectYourMove,
+  showNewGameForm,
+  START,
+  submitNewGame,
+} from './helpers.ts';
 
 const GAME: GameState = {
   startFen: START,
@@ -73,23 +81,40 @@ test('says when the socket dropped, and clears once it is back', async ({ page }
   await expect(status(page)).toHaveCount(0);
 });
 
-for (const [code, text, button] of [
-  [CLOSE_CODES.busy, 'another device is playing', 'Try again'],
-  [CLOSE_CODES.replaced, 'opened in another tab', 'Play here'],
-] as const) {
-  test(`says "${text}", and ${button} takes the game back`, async ({ page }) => {
-    await scriptedServer(page, (ws, n) => {
-      if (n === 1) void ws.close({ code });
-      else sendGame(ws, GAME);
-    });
-    await expect(status(page)).toHaveText(text);
-
-    await page.getByRole('button', { name: button }).click();
-    await expectYourMove(page);
-    await expect(status(page)).toHaveCount(0);
-    await expect(page.getByRole('button', { name: button })).toHaveCount(0);
+test('says "opened in another tab", and Play here takes the game back', async ({ page }) => {
+  await scriptedServer(page, (ws, n) => {
+    if (n === 1) void ws.close({ code: CLOSE_CODES.replaced });
+    else sendGame(ws, GAME);
   });
-}
+  await expect(status(page)).toHaveText('opened in another tab');
+
+  await page.getByRole('button', { name: 'Play here' }).click();
+  await expectYourMove(page);
+  await expect(status(page)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Play here' })).toHaveCount(0);
+});
+
+test('a refused new game brings the current game back, with the reason', async ({ page }) => {
+  const fen = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1';
+  const game: GameState = { ...GAME, fen, moves: ['e2e4'], lastMove: 'e2e4', phase: 'human' };
+  await scriptedServer(page, (ws) => {
+    sendGame(ws, game);
+    ws.onMessage(() => {
+      ws.send(JSON.stringify({ type: 'game', game } satisfies ServerMessage));
+      const reason = 'limit of 4 engines reached, try again later';
+      ws.send(JSON.stringify({ type: 'error', reason } satisfies ServerMessage));
+    });
+  });
+  await expectFen(page, fen);
+
+  await showNewGameForm(page);
+  await submitNewGame(page);
+  await expect(page.getByTestId('notice')).toHaveText(
+    'limit of 4 engines reached, try again later',
+  );
+  await expectFen(page, fen);
+  await expectYourMove(page);
+});
 
 test('a rejected move shows its notice until the next game state', async ({ page }) => {
   let server: WebSocketRoute;

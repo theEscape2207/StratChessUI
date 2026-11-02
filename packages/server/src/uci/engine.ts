@@ -91,6 +91,7 @@ export class UciEngine {
     profile: EngineProfile,
     timeouts: Timeouts,
     onTranscript?: TranscriptListener,
+    onExit?: () => void,
   ) {
     this.profile = profile;
     this.timeouts = timeouts;
@@ -107,25 +108,36 @@ export class UciEngine {
     this.exited = new Promise((resolve) => {
       this.child.on('error', (error) => {
         this.fail(`cannot start ${profile.executable}: ${error.message}`);
-        resolve();
+        // 'error' also fires for a failed kill, when the process is still running.
+        if (this.child.pid === undefined) resolve();
       });
       this.child.on('exit', (code, signal) => {
         this.fail(`engine exited (${signal ?? `code ${code}`})`);
         resolve();
       });
     });
+    if (onExit) void this.exited.then(onExit);
   }
 
   /**
    * Starts the engine, completes the UCI handshake and applies the profile's options.
-   * `onTranscript` sees every line sent and received from the first, `uci`.
+   * `onTranscript` sees every line sent and received from the first, `uci`. `onExit` is called
+   * once when the process has gone, or could not start, even if this rejects.
    */
   static async start(
     profile: EngineProfile,
     timeouts: Partial<Timeouts> = {},
     onTranscript?: TranscriptListener,
+    onExit?: () => void,
   ): Promise<UciEngine> {
-    const engine = new UciEngine(profile, { ...DEFAULT_TIMEOUTS, ...timeouts }, onTranscript);
+    let engine: UciEngine;
+    try {
+      engine = new UciEngine(profile, { ...DEFAULT_TIMEOUTS, ...timeouts }, onTranscript, onExit);
+    } catch (error) {
+      // `spawn` throws, rather than emitting 'error', for some bad executables.
+      onExit?.();
+      throw error;
+    }
     try {
       await engine.handshake();
       return engine;

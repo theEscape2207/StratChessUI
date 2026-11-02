@@ -14,6 +14,7 @@ const GAME_SPECS = [
   'layout.spec.ts',
   'status.spec.ts',
   'strips.spec.ts',
+  'two-browsers.spec.ts',
 ];
 
 // Runs against the built client served by the real server, as a phone on the LAN would see it.

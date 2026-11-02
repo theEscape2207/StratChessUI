@@ -30,7 +30,6 @@ const TOKEN_KEY = 'pairing-token';
 const LINK_STATUS: Record<Exclude<Link, 'connected'>, string> = {
   connecting: 'connecting',
   reconnecting: 'disconnected, reconnecting',
-  busy: 'another device is playing',
   replaced: 'opened in another tab',
 };
 
@@ -211,9 +210,9 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
               {status.text}
             </p>
           )}
-          {(link === 'busy' || link === 'replaced') && (
+          {link === 'replaced' && (
             <button type="button" onClick={retry}>
-              {link === 'busy' ? 'Try again' : 'Play here'}
+              Play here
             </button>
           )}
           {notice && (

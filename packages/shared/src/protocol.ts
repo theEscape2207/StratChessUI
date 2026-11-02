@@ -100,8 +100,6 @@ export type ServerMessage =
 export const CLOSE_CODES = {
   /** The token is unknown or was revoked: pair again. */
   notPaired: 4401,
-  /** Another browser controls the game. */
-  busy: 4409,
   /** This browser opened the game in another tab or a reloaded page. */
   replaced: 4000,
 };

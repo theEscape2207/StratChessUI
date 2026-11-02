@@ -1,8 +1,9 @@
-// The one game on this server and the paired browser that controls it. The game outlives the
-// browser's socket for a grace period, so a phone that locks or a page that reloads resumes it.
+// One game for each paired browser. A game outlives its browser's socket for a grace period, so a
+// phone that locks or a page that reloads resumes it.
 import { CLOSE_CODES, type ClientMessage, type ServerMessage } from '@stratchess-ui/shared';
 import type { EngineProfile } from '../engines/profiles.ts';
 import type { Timeouts } from '../uci/engine.ts';
+import { EngineSlots } from './engine-slots.ts';
 import { GameSession } from './session.ts';
 
 export type Connection = {
@@ -15,87 +16,113 @@ export type Connection = {
 export type ControllerOptions = {
   profiles: readonly EngineProfile[];
   graceMs: number;
+  /** How many engine processes may run at once, across all browsers. */
+  engineLimit: number;
   timeouts?: Partial<Timeouts>;
   log: (text: string) => void;
 };
 
+/** A paired browser's game and current socket, held until its grace period runs out. */
+type Browser = {
+  token: string;
+  connection?: Connection;
+  session: GameSession;
+  graceTimer?: ReturnType<typeof setTimeout>;
+};
+
 export class Controller {
   private readonly options: ControllerOptions;
-  /** The controlling browser's pairing token, held until its grace period runs out. */
-  private token?: string;
-  private connection?: Connection;
-  private session?: GameSession;
-  private graceTimer?: ReturnType<typeof setTimeout>;
+  private readonly slots: EngineSlots;
+  /** Keyed by pairing token, a credential: keep the keys and `Browser.token` out of the log. */
+  private readonly browsers = new Map<string, Browser>();
+  private readonly browserOf = new WeakMap<Connection, Browser>();
 
   constructor(options: ControllerOptions) {
     this.options = options;
+    this.slots = new EngineSlots(options.engineLimit);
   }
 
-  /** Gives the game to the controlling browser's new connection, or refuses any other browser. */
+  /** Gives the browser's game to its new connection, closing any older one. */
   attach(token: string, connection: Connection): void {
-    if (this.token !== undefined && this.token !== token) {
-      this.options.log(`${connection.address} refused: another device controls the game`);
-      return connection.close(CLOSE_CODES.busy, 'another device controls the game');
+    const known = this.browsers.get(token);
+    clearTimeout(known?.graceTimer);
+    if (known?.connection) {
+      this.options.log(`${known.connection.address} replaced by ${connection.address}`);
+      known.connection.close(CLOSE_CODES.replaced, 'opened elsewhere');
     }
-    clearTimeout(this.graceTimer);
-    if (this.connection) {
-      this.options.log(`${this.connection.address} replaced by ${connection.address}`);
-      this.connection.close(CLOSE_CODES.replaced, 'opened elsewhere');
-    }
-    this.options.log(`${connection.address} ${this.attachOutcome()}`);
-    this.token = token;
-    this.connection = connection;
-    this.session ??= new GameSession({
-      profiles: this.options.profiles,
-      send: (msg) => this.connection?.send(msg),
-      timeouts: this.options.timeouts,
-      log: this.options.log,
-    });
+    this.options.log(`${connection.address} ${this.attachOutcome(known)}`);
+    const browser = known ?? this.addBrowser(token);
+    browser.connection = connection;
+    this.browserOf.set(connection, browser);
     const engines = this.options.profiles.map(({ id, name }) => ({ id, name }));
     connection.send({ type: 'hello', engines });
-    const game = this.session.state;
+    const game = browser.session.state;
     if (game) connection.send({ type: 'game', game });
-    const search = this.session.search;
+    const search = browser.session.search;
     if (search) connection.send({ type: 'search', ...search });
-    const transcript = this.session.takeTranscript();
+    const transcript = browser.session.takeTranscript();
     if (transcript) connection.send({ type: 'transcript', lines: transcript, reset: true });
   }
 
   /** Messages from a connection that has been replaced are dropped. */
   receive(connection: Connection, msg: ClientMessage): void {
-    if (connection !== this.connection || !this.session) return;
-    if (msg.type === 'new-game') return void this.session.newGame(msg);
-    this.session.move(msg.uci);
+    const browser = this.browserOf.get(connection);
+    if (browser?.connection !== connection) return;
+    if (msg.type === 'new-game') return void browser.session.newGame(msg);
+    browser.session.move(msg.uci);
   }
 
   detach(connection: Connection): void {
-    if (connection !== this.connection) return;
-    this.connection = undefined;
+    const browser = this.browserOf.get(connection);
+    if (browser?.connection !== connection) return;
+    browser.connection = undefined;
     const { address } = connection;
     this.options.log(
       `${address} socket closed, grace period of ${this.options.graceMs} ms started`,
     );
-    this.graceTimer = setTimeout(() => void this.expire(address), this.options.graceMs);
+    browser.graceTimer = setTimeout(() => void this.expire(browser, address), this.options.graceMs);
   }
 
-  /** Ends the game, stopping its engine, and frees the server for any paired browser. */
+  /** Ends every game, stopping its engine. */
   async release(): Promise<void> {
-    clearTimeout(this.graceTimer);
-    const session = this.session;
-    this.session = undefined;
-    this.token = undefined;
-    await session?.close();
+    const browsers = [...this.browsers.values()];
+    this.browsers.clear();
+    await Promise.all(
+      browsers.map((browser) => {
+        clearTimeout(browser.graceTimer);
+        // A socket still closing must not start an engine that nothing would stop.
+        browser.connection = undefined;
+        return browser.session.close();
+      }),
+    );
   }
 
-  private attachOutcome(): string {
-    if (!this.session) return 'connected, took control';
-    return this.session.state ? 'reconnected, resumed the game' : 'reconnected, no game started';
+  private addBrowser(token: string): Browser {
+    const browser: Browser = {
+      token,
+      session: new GameSession({
+        profiles: this.options.profiles,
+        slots: this.slots,
+        send: (msg) => browser.connection?.send(msg),
+        refused: (reason) => this.options.log(`${browser.connection?.address} refused: ${reason}`),
+        timeouts: this.options.timeouts,
+        log: this.options.log,
+      }),
+    };
+    this.browsers.set(token, browser);
+    return browser;
   }
 
-  /** Logged here and not in `release`, which also runs when the server shuts down. */
-  private async expire(address: string): Promise<void> {
-    const outcome = this.session?.state ? 'game ended' : 'no game to end';
+  private attachOutcome(browser?: Browser): string {
+    if (!browser) return 'connected, no game started';
+    return browser.session.state ? 'reconnected, resumed the game' : 'reconnected, no game started';
+  }
+
+  /** Ends this browser's game alone. */
+  private async expire(browser: Browser, address: string): Promise<void> {
+    const outcome = browser.session.state ? 'game ended' : 'no game to end';
     this.options.log(`${address} grace period ran out, ${outcome}`);
-    await this.release();
+    this.browsers.delete(browser.token);
+    await browser.session.close();
   }
 }

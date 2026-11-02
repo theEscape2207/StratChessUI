@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { CLOSE_CODES, type ClientMessage, type ServerMessage } from '@stratchess-ui/shared';
 
-export type Link = 'connecting' | 'connected' | 'reconnecting' | 'busy' | 'replaced';
+export type Link = 'connecting' | 'connected' | 'reconnecting' | 'replaced';
 
 const RETRY_MS = 2000;
 
@@ -37,7 +37,6 @@ export function useGameSocket(
       received(JSON.parse(event.data) as ServerMessage);
     ws.onclose = (event) => {
       if (event.code === CLOSE_CODES.notPaired) return unpaired();
-      if (event.code === CLOSE_CODES.busy) return setLink('busy');
       if (event.code === CLOSE_CODES.replaced) return setLink('replaced');
       setLink('reconnecting');
       retryTimer = setTimeout(reconnect, RETRY_MS);

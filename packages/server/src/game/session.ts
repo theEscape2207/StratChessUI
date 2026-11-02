@@ -15,13 +15,18 @@ import {
 import type { EngineProfile } from '../engines/profiles.ts';
 import { EngineError, SearchCancelledError, UciEngine, type Timeouts } from '../uci/engine.ts';
 import type { SearchInfo } from '../uci/protocol.ts';
+import type { EngineSlots } from './engine-slots.ts';
 import { searchReport } from './search-report.ts';
 import { Throttle } from './throttle.ts';
 import { TranscriptFeed } from './transcript.ts';
 
 export type SessionOptions = {
   profiles: readonly EngineProfile[];
+  /** Shared with every other browser's session. */
+  slots: EngineSlots;
   send: (msg: ServerMessage) => void;
+  /** A request turned away for lack of an engine slot, for the log. */
+  refused: (reason: string) => void;
   timeouts?: Partial<Timeouts>;
   /** Where the build each game runs against, and engine failures with transcripts, are reported. */
   log: (text: string) => void;
@@ -71,6 +76,11 @@ export class GameSession {
     if (!profile) return this.error(`unknown engine: ${request.engineId}`);
     const start = parseStartFen(request.fen ?? START_FEN);
     if (!start.ok) return this.error(start.reason);
+    const { slots } = this.options;
+    // Decided before the engine starts: asked to move in a finished position, it would answer
+    // a null move, or fail to start for nothing.
+    const ended = outcome([start.fen]);
+    if (!ended && !slots.take()) return this.refuse(`limit of ${slots.limit} engines reached`);
     this.endCurrent();
     const game: Game = {
       state: {
@@ -91,14 +101,14 @@ export class GameSession {
     this.game = game;
     this.options.send({ type: 'transcript', lines: [], reset: true });
     this.publish(game);
-    // Decided before the engine starts: asked to move in a finished position, it would answer
-    // a null move, or fail to start for nothing.
-    const ended = outcome(game.positions);
     if (ended) return this.finish(game, ended);
     let engine: UciEngine;
     try {
-      engine = await UciEngine.start(profile, this.options.timeouts, (line) =>
-        game.transcript.push(line),
+      engine = await UciEngine.start(
+        profile,
+        this.options.timeouts,
+        (line) => game.transcript.push(line),
+        () => slots.free(),
       );
     } catch (error) {
       return this.fail(game, error);
@@ -208,6 +218,17 @@ export class GameSession {
     // The lines that led to this state, such as a `bestmove`, go out before it.
     game.transcript.flush();
     this.options.send({ type: 'game', game: game.state });
+  }
+
+  private refuse(reason: string): void {
+    this.options.refused(reason);
+    // The browser blanks its game when it asks for a new one, so it needs this one back. The
+    // error comes last, as a game state clears the browser's notice.
+    if (this.game) {
+      this.options.send({ type: 'game', game: this.game.state });
+      if (this.game.search) this.options.send({ type: 'search', ...this.game.search });
+    }
+    this.error(`${reason}, try again later`);
   }
 
   private error(reason: string): void {

@@ -1,5 +1,5 @@
-// One server per Playwright worker, since each holds one game; the pairing test gets one more,
-// because the token it mints would hold that game through its grace period.
+// One server per Playwright worker, since a worker's tests share a paired browser and so its one
+// game; the pairing test gets one more, so that the tokens it mints stay out of their way.
 export const BOARD_SERVERS = 4;
 export const PAIRING_CODE = '000000';
 
