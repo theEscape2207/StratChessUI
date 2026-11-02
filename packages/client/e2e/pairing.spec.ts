@@ -29,3 +29,29 @@ test('pairs, plays, and resumes the game after a reload', async ({ page }) => {
   await expectMoves(page, ['e4', 'a5']);
   await playAndAwaitReply(page, 'd2d4', false);
 });
+
+for (const [name, viewport] of [
+  ['phone', { width: 390, height: 844 }],
+  ['desktop', { width: 1280, height: 800 }],
+] as const) {
+  test.describe(name, () => {
+    test.use({ viewport });
+
+    test('keeps the card in a centred column with the notice inside', async ({ page }) => {
+      await page.goto('/');
+      await page.getByLabel('Pairing code from the host').fill('999999');
+      await page.getByRole('button', { name: 'Pair' }).click();
+
+      const card = page.locator('.pair-card');
+      await expect(card.getByTestId('notice')).toHaveText('wrong pairing code');
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow).toBeLessThanOrEqual(0);
+
+      const box = await card.boundingBox();
+      expect(box!.width).toBeLessThanOrEqual(390);
+      expect(box!.x + box!.width / 2).toBeCloseTo(viewport.width / 2, 0);
+    });
+  });
+}

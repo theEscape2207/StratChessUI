@@ -1,15 +1,16 @@
 # Design references
 
-Copies of the StratChess design system's play-screen components, for agents and reviewers who
-cannot open the design system itself (it is private). The design system is the source: change it
-there, then copy the changed files here. Each `README.md` is the component's guideline;
-`preview.html` is a static rendition with illustrative data, not app code.
+Copies of the StratChess design system's components, for agents and reviewers who cannot open the
+design system itself (it is private). The design system is the source: change it there, then copy
+the changed files here. Each `README.md` is the component's guideline; `preview.html` is a static
+rendition with illustrative data, not app code.
 
 Open a preview straight from the checkout: it loads the client's `tokens.css`, generated from the
 same design system. Piece images live in the design system and are hidden here.
 
 | Component                                    | What                                   |
 | -------------------------------------------- | -------------------------------------- |
+| [PairScreen](PairScreen/README.md)           | The whole page before a device pairs   |
 | [GameScreen](GameScreen/README.md)           | Play screen at 960px and wider         |
 | [GameScreenPhone](GameScreenPhone/README.md) | Play screen below 960px                |
 | [SearchInfo](SearchInfo/README.md)           | Engine search line, top of the sidebar |

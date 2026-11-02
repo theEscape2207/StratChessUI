@@ -20,24 +20,36 @@ export function PairForm({ onPaired }: PairFormProps) {
   };
 
   return (
-    <form className="new-game" onSubmit={(e) => void submit(e)}>
-      <label>
-        Pairing code from the host
-        <input
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-        />
-      </label>
-      <button type="submit" className="primary">
-        Pair
-      </button>
-      {notice && (
-        <p className="status notice" data-testid="notice">
-          {notice}
+    <>
+      <div className="wordmark">
+        <span className="wordmark-mark" aria-hidden="true" />
+        StratChess
+      </div>
+      <form className="pair-card" onSubmit={(e) => void submit(e)}>
+        <h1>Pair this device</h1>
+        <p className="pair-hint">
+          Type the 6-digit code shown in the host's console. You only do this once on each phone or
+          tablet.
         </p>
-      )}
-    </form>
+        <label>
+          Pairing code from the host
+          <input
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+          />
+        </label>
+        <button type="submit" className="primary">
+          Pair
+        </button>
+        {notice && (
+          <p className="status notice" data-testid="notice">
+            {notice}
+          </p>
+        )}
+      </form>
+    </>
   );
 }
