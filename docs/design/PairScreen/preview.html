@@ -1,0 +1,36 @@
+<!-- @dsCard group="Screens" height=560 width=390 subtitle="One-time device setup before the first game, at phone width" -->
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../../../packages/client/src/tokens.css"><style>img[src^="/_blob/"] { visibility: hidden; }</style><style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-sans); }
+  .screen { width: 390px; min-height: 560px; padding: var(--space-6) var(--space-5); display: flex; flex-direction: column; gap: var(--space-6); }
+  .brand { display: flex; align-items: center; gap: var(--space-3); font-size: 18px; line-height: 24px; font-weight: 800; }
+  .mark { width: 32px; height: 32px; display: grid; grid-template-columns: 1fr 1fr; border-radius: var(--radius-sm); overflow: hidden; }
+  .mark i:nth-child(1), .mark i:nth-child(4) { background: var(--board-light); }
+  .mark i:nth-child(2), .mark i:nth-child(3) { background: var(--board-dark); }
+  .card { background: var(--panel); border-radius: var(--radius-md); padding: var(--space-6) var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); }
+  h1 { margin: 0; font-size: 20px; line-height: 26px; font-weight: 800; }
+  p { margin: 0; font-size: 14px; line-height: 20px; color: var(--muted); }
+  p b { color: var(--ink); }
+  label { display: flex; flex-direction: column; gap: var(--space-2); font-size: 14px; line-height: 20px; font-weight: 600; }
+  input { width: 100%; min-height: 56px; padding: 0 var(--space-4); font: 700 28px/1 var(--font-mono); letter-spacing: 0.35em; text-align: center;
+    background: var(--bg); color: var(--ink); border: 1px solid var(--control-border); border-radius: var(--radius-sm); }
+  input:focus-visible, button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  button { font: 700 17px/20px var(--font-sans); min-height: 44px; padding: 12px; border: 0; border-radius: var(--radius-md);
+    background: var(--accent); color: var(--on-accent); box-shadow: var(--shadow-button); margin-bottom: 4px; }
+  .notice { font: 400 0.85rem/20px var(--font-mono); color: var(--notice); }
+</style></head>
+<body>
+  <div class="screen">
+    <div class="brand"><span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>StratChess</div>
+    <form class="card" onsubmit="return false">
+      <h1>Pair this device</h1>
+      <p>Type the 6-digit code shown in the host's console. You only do this once on each phone or tablet.</p>
+      <label>Pairing code from the host
+        <input inputmode="numeric" autocomplete="one-time-code" maxlength="6" value="4821">
+      </label>
+      <button type="submit">Pair</button>
+      <div class="notice">pairing: wrong code (1 of 5)</div>
+    </form>
+  </div>
+</body></html>

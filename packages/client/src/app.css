@@ -814,6 +814,7 @@ button:disabled {
 main.pair-screen {
   box-sizing: border-box;
   max-width: 390px;
+  padding: var(--space-6) var(--space-5);
 }
 
 .wordmark {
@@ -861,17 +862,23 @@ main.pair-screen {
   font-weight: 600;
 }
 
-/* The indent balances the spacing after the last digit, which would push the code off centre. */
 .pair-card input {
   box-sizing: border-box;
   width: 100%;
-  height: 56px;
+  min-height: 56px;
+  padding: 0 var(--space-4);
   border: 1px solid var(--control-border);
   border-radius: var(--radius-sm);
-  font: 700 28px var(--font-mono);
+  font: 700 28px / 1 var(--font-mono);
   letter-spacing: 0.35em;
   text-align: center;
-  text-indent: 0.35em;
   color: var(--ink);
   background: var(--bg);
+}
+
+/* The margin keeps the card's gap below the button's solid edge. */
+.pair-card button {
+  min-height: 44px;
+  margin-bottom: 4px;
+  font: 700 17px / 20px var(--font-sans);
 }
