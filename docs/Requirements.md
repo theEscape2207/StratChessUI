@@ -153,15 +153,19 @@ in build tooling (Vite, ESLint, TypeScript) rather than in the chess or server c
 ## Open questions (later milestones)
 
 - **M3:** hint form (piece, move or line) and its engine/limit (#68); resign and draw offers (#70);
-  how difficulty is named (#71).
+  how difficulty is named (#71); whether Play needs its own view (#76); how long a game survives a
+  lost connection (#73). A real game with the target player closes the milestone (#74).
 - **After M3:** PGN export, #65 (recommended: retains page-bound games without a database). M3 holds
   only what serves beginners.
+- **Several users:** one server holds one game for one browser, which will not serve even two
+  players. It needs rearchitecting at some point; no milestone yet.
 - **Analysis:** linear move navigation or variation tree; continuous analysis; multiple engines;
   when to build the engine option forms, as profiles on the host set options until then.
 - **Engine vs engine:** per-side profiles and limits; bundled Stockfish (GPL source obligations) or
   user-supplied binary.
-- **Delivery:** documented developer launcher first; installer is a separate requirement.
-- **Accessibility and keyboard** requirements.
+- **Delivery:** documented developer launcher first; installer is a separate requirement. The owner
+  starts the server through M3.
+- **Accessibility and keyboard** requirements, after M3.
 - **CI:** integration tests need a StratChess binary; pin a released build or use a fake engine
   replaying recorded transcripts (recommended for unit tests anyway).
 
