@@ -7,7 +7,7 @@ const RETRY_MS = 2000;
 
 /**
  * The game WebSocket for a paired browser. A dropped socket is retried, so a phone that locks gets
- * its game back within the server's grace period; a socket the server closed on purpose is not.
+ * its game back; a socket the server closed on purpose is not.
  */
 export function useGameSocket(
   token: string,

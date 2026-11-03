@@ -23,7 +23,8 @@ separate open-source repository, and has no commercial goal.
   4 engines run at once, as each can hold many threads and much memory; past that a new game is
   refused with a reason. No user accounts. A browser pairs through a code shown on the host. This
   is an accepted, clunky compromise; revisit for Play (#16).
-- **Session:** a game lives only while its page is open. Saved games, and timed games that survive
+- **Session:** a game is held until its browser replaces it or the server stops, however long the
+  browser is away. Saved games, which would survive a server restart, and timed games that survive
   a reconnect, are backlog.
 - **Priority:** human vs engine, then analysis/statistics, then engine vs engine (single
   configurable games, including Stockfish; batches later).
@@ -50,16 +51,16 @@ M2 and M3 are two views of one app, sharing game and engine handling. No configu
 
 ## Decisions (agreed 2026-10-25)
 
-| Decision            | Choice                                                                          | Why                                                                                                                                                                              |
-| ------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Backend             | Node + TypeScript, Fastify for HTTP/WebSocket                                   | One language end to end; chessops runs the rules on both server and browser; a single-engine UCI controller is small. python-chess saves protocol work but adds a second runtime |
-| Board               | Chessground                                                                     | Lichess's board: proven touch handling on phones, arrows and square highlights for hints, PV and legal moves. Framework-neutral, so it needs a thin wrapper component            |
-| Rules               | chessops                                                                        | Same author as Chessground and designed to pair with it; FEN/SAN/UCI notation, PGN trees for later analysis. chess.js is a simpler fallback                                      |
-| Frontend            | React + Vite + TypeScript                                                       | Widest choice of UI components; Chessground removes React's board advantage, so Svelte is an equal alternative                                                                   |
-| Transport security  | Plain HTTP/WS, accepted for the home LAN                                        | Self-signed certificates on phones (iOS especially) cost more than the threat they address                                                                                       |
-| Pairing persistence | Browser keeps its token until revoked on the host                               | One code per device, not per game                                                                                                                                                |
-| Disconnect          | Short grace period (e.g. 60 s), then stop the search and end the engine process | Phones drop sockets when locked; page-close events are unreliable                                                                                                                |
-| UCI transcript      | Read-only                                                                       | Typed commands could desync the controller, which owns `position`/`go`/`stop`, and each would need the CR/LF guard and an allowlist                                              |
+| Decision            | Choice                                                                            | Why                                                                                                                                                                              |
+| ------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend             | Node + TypeScript, Fastify for HTTP/WebSocket                                     | One language end to end; chessops runs the rules on both server and browser; a single-engine UCI controller is small. python-chess saves protocol work but adds a second runtime |
+| Board               | Chessground                                                                       | Lichess's board: proven touch handling on phones, arrows and square highlights for hints, PV and legal moves. Framework-neutral, so it needs a thin wrapper component            |
+| Rules               | chessops                                                                          | Same author as Chessground and designed to pair with it; FEN/SAN/UCI notation, PGN trees for later analysis. chess.js is a simpler fallback                                      |
+| Frontend            | React + Vite + TypeScript                                                         | Widest choice of UI components; Chessground removes React's board advantage, so Svelte is an equal alternative                                                                   |
+| Transport security  | Plain HTTP/WS, accepted for the home LAN                                          | Self-signed certificates on phones (iOS especially) cost more than the threat they address                                                                                       |
+| Pairing persistence | Browser keeps its token until revoked on the host                                 | One code per device, not per game                                                                                                                                                |
+| Disconnect          | Hold the game; after 60 s, end the engine process and restart it when next needed | Phones drop sockets when locked and networks drop; a game is cheap to hold, while an engine holds a slot, its Hash and a lock on its executable                                  |
+| UCI transcript      | Read-only                                                                         | Typed commands could desync the controller, which owns `position`/`go`/`stop`, and each would need the CR/LF guard and an allowlist                                              |
 
 ## Architecture constraints (independent of stack)
 
@@ -155,10 +156,10 @@ in build tooling (Vite, ESLint, TypeScript) rather than in the chess or server c
 ## Open questions (later milestones)
 
 - **M3:** hint form (piece, move or line) and its engine/limit (#68); resign and draw offers (#70);
-  how difficulty is named (#71); whether Play needs its own view (#76); how long a game survives a
-  lost connection (#73). A real game with the target player closes the milestone (#74).
-- **After M3:** PGN export, #65 (recommended: retains page-bound games without a database). M3 holds
-  only what serves beginners.
+  how difficulty is named (#71); whether Play needs its own view (#76). A real game with the target
+  player closes the milestone (#74).
+- **After M3:** PGN export, #65 (recommended: retains games without a database). M3 holds only what
+  serves beginners.
 - **Several users:** one game per paired browser serves a household. Accounts, or a game that moves
   between a player's devices, have no milestone.
 - **Analysis:** linear move navigation or variation tree; continuous analysis; multiple engines;

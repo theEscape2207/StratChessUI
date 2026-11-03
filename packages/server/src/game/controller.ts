@@ -1,5 +1,6 @@
-// One game for each paired browser. A game outlives its browser's socket for a grace period, so a
-// phone that locks or a page that reloads resumes it.
+// One game for each paired browser, held until that browser replaces it or the server stops, so a
+// phone that locks or loses its network resumes it. Its engine outlives the socket only for a grace
+// period, as a held engine would keep a slot, its Hash, and a lock on the executable.
 import { CLOSE_CODES, type ClientMessage, type ServerMessage } from '@stratchess-ui/shared';
 import type { EngineProfile } from '../engines/profiles.ts';
 import type { Timeouts } from '../uci/engine.ts';
@@ -22,7 +23,6 @@ export type ControllerOptions = {
   log: (text: string) => void;
 };
 
-/** A paired browser's game and current socket, held until its grace period runs out. */
 type Browser = {
   token: string;
   connection?: Connection;
@@ -46,6 +46,7 @@ export class Controller {
   attach(token: string, connection: Connection): void {
     const known = this.browsers.get(token);
     clearTimeout(known?.graceTimer);
+    known?.session.keepEngine();
     if (known?.connection) {
       this.options.log(`${known.connection.address} replaced by ${connection.address}`);
       known.connection.close(CLOSE_CODES.replaced, 'opened elsewhere');
@@ -80,7 +81,7 @@ export class Controller {
     this.options.log(
       `${address} socket closed, grace period of ${this.options.graceMs} ms started`,
     );
-    browser.graceTimer = setTimeout(() => void this.expire(browser, address), this.options.graceMs);
+    browser.graceTimer = setTimeout(() => this.expire(browser, address), this.options.graceMs);
   }
 
   /** Ends every game, stopping its engine. */
@@ -118,11 +119,15 @@ export class Controller {
     return browser.session.state ? 'reconnected, resumed the game' : 'reconnected, no game started';
   }
 
-  /** Ends this browser's game alone. */
-  private async expire(browser: Browser, address: string): Promise<void> {
-    const outcome = browser.session.state ? 'game ended' : 'no game to end';
-    this.options.log(`${address} grace period ran out, ${outcome}`);
-    this.browsers.delete(browser.token);
-    await browser.session.close();
+  /** Stops this browser's engine alone; a browser with no game holds nothing, so is dropped. */
+  private expire(browser: Browser, address: string): void {
+    if (!browser.session.state) {
+      this.options.log(`${address} grace period ran out, no game to hold`);
+      this.browsers.delete(browser.token);
+      return;
+    }
+    const stopped = browser.session.stopEngineWhenIdle();
+    const engine = stopped ? 'engine stopped' : 'engine stops once idle';
+    this.options.log(`${address} grace period ran out, ${engine}, game held`);
   }
 }

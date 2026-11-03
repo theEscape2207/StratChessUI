@@ -34,9 +34,13 @@ export type SessionOptions = {
 
 type Game = {
   state: GameState;
+  profile: EngineProfile;
   /** Every position of the game as a FEN, for repetition. */
   positions: string[];
+  /** Absent while starting, and while a held game's engine is stopped until its next search. */
   engine?: UciEngine;
+  /** Nobody is connected and the grace period has run out: stop the engine at its next idle. */
+  engineUnwanted: boolean;
   /** The last search line sent, resent to a browser that reattaches. */
   search?: SearchUpdate;
   transcript: TranscriptFeed;
@@ -80,9 +84,11 @@ export class GameSession {
     // Decided before the engine starts: asked to move in a finished position, it would answer
     // a null move, or fail to start for nothing.
     const ended = outcome([start.fen]);
-    if (!ended && !slots.take()) return this.refuse(`limit of ${slots.limit} engines reached`);
+    if (!ended && !slots.take()) return this.refuseAtLimit();
     this.endCurrent();
     const game: Game = {
+      profile,
+      engineUnwanted: false,
       state: {
         startFen: start.fen,
         fen: start.fen,
@@ -102,22 +108,7 @@ export class GameSession {
     this.options.send({ type: 'transcript', lines: [], reset: true });
     this.publish(game);
     if (ended) return this.finish(game, ended);
-    let engine: UciEngine;
-    try {
-      engine = await UciEngine.start(
-        profile,
-        this.options.timeouts,
-        (line) => game.transcript.push(line),
-        () => slots.free(),
-      );
-    } catch (error) {
-      return this.fail(game, error);
-    }
-    if (this.game !== game) return void engine.quit(); // replaced or closed while starting
-    game.engine = engine;
-    this.options.log(`${profile.name}: running ${engine.name ?? 'an engine with no id name'}`);
-    if (engine.name) game.state = { ...game.state, engineIdName: engine.name };
-    this.nextTurn(game);
+    if (await this.startEngine(game)) this.nextTurn(game);
   }
 
   move(uci: string): void {
@@ -127,7 +118,31 @@ export class GameSession {
     if (game.state.phase !== 'human') return this.error('not your turn');
     const result = applyUciMove(game.state.fen, uci);
     if (!result.ok) return this.error(result.reason);
+    // Refused before the move is applied, so the player can try it again: past here, a restart that
+    // could not run would end the game.
+    const needsRestart = !game.engine && !outcome([...game.positions, result.fen]);
+    if (needsRestart && !this.options.slots.take()) return this.refuseAtLimit();
     this.play(game, result.uci, result.fen);
+  }
+
+  /**
+   * Stops the engine of a game nobody is connected to, freeing its slot and keeping the game. A
+   * search is left to finish, which `maxSearchMs` bounds: `quit` would cancel it, and a cancelled
+   * search plays no move, leaving the game thinking for good. Returns whether the engine has
+   * already been told to stop, rather than at its next idle.
+   */
+  stopEngineWhenIdle(): boolean {
+    const game = this.game;
+    if (!game) return true;
+    game.engineUnwanted = true;
+    const busy = game.state.phase === 'starting' || game.state.phase === 'thinking';
+    if (!busy) this.stopEngine(game);
+    return !busy;
+  }
+
+  /** Someone is connected again, so an engine not yet stopped stays. */
+  keepEngine(): void {
+    if (this.game) this.game.engineUnwanted = false;
   }
 
   /** Ends the game, stopping its engine. */
@@ -151,9 +166,41 @@ export class GameSession {
     game.state = { ...game.state, phase: humanToMove ? 'human' : 'thinking' };
     this.publish(game);
     if (!humanToMove) void this.engineMove(game);
+    else if (game.engineUnwanted) this.stopEngine(game);
+  }
+
+  /** Starts the game's engine in a slot the caller has taken; false if the game has moved on. */
+  private async startEngine(game: Game): Promise<boolean> {
+    const { profile } = game;
+    let engine: UciEngine;
+    try {
+      engine = await UciEngine.start(
+        profile,
+        this.options.timeouts,
+        (line) => game.transcript.push(line),
+        () => this.options.slots.free(),
+      );
+    } catch (error) {
+      this.fail(game, error);
+      return false;
+    }
+    if (this.game !== game) {
+      void engine.quit(); // replaced or closed while starting
+      return false;
+    }
+    game.engine = engine;
+    this.options.log(`${profile.name}: running ${engine.name ?? 'an engine with no id name'}`);
+    if (engine.name) game.state = { ...game.state, engineIdName: engine.name };
+    return true;
+  }
+
+  private stopEngine(game: Game): void {
+    void game.engine?.quit();
+    game.engine = undefined;
   }
 
   private async engineMove(game: Game): Promise<void> {
+    if (!game.engine && !(await this.startEngine(game))) return;
     const fen = game.state.fen;
     const feed = new Throttle<SearchInfo>(
       (info) => this.report(game, fen, info),
@@ -220,10 +267,11 @@ export class GameSession {
     this.options.send({ type: 'game', game: game.state });
   }
 
-  private refuse(reason: string): void {
+  private refuseAtLimit(): void {
+    const reason = `limit of ${this.options.slots.limit} engines reached`;
     this.options.refused(reason);
-    // The browser blanks its game when it asks for a new one, so it needs this one back. The
-    // error comes last, as a game state clears the browser's notice.
+    // The browser has blanked its game to ask for a new one, or moved the piece, so it needs this
+    // one back. The error comes last, as a game state clears the browser's notice.
     if (this.game) {
       this.options.send({ type: 'game', game: this.game.state });
       if (this.game.search) this.options.send({ type: 'search', ...this.game.search });

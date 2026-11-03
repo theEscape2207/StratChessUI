@@ -54,8 +54,10 @@ token. The code changes after each pairing and after five wrong attempts. Pairin
 `pairings.json` in the host directory (above); delete an entry, or the file, to revoke a browser.
 It applies the next time that browser connects.
 
-Each paired browser has its own game, which it has 60 seconds to resume after a locked phone or a
-reloaded page. At most 4 engines run at once; past that a new game is refused with a reason.
+Each paired browser has its own game, held until that browser starts another or the server stops,
+so a locked phone or a lost connection does not lose it. After 60 seconds with no connection the
+engine stops, and it restarts for the next move. At most 4 engines run at once; past that a new game,
+or a move needing a restart, is refused with a reason.
 
 ## Engines
 
