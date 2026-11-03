@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import {
   appendTranscript,
+  canTakeBack,
   capturedPieces,
   materialBalance,
   START_FEN,
@@ -23,6 +24,7 @@ import { PlayerStrip } from './PlayerStrip.tsx';
 import { SearchInfo } from './SearchInfo.tsx';
 import { limitLabel, materialLead, stripChip } from './strip.ts';
 import { Transcript } from './Transcript.tsx';
+import { UndoButton } from './UndoButton.tsx';
 import { useGameSocket, type Link } from './useGameSocket.ts';
 
 const TOKEN_KEY = 'pairing-token';
@@ -148,6 +150,9 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
   // Whether this page saw the current game in play, so a game already over at load opens no dialog.
   const inPlay = useRef(false);
   const [gameOverOpen, setGameOverOpen] = useState(false);
+  // From the tap until the server answers, so a double tap cannot take back two turns, nor a move
+  // made meanwhile land on the rewound position.
+  const [undoSent, setUndoSent] = useState(false);
   const newGameButton = useRef<HTMLButtonElement>(null);
   const clearGame = () => {
     setGame(undefined);
@@ -155,6 +160,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
     setEvalScore(undefined);
     setFormOpen(false);
     setGameOverOpen(false);
+    setUndoSent(false);
   };
   const { link, send, retry } = useGameSocket(
     token,
@@ -178,11 +184,18 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
       }
       if (msg.type === 'error') {
         setNotice(msg.reason);
+        setUndoSent(false);
         // Redraw the last server position to undo the board's optimistic move.
         setRevision((r) => r + 1);
         return;
       }
       setNotice('');
+      setUndoSent(false);
+      // What the engine said was about moves that are gone. The server has forgotten it too.
+      if (game && msg.game.moves.length < game.moves.length) {
+        setSearch(undefined);
+        setEvalScore(undefined);
+      }
       setGame(msg.game);
       // The last search stays up until the engine starts on another position.
       const { phase, fen } = msg.game;
@@ -212,7 +225,9 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
           lastMove={game?.lastMove}
           revision={revision}
           orientation={humanColor}
-          movable={link === 'connected' && game?.phase === 'human' ? humanColor : undefined}
+          movable={
+            link === 'connected' && game?.phase === 'human' && !undoSent ? humanColor : undefined
+          }
           onMove={(uci) => send({ type: 'move', uci })}
         >
           {gameOverOpen && game?.phase === 'over' && (
@@ -250,11 +265,20 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
         <h2 className="sidebar-title">{game ? `Play ${game.engineName}` : 'New game'}</h2>
         {game && search && <SearchInfo fen={search.fen} info={search.info} />}
         <MoveList startFen={game?.startFen ?? START_FEN} moves={game?.moves ?? []} />
-        {ready && formHidden && (
+        {game && (
           <div className="actions">
-            <button type="button" data-testid="show-new-game" onClick={() => setFormOpen(true)}>
-              New game
-            </button>
+            <UndoButton
+              disabled={link !== 'connected' || undoSent || !canTakeBack(game)}
+              onClick={() => {
+                setUndoSent(true);
+                send({ type: 'takeback' });
+              }}
+            />
+            {ready && formHidden && (
+              <button type="button" data-testid="show-new-game" onClick={() => setFormOpen(true)}>
+                New game
+              </button>
+            )}
           </div>
         )}
         {ready && (

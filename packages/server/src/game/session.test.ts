@@ -410,6 +410,140 @@ describe('GameSession', () => {
     });
   });
 
+  describe('takeback', () => {
+    it('returns to the start of the game, with no last move and no search to resend', async () => {
+      const { session, settled } = open();
+      void session.newGame(game('legal', 'white'));
+      await settled();
+      session.move('e2e4');
+      expect(await settled()).toMatchObject({ moves: ['e2e4', 'a7a5'], lastMove: 'a7a5' });
+      expect(session.search).toBeDefined();
+
+      session.takeBack();
+      const state = await settled();
+      expect(state).toMatchObject({ phase: 'human', fen: START_FEN, moves: [] });
+      expect(state.lastMove).toBeUndefined();
+      expect(session.search).toBeUndefined();
+    });
+
+    it('returns to the turn before, from which the game plays on', async () => {
+      const { session, settled } = open();
+      void session.newGame(game('legal', 'white'));
+      await settled();
+      session.move('e2e4');
+      const afterFirst = await settled();
+      session.move('d2d4');
+      await settled();
+
+      session.takeBack();
+      expect(await settled()).toEqual(afterFirst);
+      session.move('g1f3');
+      expect(await settled()).toMatchObject({
+        phase: 'human',
+        moves: ['e2e4', 'a7a5', 'g1f3', 'a5a4'],
+      });
+    });
+
+    it('stops at the opening move of an engine that moved first', async () => {
+      const { session, next, settled } = open();
+      void session.newGame(game('legal', 'black'));
+      const opened = await settled();
+      expect(opened.moves).toHaveLength(1);
+      session.takeBack();
+      expect(await next()).toEqual({ type: 'error', reason: 'nothing to take back' });
+      expect(session.state).toEqual(opened);
+
+      session.move('e7e5');
+      await settled();
+      session.takeBack();
+      expect(await settled()).toEqual(opened);
+    });
+
+    it('returns to a start FEN, refused there whichever side it has to move', async () => {
+      const fen = '4k3/8/8/8/4P3/8/8/4K3 b - - 0 40';
+      const { session, next, settled } = open();
+      void session.newGame({ ...game('legal', 'black'), fen });
+      const humanFirst = await settled();
+      expect(humanFirst).toMatchObject({ fen, moves: [] });
+      session.takeBack();
+      expect(await next()).toEqual({ type: 'error', reason: 'nothing to take back' });
+
+      session.move('e8d8');
+      await settled();
+      session.takeBack();
+      expect(await settled()).toEqual(humanFirst);
+
+      void session.newGame({ ...game('legal', 'white'), fen });
+      const engineFirst = await settled();
+      expect(engineFirst.moves).toHaveLength(1);
+      session.takeBack();
+      expect(await next()).toEqual({ type: 'error', reason: 'nothing to take back' });
+    });
+
+    it('forgets the positions it removes, which no longer count towards a repetition', async () => {
+      const { session, settled } = open();
+      void session.newGame(game('legal', 'black'));
+      await settled();
+      // Were they still counted, the third of these would end the game by threefold repetition.
+      for (let i = 0; i < 3; i++) {
+        session.move('g8f6');
+        expect((await settled()).phase).toBe('human');
+        session.takeBack();
+        await settled();
+      }
+      expect(session.state?.moves).toEqual(['b1a3']);
+    });
+
+    it('rewinds a held game without starting its engine, which the next move restarts', async () => {
+      const { session, settled, logged } = open();
+      void session.newGame(game('legal', 'white'));
+      await settled();
+      session.move('e2e4');
+      await settled();
+      expect(session.stopEngineWhenIdle()).toBe(true);
+      const running = () => logged.filter((line) => line.includes('running')).length;
+      expect(running()).toBe(1);
+
+      session.takeBack();
+      expect(await settled()).toMatchObject({ phase: 'human', moves: [] });
+      expect(running()).toBe(1);
+
+      session.move('d2d4');
+      expect(await settled()).toMatchObject({ phase: 'human', moves: ['d2d4', 'a7a5'] });
+      expect(running()).toBe(2);
+    });
+
+    it('is refused with no game, and with the game unchanged once it is over', async () => {
+      const { session, next, settled } = open();
+      session.takeBack();
+      expect(await next()).toEqual({ type: 'error', reason: 'no game in progress' });
+
+      void session.newGame(game('legal', 'white'));
+      await settled();
+      for (const move of ['e2e4', 'f1c4', 'd1h5']) {
+        session.move(move);
+        await settled();
+      }
+      session.move('h5f7');
+      const over = await settled();
+      expect(over.phase).toBe('over');
+      session.takeBack();
+      expect(await next()).toEqual({ type: 'error', reason: 'the game is over' });
+      expect(session.state).toEqual(over);
+    });
+
+    it('is refused while the engine thinks', async () => {
+      const { session, next, settled } = open();
+      void session.newGame(game('legal', 'white'));
+      await settled();
+      session.move('e2e4');
+      session.takeBack();
+      expect(await next()).toMatchObject({ type: 'game', game: { phase: 'thinking' } });
+      expect(await next()).toEqual({ type: 'error', reason: 'not your turn' });
+      expect(await settled()).toMatchObject({ moves: ['e2e4', 'a7a5'] });
+    });
+  });
+
   describe('transcript', () => {
     /** The lines streamed up to the next state the human can move in, which must follow them. */
     async function linesUntilHumanMove(nextAny: () => Promise<ServerMessage>) {
