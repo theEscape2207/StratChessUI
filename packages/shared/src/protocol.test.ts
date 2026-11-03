@@ -45,6 +45,11 @@ describe('protocol', () => {
     expect(request(42)).toBeUndefined();
   });
 
+  it('accepts a takeback, dropping anything sent with it', () => {
+    const raw = JSON.stringify({ type: 'takeback', plies: 7 });
+    expect(parseClientMessage(raw)).toEqual({ type: 'takeback' });
+  });
+
   it('keeps the newest lines of a transcript', () => {
     const line = (i: number): TranscriptLine => ({ dir: 'received', text: `${i}` });
     const lines = Array.from({ length: TRANSCRIPT_LINES - 1 }, (_, i) => line(i));

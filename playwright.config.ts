@@ -14,6 +14,7 @@ const GAME_SPECS = [
   'layout.spec.ts',
   'status.spec.ts',
   'strips.spec.ts',
+  'takeback.spec.ts',
   'two-browsers.spec.ts',
 ];
 

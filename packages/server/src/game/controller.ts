@@ -70,6 +70,7 @@ export class Controller {
     const browser = this.browserOf.get(connection);
     if (browser?.connection !== connection) return;
     if (msg.type === 'new-game') return void browser.session.newGame(msg);
+    if (msg.type === 'takeback') return browser.session.takeBack();
     browser.session.move(msg.uci);
   }
 

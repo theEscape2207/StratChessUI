@@ -1,12 +1,11 @@
 import type { Page } from '@playwright/test';
-import type { GameState, SearchReport, ServerMessage } from '@stratchess-ui/shared';
 import { expect, test } from './fixtures.ts';
 import {
   expectFen,
-  expectThinking,
   expectYourMove,
   newGame,
   openSettled,
+  scriptedServer,
   START,
 } from './helpers.ts';
 
@@ -15,38 +14,6 @@ const DESKTOP = 960;
 
 const bar = (page: Page) => page.getByTestId('eval-bar');
 const number = (page: Page) => page.getByTestId('eval-number');
-
-const GAME: GameState = {
-  startFen: START,
-  fen: START,
-  moves: [],
-  humanColor: 'black',
-  engineName: 'Fake',
-  limit: { depth: 3 },
-  phase: 'thinking',
-};
-
-/** Stands in for the server, so a test can send exactly the search lines it needs. */
-async function scriptedServer(page: Page) {
-  let send: (msg: ServerMessage) => void = () => {};
-  const newGames: unknown[] = [];
-  await page.routeWebSocket(/\/ws/, (ws) => {
-    send = (msg) => ws.send(JSON.stringify(msg));
-    ws.onMessage((data) => {
-      const msg = JSON.parse(String(data));
-      if (msg.type === 'new-game') newGames.push(msg);
-    });
-    send({ type: 'hello', engines: [{ id: 'fake', name: 'Fake' }], hasGame: true });
-    send({ type: 'game', game: GAME });
-  });
-  await page.goto('/');
-  await expectThinking(page);
-  return {
-    game: (game: Partial<GameState>) => send({ type: 'game', game: { ...GAME, ...game } }),
-    search: (fen: string, info: SearchReport) => send({ type: 'search', fen, info }),
-    newGames,
-  };
-}
 
 test('before the first search the bar is at half with no number', async ({ page }) => {
   await scriptedServer(page);

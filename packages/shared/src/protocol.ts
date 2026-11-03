@@ -21,7 +21,11 @@ export type NewGameRequest = {
   fen?: string;
 };
 
-export type ClientMessage = { type: 'move'; uci: string } | ({ type: 'new-game' } & NewGameRequest);
+export type ClientMessage =
+  | { type: 'move'; uci: string }
+  /** No arguments: the server works out the target from its own phase. */
+  | { type: 'takeback' }
+  | ({ type: 'new-game' } & NewGameRequest);
 
 export type EngineChoice = { id: string; name: string };
 
@@ -52,6 +56,14 @@ export type GameState = {
   /** Set when the game ended for another reason, such as an engine failure. */
   reason?: string;
 };
+
+/**
+ * Whether a takeback has a turn of the human's to return to. On the human's turn the last two moves
+ * are the human's and the engine's reply; with fewer, the human has not moved yet.
+ */
+export function canTakeBack(game: Pick<GameState, 'phase' | 'moves'>): boolean {
+  return game.phase === 'human' && game.moves.length >= 2;
+}
 
 export type Score = { cp: number } | { mate: number };
 
@@ -118,6 +130,7 @@ export function parseClientMessage(raw: string): ClientMessage | undefined {
   if (typeof value !== 'object' || value === null) return undefined;
   const msg = value as Record<string, unknown>;
   if (msg.type === 'move' && typeof msg.uci === 'string') return { type: 'move', uci: msg.uci };
+  if (msg.type === 'takeback') return { type: 'takeback' };
   if (msg.type !== 'new-game') return undefined;
   const limit = parseLimit(msg.limit);
   if (msg.humanColor !== 'white' && msg.humanColor !== 'black') return undefined;

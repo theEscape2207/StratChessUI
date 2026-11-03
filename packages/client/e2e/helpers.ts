@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import type { GameState, SearchReport, ServerMessage } from '@stratchess-ui/shared';
 
 // The server runs the fake engine, which answers its first legal move (see playwright.config.ts).
 export const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
@@ -109,4 +110,40 @@ export async function playAndAwaitReply(page: Page, uci: string, touch: boolean,
 /** The move list shows exactly these moves in SAN, white's and black's in turn. */
 export async function expectMoves(page: Page, sans: string[]) {
   await expect(page.getByTestId('moves').locator('.white, .black')).toHaveText(sans);
+}
+
+const SCRIPTED_GAME: GameState = {
+  startFen: START,
+  fen: START,
+  moves: [],
+  humanColor: 'black',
+  engineName: 'Fake',
+  limit: { depth: 3 },
+  phase: 'thinking',
+};
+
+/** Stands in for the server, so a test can send exactly the messages it needs. */
+export async function scriptedServer(page: Page) {
+  let send: (msg: ServerMessage) => void = () => {};
+  const newGames: unknown[] = [];
+  const takebacks: unknown[] = [];
+  await page.routeWebSocket(/\/ws/, (ws) => {
+    send = (msg) => ws.send(JSON.stringify(msg));
+    ws.onMessage((data) => {
+      const msg = JSON.parse(String(data));
+      if (msg.type === 'new-game') newGames.push(msg);
+      if (msg.type === 'takeback') takebacks.push(msg);
+    });
+    send({ type: 'hello', engines: [{ id: 'fake', name: 'Fake' }], hasGame: true });
+    send({ type: 'game', game: SCRIPTED_GAME });
+  });
+  await page.goto('/');
+  await expectThinking(page);
+  return {
+    game: (game: Partial<GameState>) => send({ type: 'game', game: { ...SCRIPTED_GAME, ...game } }),
+    search: (fen: string, info: SearchReport) => send({ type: 'search', fen, info }),
+    error: (reason: string) => send({ type: 'error', reason }),
+    newGames,
+    takebacks,
+  };
 }

@@ -2,6 +2,7 @@
 // plays the other side.
 import {
   applyUciMove,
+  canTakeBack,
   outcome,
   parseStartFen,
   START_FEN,
@@ -123,6 +124,23 @@ export class GameSession {
     const needsRestart = !game.engine && !outcome([...game.positions, result.fen]);
     if (needsRestart && !this.options.slots.take()) return this.refuseAtLimit();
     this.play(game, result.uci, result.fen);
+  }
+
+  /**
+   * Returns to the human's previous turn. The engine is left alone, running or not: each search
+   * sends it the whole game.
+   */
+  takeBack(): void {
+    const game = this.game;
+    if (!game) return this.error('no game in progress');
+    if (game.state.phase === 'over') return this.error('the game is over');
+    if (game.state.phase !== 'human') return this.error('not your turn');
+    if (!canTakeBack(game.state)) return this.error('nothing to take back');
+    const moves = game.state.moves.slice(0, -2);
+    game.positions.length -= 2;
+    game.search = undefined;
+    game.state = { ...game.state, fen: game.positions.at(-1)!, moves, lastMove: moves.at(-1) };
+    this.publish(game);
   }
 
   /**
