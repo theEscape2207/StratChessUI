@@ -150,7 +150,8 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
   // Whether this page saw the current game in play, so a game already over at load opens no dialog.
   const inPlay = useRef(false);
   const [gameOverOpen, setGameOverOpen] = useState(false);
-  // From the tap until the server answers, so a double tap cannot take back two turns.
+  // From the tap until the server answers, so a double tap cannot take back two turns, nor a move
+  // made meanwhile land on the rewound position.
   const [undoSent, setUndoSent] = useState(false);
   const newGameButton = useRef<HTMLButtonElement>(null);
   const clearGame = () => {
@@ -224,7 +225,9 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
           lastMove={game?.lastMove}
           revision={revision}
           orientation={humanColor}
-          movable={link === 'connected' && game?.phase === 'human' ? humanColor : undefined}
+          movable={
+            link === 'connected' && game?.phase === 'human' && !undoSent ? humanColor : undefined
+          }
           onMove={(uci) => send({ type: 'move', uci })}
         >
           {gameOverOpen && game?.phase === 'over' && (

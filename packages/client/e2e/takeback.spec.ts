@@ -12,6 +12,7 @@ import {
   playMove,
   scriptedServer,
   START,
+  tapSquare,
 } from './helpers.ts';
 
 const AFTER_REPLY = 'rnbqkbnr/1ppppppp/8/p7/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2';
@@ -70,6 +71,7 @@ test('is disabled while the engine thinks', async ({ page, hasTouch }) => {
 
 test('sends one takeback until the server answers, with a game state or an error', async ({
   page,
+  hasTouch,
 }) => {
   const server = await scriptedServer(page);
   server.game(IN_PLAY);
@@ -77,16 +79,23 @@ test('sends one takeback until the server answers, with a game state or an error
 
   await undo(page).click();
   await expect(undo(page)).toBeDisabled();
-  expect(server.takebacks).toHaveLength(1);
+  await expect.poll(() => server.takebacks.length).toBe(1);
 
   server.error('nothing to take back');
   await expect(undo(page)).toBeEnabled();
 
   await undo(page).click();
   await expect(undo(page)).toBeDisabled();
+  await expect.poll(() => server.takebacks.length).toBe(2);
+  // The board waits too: a move sent now would land on the rewound position.
+  const selected = page.locator('cg-board square.selected:visible');
+  await tapSquare(page, 'd2', hasTouch);
+  await expect(selected).toHaveCount(0);
+
   server.game(IN_PLAY);
   await expect(undo(page)).toBeEnabled();
-  expect(server.takebacks).toHaveLength(2);
+  await tapSquare(page, 'd2', hasTouch);
+  await expect(selected).toHaveCount(1);
 });
 
 test('is disabled once the game is over', async ({ page }) => {

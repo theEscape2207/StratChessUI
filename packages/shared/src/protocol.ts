@@ -23,7 +23,7 @@ export type NewGameRequest = {
 
 export type ClientMessage =
   | { type: 'move'; uci: string }
-  /** No arguments: the server works out the target from its own phase. */
+  /** No arguments: the server works out the target from its own state. */
   | { type: 'takeback' }
   | ({ type: 'new-game' } & NewGameRequest);
 
