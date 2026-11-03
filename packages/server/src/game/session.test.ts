@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   sanMoves,
   START_FEN,
@@ -9,13 +9,20 @@ import {
   TRANSCRIPT_LINES,
   type TranscriptLine,
 } from '@stratchess-ui/shared';
+import type { Timeouts } from '../uci/engine.ts';
 import { fakeProfile } from '../uci/fake-profile.ts';
 import { EngineSlots } from './engine-slots.ts';
 import { GameSession } from './session.ts';
 
-const PROFILES = ['legal', 'normal', 'crash-on-go', 'no-uciok', 'chatty', 'no-id-name'].map(
-  (mode) => ({ ...fakeProfile(mode), id: mode }),
-);
+const PROFILES = [
+  'legal',
+  'normal',
+  'crash-on-go',
+  'no-uciok',
+  'chatty',
+  'no-id-name',
+  'ignore-stop',
+].map((mode) => ({ ...fakeProfile(mode), id: mode }));
 // A cold Node spawn of the fake can take well over 300 ms on a Windows CI runner.
 const TIMEOUTS = { handshakeMs: 2000, readyMs: 1000, stopGraceMs: 300 };
 
@@ -29,13 +36,16 @@ afterEach(async () => {
  * A session whose messages queue up until a test waits for them. `next` skips transcript
  * messages, which interleave with the rest at the batch interval; `nextAny` does not.
  */
-function open(timeouts = TIMEOUTS) {
+function open(
+  timeouts: Partial<Timeouts> = TIMEOUTS,
+  slots = new EngineSlots(Number.MAX_SAFE_INTEGER),
+) {
   const queue: ServerMessage[] = [];
   let wake = () => {};
   const logged: string[] = [];
   session = new GameSession({
     profiles: PROFILES,
-    slots: new EngineSlots(Number.MAX_SAFE_INTEGER),
+    slots,
     refused: () => {},
     timeouts,
     log: (text) => logged.push(text),
@@ -532,15 +542,198 @@ describe('GameSession', () => {
       expect(session.state).toEqual(over);
     });
 
-    it('is refused while the engine thinks', async () => {
-      const { session, next, settled } = open();
-      void session.newGame(game('legal', 'white'));
-      await settled();
-      session.move('e2e4');
-      session.takeBack();
-      expect(await next()).toMatchObject({ type: 'game', game: { phase: 'thinking' } });
-      expect(await next()).toEqual({ type: 'error', reason: 'not your turn' });
-      expect(await settled()).toMatchObject({ moves: ['e2e4', 'a7a5'] });
+    describe('during a search', () => {
+      const LONG_MOVETIME = { movetimeMs: 60_000 };
+      // Black to move, so an engine playing white searches at once and a human playing black moves.
+      const BLACK_TO_MOVE = '4k3/8/8/8/4P3/8/8/4K3 b - - 0 40';
+      const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+      /** Plays a move and waits for the engine's first search line, so the search is under way. */
+      async function searchAfter(
+        { session, next }: Pick<ReturnType<typeof open>, 'session' | 'next'>,
+        uci: string,
+      ) {
+        session.move(uci);
+        while ((await next()).type !== 'search');
+      }
+
+      it('takes back the human move alone, and the cancelled bestmove is never played', async () => {
+        const opened = open();
+        const { session, settled } = opened;
+        void session.newGame({ ...game('legal', 'white'), limit: LONG_MOVETIME });
+        await settled();
+        await searchAfter(opened, 'e2e4');
+
+        session.takeBack();
+        const state = await settled();
+        expect(state).toMatchObject({ phase: 'human', fen: START_FEN, moves: [] });
+        expect(state.lastMove).toBeUndefined();
+        expect(session.search).toBeUndefined();
+
+        await vi.waitFor(() =>
+          expect(session.takeTranscript()?.map((l) => l.text)).toContainEqual(
+            expect.stringMatching(/^bestmove/),
+          ),
+        );
+        expect(session.state).toEqual(state);
+      });
+
+      it('cancels a search the engine has not begun', async () => {
+        const { session, settled } = open();
+        void session.newGame(game('legal', 'white'));
+        await settled();
+        session.move('e2e4');
+        session.takeBack();
+        const state = await settled();
+        expect(state.moves).toEqual([]);
+        await sleep(100);
+        expect(session.state).toEqual(state);
+      });
+
+      it('searches a move replayed straight after, for that move alone', async () => {
+        const opened = open();
+        const { session, settled } = opened;
+        void session.newGame({ ...game('legal', 'white'), limit: { movetimeMs: 500 } });
+        await settled();
+        await searchAfter(opened, 'e2e4');
+        session.takeBack();
+        session.move('d2d4');
+        expect(await settled()).toMatchObject({ moves: [] });
+        expect(await settled()).toMatchObject({ phase: 'human', moves: ['d2d4', 'a7a5'] });
+      });
+
+      it('keeps the opening move of an engine that moved first', async () => {
+        const opened = open();
+        const { session, settled } = opened;
+        void session.newGame({ ...game('legal', 'black'), limit: { movetimeMs: 500 } });
+        const first = await settled();
+        await searchAfter(opened, 'e7e5');
+        session.takeBack();
+        expect(await settled()).toEqual(first);
+      });
+
+      it('is refused before the human has moved, and the engine still replies', async () => {
+        const { session, next, settled } = open();
+        void session.newGame({
+          ...game('legal', 'white'),
+          fen: BLACK_TO_MOVE,
+          limit: { movetimeMs: 200 },
+        });
+        expect(await next()).toMatchObject({ type: 'game', game: { phase: 'starting' } });
+        expect(await next()).toMatchObject({ type: 'game', game: { phase: 'thinking' } });
+        session.takeBack();
+        expect(await next()).toEqual({ type: 'error', reason: 'nothing to take back' });
+        expect((await settled()).moves).toHaveLength(1);
+      });
+
+      describe('while a held game restarts its engine', () => {
+        const running = (logged: string[]) => logged.filter((l) => l.includes('running')).length;
+
+        /** Waits until only the slot-holding engines still running would keep this false. */
+        const expectSlotFree = (slots: EngineSlots) =>
+          vi.waitFor(() => {
+            expect(slots.take()).toBe(true);
+            slots.free();
+          });
+
+        /** Plays the moves, each with its reply, then holds the game, its engine gone. */
+        async function held(moves: string[], slots?: EngineSlots) {
+          const opened = open(TIMEOUTS, slots);
+          void opened.session.newGame(game('legal', 'white'));
+          let before = await opened.settled();
+          for (const move of moves) {
+            opened.session.move(move);
+            before = await opened.settled();
+          }
+          expect(opened.session.stopEngineWhenIdle()).toBe(true);
+          return { ...opened, before };
+        }
+
+        it('does not search, which would play the engine move for the human', async () => {
+          const { session, settled, logged, before } = await held(['e2e4']);
+          session.move('d2d4');
+          session.takeBack();
+          expect(await settled()).toMatchObject({ phase: 'human', moves: before.moves });
+          await vi.waitFor(() => expect(running(logged)).toBe(2));
+          await sleep(100);
+          expect(session.state).toMatchObject({ phase: 'human', moves: before.moves });
+        });
+
+        it('shares the restart with a replayed move', async () => {
+          // One slot: the replayed move must not ask for another.
+          const slots = new EngineSlots(1);
+          const { session, settled, logged, before } = await held(['e2e4'], slots);
+          await expectSlotFree(slots);
+          session.move('d2d4');
+          session.takeBack();
+          session.move('g1f3');
+          expect(await settled()).toMatchObject({ moves: before.moves });
+          expect(await settled()).toMatchObject({
+            phase: 'human',
+            moves: [...before.moves, 'g1f3', 'a5a4'],
+          });
+          expect(running(logged)).toBe(2);
+        });
+
+        it('stops the engine once started if nobody is connected any more', async () => {
+          const slots = new EngineSlots(1);
+          const { session, settled, logged } = await held(['e2e4'], slots);
+          await expectSlotFree(slots);
+          session.move('d2d4');
+          session.takeBack();
+          await settled();
+          expect(session.stopEngineWhenIdle()).toBe(false);
+          await vi.waitFor(() => expect(running(logged)).toBe(2));
+          await expectSlotFree(slots);
+        });
+
+        it('stops the engine once started if a replayed move ended the game', async () => {
+          const slots = new EngineSlots(1);
+          const { session, settled, logged } = await held(['e2e4', 'f1c4', 'd1h5'], slots);
+          await expectSlotFree(slots);
+          session.move('g1f3');
+          session.takeBack();
+          session.move('h5f7');
+          await settled();
+          expect(await settled()).toMatchObject({ phase: 'over', termination: 'checkmate' });
+          await vi.waitFor(() => expect(running(logged)).toBe(2));
+          await expectSlotFree(slots);
+        });
+      });
+
+      describe('with an engine that ignores stop', () => {
+        const SHORT_MAX_SEARCH = { ...TIMEOUTS, maxSearchMs: 300 };
+
+        it('drops a search line still pending from the cancelled search', async () => {
+          const opened = open(SHORT_MAX_SEARCH);
+          const { session, settled } = opened;
+          // No `bestmove` cancels the throttle, whose timer goes on to send what it holds.
+          void session.newGame({ ...game('ignore-stop', 'black'), fen: BLACK_TO_MOVE });
+          await settled();
+          await searchAfter(opened, 'e8d8');
+          await sleep(30); // the rest of the burst reaches the throttle, within its first interval
+          session.takeBack();
+          await settled();
+          await sleep(200);
+          expect(session.search).toBeUndefined();
+        });
+
+        it('ends the game as failed, even with a move replayed meanwhile', async () => {
+          const opened = open(SHORT_MAX_SEARCH);
+          const { session, settled } = opened;
+          void session.newGame({ ...game('ignore-stop', 'black'), fen: BLACK_TO_MOVE });
+          await settled();
+          await searchAfter(opened, 'e8d8');
+          session.takeBack();
+          await settled();
+          session.move('e8f8');
+          expect(await settled()).toMatchObject({
+            phase: 'over',
+            moves: ['e8f8'],
+            reason: expect.stringMatching(/failed: timed out .* bestmove/),
+          });
+        });
+      });
     });
   });
 

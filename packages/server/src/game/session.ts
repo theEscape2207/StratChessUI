@@ -40,6 +40,8 @@ type Game = {
   positions: string[];
   /** Absent while starting, and while a held game's engine is stopped until its next search. */
   engine?: UciEngine;
+  /** A held game's restart under way, shared by a move replayed after a takeback. */
+  engineStart?: Promise<boolean>;
   /** Nobody is connected and the grace period has run out: stop the engine at its next idle. */
   engineUnwanted: boolean;
   /** The last search line sent, resent to a browser that reattaches. */
@@ -121,25 +123,34 @@ export class GameSession {
     if (!result.ok) return this.error(result.reason);
     // Refused before the move is applied, so the player can try it again: past here, a restart that
     // could not run would end the game.
-    const needsRestart = !game.engine && !outcome([...game.positions, result.fen]);
+    const needsRestart =
+      !game.engine && !game.engineStart && !outcome([...game.positions, result.fen]);
     if (needsRestart && !this.options.slots.take()) return this.refuseAtLimit();
     this.play(game, result.uci, result.fen);
   }
 
   /**
-   * Returns to the human's previous turn. The engine is left alone, running or not: each search
-   * sends it the whole game.
+   * Returns to the human's previous turn, which depends on the server's phase rather than the
+   * browser's, so an Undo that crosses the engine's reply lands on the same turn. Any search is
+   * cancelled; the engine otherwise stays as it is, as each search sends it the whole game.
    */
   takeBack(): void {
     const game = this.game;
     if (!game) return this.error('no game in progress');
     if (game.state.phase === 'over') return this.error('the game is over');
-    if (game.state.phase !== 'human') return this.error('not your turn');
     if (!canTakeBack(game.state)) return this.error('nothing to take back');
-    const moves = game.state.moves.slice(0, -2);
-    game.positions.length -= 2;
+    const plies = game.state.phase === 'thinking' ? 1 : 2;
+    const moves = game.state.moves.slice(0, -plies);
+    game.positions.length -= plies;
     game.search = undefined;
-    game.state = { ...game.state, fen: game.positions.at(-1)!, moves, lastMove: moves.at(-1) };
+    game.state = {
+      ...game.state,
+      phase: 'human',
+      fen: game.positions.at(-1)!,
+      moves,
+      lastMove: moves.at(-1),
+    };
+    void game.engine?.stop();
     this.publish(game);
   }
 
@@ -153,7 +164,8 @@ export class GameSession {
     const game = this.game;
     if (!game) return true;
     game.engineUnwanted = true;
-    const busy = game.state.phase === 'starting' || game.state.phase === 'thinking';
+    const busy =
+      game.state.phase === 'starting' || game.state.phase === 'thinking' || !!game.engineStart;
     if (!busy) this.stopEngine(game);
     return !busy;
   }
@@ -212,13 +224,28 @@ export class GameSession {
     return true;
   }
 
+  /** Restarts a held game's engine; false if the turn it was for is gone by the time it is up. */
+  private async restartForTurn(game: Game): Promise<boolean> {
+    const { moves } = game.state;
+    game.engineStart ??= this.startEngine(game).finally(() => {
+      game.engineStart = undefined;
+    });
+    if (!(await game.engineStart)) return false;
+    // Every move and takeback makes a new array. Taken back during the restart, a search now would
+    // play the engine's move for the human; a replayed move waits on the same restart.
+    if (game.state.moves === moves) return true;
+    const { phase } = game.state;
+    if (phase === 'over' || (phase === 'human' && game.engineUnwanted)) this.stopEngine(game);
+    return false;
+  }
+
   private stopEngine(game: Game): void {
     void game.engine?.quit();
     game.engine = undefined;
   }
 
   private async engineMove(game: Game): Promise<void> {
-    if (!game.engine && !(await this.startEngine(game))) return;
+    if (!game.engine && !(await this.restartForTurn(game))) return;
     const fen = game.state.fen;
     const feed = new Throttle<SearchInfo>(
       (info) => this.report(game, fen, info),
@@ -274,7 +301,8 @@ export class GameSession {
   }
 
   private report(game: Game, fen: string, info: SearchInfo): void {
-    if (this.game !== game) return;
+    // A throttled line can outlive its search, cancelled by a takeback.
+    if (this.game !== game || game.state.fen !== fen) return;
     game.search = { fen, info: searchReport(fen, info) };
     this.options.send({ type: 'search', ...game.search });
   }

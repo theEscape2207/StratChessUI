@@ -398,7 +398,8 @@ describe('server', () => {
   ])('frees the slot of an engine that %s', async (_name, broken) => {
     await build({
       engineLimit: 1,
-      engineTimeouts: { handshakeMs: 200 },
+      // The working engine started afterwards gets this limit too, and a cold Node spawn is slow.
+      engineTimeouts: { handshakeMs: 2000 },
       profiles: [fakeProfile('legal'), { ...fakeProfile('legal'), ...broken, id: 'broken' }],
     });
     const client = await connect(app, await pairedToken());
