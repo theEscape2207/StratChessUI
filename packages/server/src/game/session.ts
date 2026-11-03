@@ -224,11 +224,19 @@ export class GameSession {
     return true;
   }
 
-  private restartEngine(game: Game): Promise<boolean> {
+  /** Restarts a held game's engine; false if the turn it was for is gone by the time it is up. */
+  private async restartForTurn(game: Game): Promise<boolean> {
+    const { moves } = game.state;
     game.engineStart ??= this.startEngine(game).finally(() => {
       game.engineStart = undefined;
     });
-    return game.engineStart;
+    if (!(await game.engineStart)) return false;
+    // Every move and takeback makes a new array. Taken back during the restart, a search now would
+    // play the engine's move for the human; a replayed move waits on the same restart.
+    if (game.state.moves === moves) return true;
+    const { phase } = game.state;
+    if (phase === 'over' || (phase === 'human' && game.engineUnwanted)) this.stopEngine(game);
+    return false;
   }
 
   private stopEngine(game: Game): void {
@@ -237,17 +245,7 @@ export class GameSession {
   }
 
   private async engineMove(game: Game): Promise<void> {
-    if (!game.engine) {
-      const { moves } = game.state;
-      if (!(await this.restartEngine(game))) return;
-      // Every move and takeback makes a new array. Taken back during the restart, a search now
-      // would play the engine's move for the human; a replayed move waits on the same restart.
-      if (game.state.moves !== moves) {
-        const { phase } = game.state;
-        if (phase === 'over' || (phase === 'human' && game.engineUnwanted)) this.stopEngine(game);
-        return;
-      }
-    }
+    if (!game.engine && !(await this.restartForTurn(game))) return;
     const fen = game.state.fen;
     const feed = new Throttle<SearchInfo>(
       (info) => this.report(game, fen, info),

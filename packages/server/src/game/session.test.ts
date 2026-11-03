@@ -543,9 +543,9 @@ describe('GameSession', () => {
     });
 
     describe('during a search', () => {
-      const LONG = { movetimeMs: 60_000 };
+      const LONG_MOVETIME = { movetimeMs: 60_000 };
       // Black to move, so an engine playing white searches at once and a human playing black moves.
-      const FEN = '4k3/8/8/8/4P3/8/8/4K3 b - - 0 40';
+      const BLACK_TO_MOVE = '4k3/8/8/8/4P3/8/8/4K3 b - - 0 40';
       const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
       /** Plays a move and waits for the engine's first search line, so the search is under way. */
@@ -560,7 +560,7 @@ describe('GameSession', () => {
       it('takes back the human move alone, and the cancelled bestmove is never played', async () => {
         const opened = open();
         const { session, settled } = opened;
-        void session.newGame({ ...game('legal', 'white'), limit: LONG });
+        void session.newGame({ ...game('legal', 'white'), limit: LONG_MOVETIME });
         await settled();
         await searchAfter(opened, 'e2e4');
 
@@ -614,7 +614,11 @@ describe('GameSession', () => {
 
       it('is refused before the human has moved, and the engine still replies', async () => {
         const { session, next, settled } = open();
-        void session.newGame({ ...game('legal', 'white'), fen: FEN, limit: { movetimeMs: 200 } });
+        void session.newGame({
+          ...game('legal', 'white'),
+          fen: BLACK_TO_MOVE,
+          limit: { movetimeMs: 200 },
+        });
         expect(await next()).toMatchObject({ type: 'game', game: { phase: 'starting' } });
         expect(await next()).toMatchObject({ type: 'game', game: { phase: 'thinking' } });
         session.takeBack();
@@ -698,13 +702,13 @@ describe('GameSession', () => {
       });
 
       describe('with an engine that ignores stop', () => {
-        const IGNORES = { ...TIMEOUTS, maxSearchMs: 300 };
+        const SHORT_MAX_SEARCH = { ...TIMEOUTS, maxSearchMs: 300 };
 
         it('drops a search line still pending from the cancelled search', async () => {
-          const opened = open(IGNORES);
+          const opened = open(SHORT_MAX_SEARCH);
           const { session, settled } = opened;
           // No `bestmove` cancels the throttle, whose timer goes on to send what it holds.
-          void session.newGame({ ...game('ignore-stop', 'black'), fen: FEN });
+          void session.newGame({ ...game('ignore-stop', 'black'), fen: BLACK_TO_MOVE });
           await settled();
           await searchAfter(opened, 'e8d8');
           await sleep(30); // the rest of the burst reaches the throttle, within its first interval
@@ -715,9 +719,9 @@ describe('GameSession', () => {
         });
 
         it('ends the game as failed, even with a move replayed meanwhile', async () => {
-          const opened = open(IGNORES);
+          const opened = open(SHORT_MAX_SEARCH);
           const { session, settled } = opened;
-          void session.newGame({ ...game('ignore-stop', 'black'), fen: FEN });
+          void session.newGame({ ...game('ignore-stop', 'black'), fen: BLACK_TO_MOVE });
           await settled();
           await searchAfter(opened, 'e8d8');
           session.takeBack();
