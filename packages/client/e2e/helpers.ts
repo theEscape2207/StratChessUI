@@ -127,12 +127,14 @@ export async function scriptedServer(page: Page) {
   let send: (msg: ServerMessage) => void = () => {};
   const newGames: unknown[] = [];
   const takebacks: unknown[] = [];
+  const resigns: unknown[] = [];
   await page.routeWebSocket(/\/ws/, (ws) => {
     send = (msg) => ws.send(JSON.stringify(msg));
     ws.onMessage((data) => {
       const msg = JSON.parse(String(data));
       if (msg.type === 'new-game') newGames.push(msg);
       if (msg.type === 'takeback') takebacks.push(msg);
+      if (msg.type === 'resign') resigns.push(msg);
     });
     send({ type: 'hello', engines: [{ id: 'fake', name: 'Fake' }], hasGame: true });
     send({ type: 'game', game: SCRIPTED_GAME });
@@ -145,5 +147,6 @@ export async function scriptedServer(page: Page) {
     error: (reason: string) => send({ type: 'error', reason }),
     newGames,
     takebacks,
+    resigns,
   };
 }

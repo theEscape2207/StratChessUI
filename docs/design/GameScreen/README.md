@@ -22,6 +22,11 @@ primary button during play. Hint is disabled while the engine is thinking; Undo 
 toolbar holds Copy FEN and Settings only — move stepping belongs to GameReview. Settings appears
 once it has something to set; until then the toolbar is Copy FEN alone.
 
+**Resign** asks once, inline: the tap swaps the whole row for `Resign this game?` over two
+secondary buttons, **Keep playing** on the left and **Resign** on the right, clear of where Resign
+was tapped, so a double tap cannot end the game. Neither is primary. Keep playing, or
+the game ending meanwhile, brings the row back.
+
 **Moment shown** the human (white) has just played 12. a3, judged an inaccuracy (-0.64 against
 0.00 for O-O); the engine strip's chip reads "thinking", so the board is locked. When the game ends,
 GameOverDialog opens over the board.

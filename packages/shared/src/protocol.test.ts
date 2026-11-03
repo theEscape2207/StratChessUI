@@ -45,6 +45,11 @@ describe('protocol', () => {
     expect(request(42)).toBeUndefined();
   });
 
+  it('accepts a resignation, dropping anything sent with it', () => {
+    const raw = JSON.stringify({ type: 'resign', result: 'white' });
+    expect(parseClientMessage(raw)).toEqual({ type: 'resign' });
+  });
+
   it('accepts a takeback, dropping anything sent with it', () => {
     const raw = JSON.stringify({ type: 'takeback', plies: 7 });
     expect(parseClientMessage(raw)).toEqual({ type: 'takeback' });

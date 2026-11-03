@@ -25,6 +25,7 @@ export type ClientMessage =
   | { type: 'move'; uci: string }
   /** No arguments: the server works out the target from its own state. */
   | { type: 'takeback' }
+  | { type: 'resign' }
   | ({ type: 'new-game' } & NewGameRequest);
 
 export type EngineChoice = { id: string; name: string };
@@ -32,7 +33,12 @@ export type EngineChoice = { id: string; name: string };
 export type GamePhase = 'starting' | 'human' | 'thinking' | 'over';
 
 export type Termination =
-  'checkmate' | 'stalemate' | 'insufficient material' | 'fifty-move rule' | 'threefold repetition';
+  | 'checkmate'
+  | 'stalemate'
+  | 'insufficient material'
+  | 'fifty-move rule'
+  | 'threefold repetition'
+  | 'resignation';
 
 export type Outcome = { result: Color | 'draw'; termination: Termination };
 
@@ -65,6 +71,11 @@ export type GameState = {
 export function canTakeBack(game: Pick<GameState, 'phase' | 'moves'>): boolean {
   if (game.phase === 'thinking') return game.moves.length >= 1;
   return game.phase === 'human' && game.moves.length >= 2;
+}
+
+/** Not while starting: `newGame` takes its turn once the engine is up, whatever has happened. */
+export function canResign(game: Pick<GameState, 'phase'>): boolean {
+  return game.phase === 'human' || game.phase === 'thinking';
 }
 
 export type Score = { cp: number } | { mate: number };
@@ -133,6 +144,7 @@ export function parseClientMessage(raw: string): ClientMessage | undefined {
   const msg = value as Record<string, unknown>;
   if (msg.type === 'move' && typeof msg.uci === 'string') return { type: 'move', uci: msg.uci };
   if (msg.type === 'takeback') return { type: 'takeback' };
+  if (msg.type === 'resign') return { type: 'resign' };
   if (msg.type !== 'new-game') return undefined;
   const limit = parseLimit(msg.limit);
   if (msg.humanColor !== 'white' && msg.humanColor !== 'black') return undefined;

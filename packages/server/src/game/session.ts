@@ -2,6 +2,7 @@
 // plays the other side.
 import {
   applyUciMove,
+  canResign,
   canTakeBack,
   outcome,
   parseStartFen,
@@ -154,6 +155,16 @@ export class GameSession {
     this.publish(game);
   }
 
+  /** Only the human resigns. Ending the game quits the engine, which cancels any search. */
+  resign(): void {
+    const game = this.game;
+    if (!game) return this.error('no game in progress');
+    if (game.state.phase === 'over') return this.error('the game is over');
+    if (!canResign(game.state)) return this.error('the game has not started');
+    const result = game.state.humanColor === 'white' ? 'black' : 'white';
+    this.finish(game, { result, termination: 'resignation' });
+  }
+
   /**
    * Stops the engine of a game nobody is connected to, freeing its slot and keeping the game. A
    * search is left to finish, which `maxSearchMs` bounds: `quit` would cancel it, and a cancelled
@@ -231,10 +242,11 @@ export class GameSession {
       game.engineStart = undefined;
     });
     if (!(await game.engineStart)) return false;
-    // Every move and takeback makes a new array. Taken back during the restart, a search now would
-    // play the engine's move for the human; a replayed move waits on the same restart.
-    if (game.state.moves === moves) return true;
     const { phase } = game.state;
+    // Every move and takeback makes a new array. Taken back during the restart, a search now would
+    // play the engine's move for the human; a replayed move waits on the same restart. Resigning
+    // leaves the moves alone.
+    if (game.state.moves === moves && phase !== 'over') return true;
     if (phase === 'over' || (phase === 'human' && game.engineUnwanted)) this.stopEngine(game);
     return false;
   }
@@ -280,7 +292,8 @@ export class GameSession {
   }
 
   private fail(game: Game, error: unknown): void {
-    if (this.game !== game) return;
+    // An engine that dies being quit must not rewrite how the game ended.
+    if (this.game !== game || game.state.phase === 'over') return;
     const message = (error as Error).message;
     const transcript = error instanceof EngineError ? error.transcript.slice(-TRANSCRIPT_TAIL) : [];
     this.options.log([`${game.state.engineName}: ${message}`, ...transcript].join('\n'));
@@ -301,8 +314,8 @@ export class GameSession {
   }
 
   private report(game: Game, fen: string, info: SearchInfo): void {
-    // A throttled line can outlive its search, cancelled by a takeback.
-    if (this.game !== game || game.state.fen !== fen) return;
+    // A throttled line can outlive its search, cancelled by a takeback or a resignation.
+    if (this.game !== game || game.state.phase === 'over' || game.state.fen !== fen) return;
     game.search = { fen, info: searchReport(fen, info) };
     this.options.send({ type: 'search', ...game.search });
   }

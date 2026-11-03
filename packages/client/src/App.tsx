@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import {
   appendTranscript,
+  canResign,
   canTakeBack,
   capturedPieces,
   materialBalance,
@@ -21,6 +22,7 @@ import { MoveList } from './MoveList.tsx';
 import { NewGameForm } from './NewGameForm.tsx';
 import { PairForm } from './PairForm.tsx';
 import { PlayerStrip } from './PlayerStrip.tsx';
+import { ResignButton, ResignPrompt } from './Resign.tsx';
 import { SearchInfo } from './SearchInfo.tsx';
 import { limitLabel, materialLead, stripChip } from './strip.ts';
 import { Transcript } from './Transcript.tsx';
@@ -153,6 +155,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
   // From the tap until the server answers, so a double tap cannot take back two turns, nor a move
   // made meanwhile land on the rewound position.
   const [undoSent, setUndoSent] = useState(false);
+  const [resignAsked, setResignAsked] = useState(false);
   const newGameButton = useRef<HTMLButtonElement>(null);
   const clearGame = () => {
     setGame(undefined);
@@ -161,6 +164,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
     setFormOpen(false);
     setGameOverOpen(false);
     setUndoSent(false);
+    setResignAsked(false);
   };
   const { link, send, retry } = useGameSocket(
     token,
@@ -200,6 +204,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
       // The last search stays up until the engine starts on another position.
       const { phase, fen } = msg.game;
       if (phase === 'over' && inPlay.current) setGameOverOpen(true);
+      if (phase === 'over') setResignAsked(false);
       inPlay.current = phase !== 'over';
       if (phase === 'thinking') setSearch((last) => (last?.fen === fen ? last : undefined));
     },
@@ -265,8 +270,22 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
         <h2 className="sidebar-title">{game ? `Play ${game.engineName}` : 'New game'}</h2>
         {game && search && <SearchInfo fen={search.fen} info={search.info} />}
         <MoveList startFen={game?.startFen ?? START_FEN} moves={game?.moves ?? []} />
-        {game && (
+        {game && resignAsked && (
+          <ResignPrompt
+            disabled={link !== 'connected'}
+            onKeepPlaying={() => setResignAsked(false)}
+            onResign={() => {
+              setResignAsked(false);
+              send({ type: 'resign' });
+            }}
+          />
+        )}
+        {game && !resignAsked && (
           <div className="actions">
+            <ResignButton
+              disabled={link !== 'connected' || !canResign(game)}
+              onClick={() => setResignAsked(true)}
+            />
             <UndoButton
               disabled={link !== 'connected' || undoSent || !canTakeBack(game)}
               onClick={() => {
