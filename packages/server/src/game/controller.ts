@@ -56,8 +56,8 @@ export class Controller {
     browser.connection = connection;
     this.browserOf.set(connection, browser);
     const engines = this.options.profiles.map(({ id, name }) => ({ id, name }));
-    connection.send({ type: 'hello', engines });
     const game = browser.session.state;
+    connection.send({ type: 'hello', engines, hasGame: game !== undefined });
     if (game) connection.send({ type: 'game', game });
     const search = browser.session.search;
     if (search) connection.send({ type: 'search', ...search });

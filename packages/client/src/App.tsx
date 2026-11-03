@@ -33,6 +33,10 @@ const LINK_STATUS: Record<Exclude<Link, 'connected'>, string> = {
   replaced: 'opened in another tab',
 };
 
+/** The server holds a game until the browser replaces it, so only a server restart loses one. */
+const GAME_SAFE_STATUS = 'disconnected, your game is safe, reconnecting';
+const GAME_LOST_NOTICE = 'the game ended because the server restarted';
+
 function describeEnd(game: GameState): string {
   if (game.reason) return `game over: ${game.reason}`;
   if (game.result === 'draw') return `game over: draw by ${game.termination}`;
@@ -44,6 +48,11 @@ function describeEnd(game: GameState): string {
  * after a game say just "won", "lost", "draw" or "ended".
  */
 function statusLine(link: Link, game: GameState | undefined, dialogOpen: boolean) {
+  // A retry passes through "connecting", which on a dead network can outlast the wait between tries.
+  const retrying = link === 'reconnecting' || link === 'connecting';
+  if (retrying && game && game.phase !== 'over') {
+    return { text: GAME_SAFE_STATUS, className: 'status' };
+  }
   if (link !== 'connected') return { text: LINK_STATUS[link], className: 'status' };
   return game?.phase === 'over' && !dialogOpen
     ? { text: describeEnd(game), className: 'status result' }
@@ -140,10 +149,25 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
   const inPlay = useRef(false);
   const [gameOverOpen, setGameOverOpen] = useState(false);
   const newGameButton = useRef<HTMLButtonElement>(null);
+  const clearGame = () => {
+    setGame(undefined);
+    setSearch(undefined);
+    setEvalScore(undefined);
+    setFormOpen(false);
+    setGameOverOpen(false);
+  };
   const { link, send, retry } = useGameSocket(
     token,
     (msg) => {
-      if (msg.type === 'hello') return setEngines(msg.engines);
+      if (msg.type === 'hello') {
+        setEngines(msg.engines);
+        if (game && !msg.hasGame) {
+          clearGame();
+          setTranscript([]);
+          setNotice(GAME_LOST_NOTICE);
+        }
+        return;
+      }
       if (msg.type === 'search') {
         setEvalScore((last) => nextEval(last, msg.info));
         return setSearch({ fen: msg.fen, info: msg.info });
@@ -239,11 +263,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
             hidden={formHidden}
             onStart={(request) => {
               // Until the new game arrives, the old one's status must not pass for it.
-              setGame(undefined);
-              setSearch(undefined);
-              setEvalScore(undefined);
-              setFormOpen(false);
-              setGameOverOpen(false);
+              clearGame();
               // A start position that is already over ends the game in its first state.
               inPlay.current = true;
               send({ type: 'new-game', ...request });

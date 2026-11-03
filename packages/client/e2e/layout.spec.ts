@@ -25,6 +25,7 @@ test('before the first game the sidebar shows the new-game form', async ({ page 
     const hello = {
       type: 'hello',
       engines: [{ id: 'fake', name: 'Fake' }],
+      hasGame: false,
     } satisfies ServerMessage;
     ws.send(JSON.stringify(hello));
   });

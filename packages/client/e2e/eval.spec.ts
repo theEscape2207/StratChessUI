@@ -36,7 +36,7 @@ async function scriptedServer(page: Page) {
       const msg = JSON.parse(String(data));
       if (msg.type === 'new-game') newGames.push(msg);
     });
-    send({ type: 'hello', engines: [{ id: 'fake', name: 'Fake' }] });
+    send({ type: 'hello', engines: [{ id: 'fake', name: 'Fake' }], hasGame: true });
     send({ type: 'game', game: GAME });
   });
   await page.goto('/');

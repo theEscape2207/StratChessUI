@@ -5,6 +5,7 @@ import {
   chip,
   expectFen,
   expectFenNotShown,
+  expectMoves,
   expectYourMove,
   showNewGameForm,
   START,
@@ -21,6 +22,12 @@ const GAME: GameState = {
   phase: 'human',
 };
 
+const HELLO: ServerMessage = {
+  type: 'hello',
+  engines: [{ id: 'fake', name: 'Fake' }],
+  hasGame: true,
+};
+
 const status = (page: Page) => page.getByTestId('status');
 
 /** Stands in for the server, handing each new connection to `connected`. */
@@ -31,10 +38,7 @@ async function scriptedServer(page: Page, connected: (ws: WebSocketRoute, n: num
 }
 
 function sendGame(ws: WebSocketRoute, game: GameState) {
-  const messages: ServerMessage[] = [
-    { type: 'hello', engines: [{ id: 'fake', name: 'Fake' }] },
-    { type: 'game', game },
-  ];
+  const messages: ServerMessage[] = [HELLO, { type: 'game', game }];
   for (const msg of messages) ws.send(JSON.stringify(msg));
 }
 
@@ -79,6 +83,76 @@ test('says when the socket dropped, and clears once it is back', async ({ page }
   await expect(status(page)).toHaveText('disconnected, reconnecting');
   await expectYourMove(page);
   await expect(status(page)).toHaveCount(0);
+});
+
+test('says a game in play is safe through the whole retry', async ({ page }) => {
+  let first: WebSocketRoute;
+  await page.routeWebSocket(/\/ws/, (ws) => {
+    first = ws;
+    sendGame(ws, GAME);
+  });
+  // Later sockets never open, as on a dead network, holding the retry in "connecting".
+  await page.addInitScript(() => {
+    const Real = window.WebSocket;
+    const sockets = { count: 0 };
+    Object.assign(window, { sockets });
+    window.WebSocket = function (url: string) {
+      return ++sockets.count === 1 ? new Real(url) : { close() {} };
+    } as unknown as typeof WebSocket;
+  });
+  await page.goto('/');
+  await expectYourMove(page);
+
+  await first!.close({ code: 1011 });
+  const safe = 'disconnected, your game is safe, reconnecting';
+  await expect(status(page)).toHaveText(safe);
+  await page.waitForFunction(
+    () => (window as unknown as { sockets: { count: number } }).sockets.count === 2,
+  );
+  await expect(status(page)).toHaveText(safe);
+});
+
+test('a finished game does not claim to be safe while disconnected', async ({ page }) => {
+  let first: WebSocketRoute;
+  await scriptedServer(page, (ws, n) => {
+    if (n > 1) return;
+    first = ws;
+    sendGame(ws, { ...GAME, phase: 'over', result: 'white', termination: 'checkmate' });
+  });
+  await expect(status(page)).toHaveText('game over: white wins by checkmate');
+  await first!.close({ code: 1011 });
+  await expect(status(page)).toHaveText('disconnected, reconnecting');
+});
+
+test('a game the server no longer has is cleared, with the reason', async ({ page }) => {
+  const fen = 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2';
+  let first: WebSocketRoute;
+  await scriptedServer(page, (ws, n) => {
+    if (n > 1) return ws.send(JSON.stringify({ ...HELLO, hasGame: false }));
+    first = ws;
+    sendGame(ws, { ...GAME, fen, moves: ['e2e4', 'e7e5'], lastMove: 'e7e5' });
+    const line = { dir: 'sent', text: 'uci' } as const;
+    ws.send(JSON.stringify({ type: 'transcript', lines: [line] } satisfies ServerMessage));
+  });
+  await expectFen(page, fen);
+  await expectMoves(page, ['e4', 'e5']);
+  await expect(page.getByTestId('transcript')).toBeAttached();
+
+  await first!.close({ code: 1011 });
+  await expect(page.getByTestId('notice')).toHaveText(
+    'the game ended because the server restarted',
+  );
+  await expectFen(page, START);
+  await expectMoves(page, []);
+  await expect(chip(page, 'human')).toHaveCount(0);
+  await expect(page.locator('form.new-game')).toBeVisible();
+  await expect(page.getByTestId('transcript')).toHaveCount(0);
+});
+
+test('a page with no game says nothing when the server has none either', async ({ page }) => {
+  await scriptedServer(page, (ws) => ws.send(JSON.stringify({ ...HELLO, hasGame: false })));
+  await expect(page.locator('form.new-game')).toBeVisible();
+  await expect(page.getByTestId('notice')).toHaveCount(0);
 });
 
 test('says "opened in another tab", and Play here takes the game back', async ({ page }) => {
