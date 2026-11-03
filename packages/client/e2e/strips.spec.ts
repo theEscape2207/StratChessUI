@@ -118,7 +118,7 @@ test('each phase has its chips, and the limit shows as move time', async ({ page
   await page.routeWebSocket(/\/ws/, (ws) => {
     send = (game) =>
       ws.send(JSON.stringify({ type: 'game', game: { ...GAME, ...game } } satisfies ServerMessage));
-    ws.send(JSON.stringify({ type: 'hello', engines: [] } satisfies ServerMessage));
+    ws.send(JSON.stringify({ type: 'hello', engines: [], hasGame: true } satisfies ServerMessage));
     send({});
   });
   await page.goto('/');
@@ -142,7 +142,7 @@ test('each phase has its chips, and the limit shows as move time', async ({ page
 
 test('the id name replaces the profile name, its tile following', async ({ page }) => {
   await page.routeWebSocket(/\/ws/, (ws) => {
-    ws.send(JSON.stringify({ type: 'hello', engines: [] } satisfies ServerMessage));
+    ws.send(JSON.stringify({ type: 'hello', engines: [], hasGame: true } satisfies ServerMessage));
     const game = { ...GAME, phase: 'human', engineIdName: 'Delta 2.1' } satisfies GameState;
     ws.send(JSON.stringify({ type: 'game', game } satisfies ServerMessage));
   });
@@ -155,7 +155,7 @@ test('a long id name truncates, leaving the limit whole and the strip unbroken',
   page,
 }) => {
   await page.routeWebSocket(/\/ws/, (ws) => {
-    ws.send(JSON.stringify({ type: 'hello', engines: [] } satisfies ServerMessage));
+    ws.send(JSON.stringify({ type: 'hello', engines: [], hasGame: true } satisfies ServerMessage));
     const game = { ...GAME, phase: 'human', engineIdName: 'Long'.repeat(50) } satisfies GameState;
     ws.send(JSON.stringify({ type: 'game', game } satisfies ServerMessage));
   });

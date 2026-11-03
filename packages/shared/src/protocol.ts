@@ -89,7 +89,8 @@ export function appendTranscript(
 }
 
 export type ServerMessage =
-  | { type: 'hello'; engines: EngineChoice[] }
+  /** With `hasGame` false no `game` follows, so a page still showing one shows one that is gone. */
+  | { type: 'hello'; engines: EngineChoice[]; hasGame: boolean }
   | { type: 'game'; game: GameState }
   | ({ type: 'search' } & SearchUpdate)
   /** New lines of the current game's transcript; with `reset`, all of it, replacing the last. */

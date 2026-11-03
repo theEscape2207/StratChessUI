@@ -219,6 +219,7 @@ describe('server', () => {
     expect(await next()).toEqual({
       type: 'hello',
       engines: [{ id: 'fake', name: 'StratChess (fake)' }],
+      hasGame: false,
     });
 
     ws.send(JSON.stringify({ type: 'move', uci: '{' }));
@@ -417,7 +418,7 @@ describe('server', () => {
 
     const second = await connect(app, token);
     expect(await first.closed).toBe(CLOSE_CODES.replaced);
-    expect(await second.next()).toMatchObject({ type: 'hello' });
+    expect(await second.next()).toMatchObject({ type: 'hello', hasGame: true });
     expect(await second.next()).toMatchObject({ game: { phase: 'human' } });
     // The engine's last line about its opening move, still shown on the new socket.
     expect(await second.next()).toEqual({
