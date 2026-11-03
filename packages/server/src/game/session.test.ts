@@ -86,6 +86,7 @@ function open(
 }
 
 const searches = (messages: ServerMessage[]) => messages.filter((m) => m.type === 'search');
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const game = (engineId: string, humanColor: NewGameRequest['humanColor']): NewGameRequest => ({
   engineId,
@@ -420,6 +421,96 @@ describe('GameSession', () => {
     });
   });
 
+  describe('resign', () => {
+    it.each([
+      ['white', 'black'],
+      ['black', 'white'],
+    ] as const)('as %s gives %s the game, on the position it stood at', async (human, winner) => {
+      const { session, settled } = open();
+      void session.newGame(game('legal', human));
+      const before = await settled();
+      session.resign();
+      expect(await settled()).toMatchObject({
+        phase: 'over',
+        result: winner,
+        termination: 'resignation',
+        fen: before.fen,
+        moves: before.moves,
+      });
+    });
+
+    it('frees the engine slot', async () => {
+      const slots = new EngineSlots(1);
+      const { session, settled } = open(TIMEOUTS, slots);
+      void session.newGame(game('legal', 'white'));
+      await settled();
+      expect(slots.take()).toBe(false);
+      session.resign();
+      await settled();
+      await vi.waitFor(() => expect(slots.take()).toBe(true));
+      slots.free();
+    });
+
+    it('cancels a search, whose reply never lands', async () => {
+      const { session, next, settled } = open();
+      void session.newGame({ ...game('legal', 'white'), limit: { movetimeMs: 60_000 } });
+      await settled();
+      session.move('e2e4');
+      let msg: ServerMessage;
+      do msg = await next();
+      while (msg.type !== 'search');
+
+      session.resign();
+      expect(await settled()).toMatchObject({
+        phase: 'over',
+        result: 'black',
+        termination: 'resignation',
+        moves: ['e2e4'],
+      });
+      await sleep(100);
+      expect(session.state).toMatchObject({ termination: 'resignation', moves: ['e2e4'] });
+    });
+
+    it('keeps its result when the engine ignores stop and has to be killed', async () => {
+      const { session, next, settled } = open({ ...TIMEOUTS, stopGraceMs: 50 });
+      void session.newGame({ ...game('ignore-stop', 'white'), limit: { movetimeMs: 100 } });
+      await settled();
+      session.move('e2e4');
+      // Before this, the search has not reached the engine, and a resignation cancels it unsent.
+      let msg: ServerMessage;
+      do msg = await next();
+      while (msg.type !== 'search');
+      session.resign();
+      await settled();
+      await sleep(400);
+      expect(session.state).toMatchObject({ result: 'black', termination: 'resignation' });
+      expect(session.state?.reason).toBeUndefined();
+    });
+
+    it('is refused while the engine starts, as the game would then carry on', async () => {
+      const { session, next, settled } = open();
+      void session.newGame(game('legal', 'white'));
+      session.resign();
+      let msg: ServerMessage;
+      do msg = await next();
+      while (msg.type !== 'error');
+      expect(msg.reason).toBe('the game has not started');
+      expect(await settled()).toMatchObject({ phase: 'human' });
+    });
+
+    it('is refused with no game, and once the game is over', async () => {
+      const { session, next, settled } = open();
+      session.resign();
+      expect(await next()).toEqual({ type: 'error', reason: 'no game in progress' });
+      void session.newGame(game('legal', 'white'));
+      await settled();
+      session.resign();
+      await settled();
+      session.resign();
+      expect(await next()).toEqual({ type: 'error', reason: 'the game is over' });
+    });
+  });
+
   describe('takeback', () => {
     it('returns to the start of the game, with no last move and no search to resend', async () => {
       const { session, settled } = open();
@@ -546,7 +637,6 @@ describe('GameSession', () => {
       const LONG_MOVETIME = { movetimeMs: 60_000 };
       // Black to move, so an engine playing white searches at once and a human playing black moves.
       const BLACK_TO_MOVE = '4k3/8/8/8/4P3/8/8/4K3 b - - 0 40';
-      const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
       /** Plays a move and waits for the engine's first search line, so the search is under way. */
       async function searchAfter(
@@ -657,6 +747,19 @@ describe('GameSession', () => {
           await vi.waitFor(() => expect(running(logged)).toBe(2));
           await sleep(100);
           expect(session.state).toMatchObject({ phase: 'human', moves: before.moves });
+        });
+
+        it('does not search once the human resigns, and stops the engine', async () => {
+          const { session, settled, logged } = await held(['e2e4']);
+          session.move('d2d4');
+          session.resign();
+          expect(await settled()).toMatchObject({ phase: 'over', termination: 'resignation' });
+          await vi.waitFor(() => expect(running(logged)).toBe(2));
+          await sleep(100);
+          expect(session.state).toMatchObject({
+            termination: 'resignation',
+            moves: ['e2e4', 'a7a5', 'd2d4'],
+          });
         });
 
         it('shares the restart with a replayed move', async () => {

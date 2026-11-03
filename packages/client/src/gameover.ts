@@ -14,5 +14,6 @@ export function gameOverText(game: Ended): GameOverText {
   const score = game.result === 'white' ? '1-0' : '0-1';
   const title =
     game.result === game.humanColor ? `You beat ${game.engineName}` : `${game.engineName} wins`;
-  return { title, line: `${score} · by ${game.termination}` };
+  const how = game.termination === 'resignation' ? 'you resigned' : `by ${game.termination}`;
+  return { title, line: `${score} · ${how}` };
 }
