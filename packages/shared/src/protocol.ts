@@ -58,10 +58,12 @@ export type GameState = {
 };
 
 /**
- * Whether a takeback has a turn of the human's to return to. On the human's turn the last two moves
- * are the human's and the engine's reply; with fewer, the human has not moved yet.
+ * Whether a takeback has a turn of the human's to return to. While the engine thinks, the last move
+ * is the human's. On the human's turn the last two moves are the human's and the engine's reply;
+ * with fewer, the human has not moved yet.
  */
 export function canTakeBack(game: Pick<GameState, 'phase' | 'moves'>): boolean {
+  if (game.phase === 'thinking') return game.moves.length >= 1;
   return game.phase === 'human' && game.moves.length >= 2;
 }
 

@@ -12,6 +12,7 @@ import {
   playMove,
   scriptedServer,
   START,
+  submitNewGame,
   tapSquare,
 } from './helpers.ts';
 
@@ -59,13 +60,34 @@ test('an engine that moved first keeps its opening move', async ({ page, hasTouc
   await expect(undo(page)).toBeDisabled();
 });
 
-test('is disabled while the engine thinks', async ({ page, hasTouch }) => {
+test('takes back the human move during a search, whose reply never lands', async ({
+  page,
+  hasTouch,
+}) => {
   await openSettled(page);
-  // The move-time default: the fake sleeps it out.
-  await page.getByRole('button', { name: 'New game' }).click();
+  // The fake sleeps out a move time. A click waits for a disabled button, so one left to wait out
+  // the search would land after the reply and return to this same position; hence its timeout.
+  await page.getByRole('spinbutton').fill('3000');
+  await submitNewGame(page);
   await expectYourMove(page);
   await playMove(page, 'e2e4', hasTouch);
   await expectThinking(page);
+
+  await undo(page).click({ timeout: 1000 });
+  await expectFen(page, START);
+  await expectMoves(page, []);
+  await expectYourMove(page);
+  await expect(undo(page)).toBeDisabled();
+
+  await playMove(page, 'd2d4', hasTouch);
+  await expectThinking(page);
+  await expectMoves(page, ['d4', 'a5']);
+  await expectYourMove(page);
+});
+
+test('is disabled while the engine thinks before the human has moved', async ({ page }) => {
+  const server = await scriptedServer(page);
+  server.game({ humanColor: 'black', phase: 'thinking' });
   await expect(undo(page)).toBeDisabled();
 });
 
