@@ -15,7 +15,7 @@ type ResignPromptProps = {
   onResign: () => void;
 };
 
-/** Keep playing comes first, taking the place of the Resign just tapped: a double tap is safe. */
+/** Resign moves clear of the button just tapped, so a double tap cannot confirm. */
 export function ResignPrompt({ disabled, onKeepPlaying, onResign }: ResignPromptProps) {
   return (
     <div className="actions resign-prompt">

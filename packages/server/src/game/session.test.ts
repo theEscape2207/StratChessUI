@@ -82,7 +82,7 @@ function open(
         return messages;
     }
   };
-  return { session, next, nextAny, settled, untilSettled, logged };
+  return { session, next, nextAny, take, settled, untilSettled, logged };
 }
 
 const searches = (messages: ServerMessage[]) => messages.filter((m) => m.type === 'search');
@@ -452,13 +452,11 @@ describe('GameSession', () => {
     });
 
     it('cancels a search, whose reply never lands', async () => {
-      const { session, next, settled } = open();
+      const { session, take, settled } = open();
       void session.newGame({ ...game('legal', 'white'), limit: { movetimeMs: 60_000 } });
       await settled();
       session.move('e2e4');
-      let msg: ServerMessage;
-      do msg = await next();
-      while (msg.type !== 'search');
+      await take((msg) => msg.type === 'search');
 
       session.resign();
       expect(await settled()).toMatchObject({
@@ -472,29 +470,29 @@ describe('GameSession', () => {
     });
 
     it('keeps its result when the engine ignores stop and has to be killed', async () => {
-      const { session, next, settled } = open({ ...TIMEOUTS, stopGraceMs: 50 });
+      const { session, take, settled } = open({ ...TIMEOUTS, stopGraceMs: 50 });
       void session.newGame({ ...game('ignore-stop', 'white'), limit: { movetimeMs: 100 } });
       await settled();
       session.move('e2e4');
       // Before this, the search has not reached the engine, and a resignation cancels it unsent.
-      let msg: ServerMessage;
-      do msg = await next();
-      while (msg.type !== 'search');
+      await take((msg) => msg.type === 'search');
       session.resign();
       await settled();
+      const lastSearch = session.search;
       await sleep(400);
+      // The search answers nothing until the kill, so its throttled last line is still due.
+      expect(session.search).toBe(lastSearch);
       expect(session.state).toMatchObject({ result: 'black', termination: 'resignation' });
       expect(session.state?.reason).toBeUndefined();
     });
 
     it('is refused while the engine starts, as the game would then carry on', async () => {
-      const { session, next, settled } = open();
+      const { session, take, settled } = open();
       void session.newGame(game('legal', 'white'));
       session.resign();
-      let msg: ServerMessage;
-      do msg = await next();
-      while (msg.type !== 'error');
-      expect(msg.reason).toBe('the game has not started');
+      expect(await take((msg) => msg.type === 'error')).toMatchObject({
+        reason: 'the game has not started',
+      });
       expect(await settled()).toMatchObject({ phase: 'human' });
     });
 

@@ -63,10 +63,10 @@ test('Keep playing brings the row back and the game plays on', async ({ page, ha
 test('a double tap on Resign sends nothing', async ({ page }) => {
   const server = await scriptedServer(page);
   server.game(IN_PLAY);
+  const tapped = (await resign(page).boundingBox())!;
   await resign(page).dblclick();
-  const keep = (await keepPlaying(page).boundingBox())!;
   const confirm = (await resign(page).boundingBox())!;
-  expect(keep.x).toBeLessThan(confirm.x);
+  expect(confirm.x).toBeGreaterThanOrEqual(tapped.x + tapped.width);
   expect(server.resigns).toEqual([]);
 });
 

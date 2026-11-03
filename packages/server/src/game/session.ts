@@ -1,8 +1,8 @@
 // The human-vs-engine game: the server's position, whose turn it is, and the engine process that
 // plays the other side.
 import {
-  canResign,
   applyUciMove,
+  canResign,
   canTakeBack,
   outcome,
   parseStartFen,
@@ -314,8 +314,8 @@ export class GameSession {
   }
 
   private report(game: Game, fen: string, info: SearchInfo): void {
-    // A throttled line can outlive its search, cancelled by a takeback.
-    if (this.game !== game || game.state.fen !== fen) return;
+    // A throttled line can outlive its search, cancelled by a takeback or a resignation.
+    if (this.game !== game || game.state.phase === 'over' || game.state.fen !== fen) return;
     game.search = { fen, info: searchReport(fen, info) };
     this.options.send({ type: 'search', ...game.search });
   }
