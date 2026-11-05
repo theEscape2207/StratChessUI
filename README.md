@@ -71,7 +71,7 @@ build. Download it next to `engines.json` (PowerShell), then point the profile's
 `cwd` at that folder; the release is one `.exe` that needs nothing else there:
 
 ```powershell
-gh release download v0.8.0 -R theEscape2207/StratChess -D "$env:APPDATA\StratChessUI\engines\stratchess-0.8.0"
+gh release download v0.9.0 -R theEscape2207/StratChess -D "$env:APPDATA\StratChessUI\engines\stratchess-0.9.0"
 ```
 
 Check a profile against the real engine with:

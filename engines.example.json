@@ -3,8 +3,8 @@
     {
       "id": "stratchess",
       "name": "StratChess",
-      "executable": "engines/stratchess-0.8.0/StratChess-0.8.0-windows-x64.exe",
-      "cwd": "engines/stratchess-0.8.0",
+      "executable": "engines/stratchess-0.9.0/StratChess-0.9.0-windows-x64.exe",
+      "cwd": "engines/stratchess-0.9.0",
       "options": { "Threads": 2, "Hash": 256 }
     }
   ]

@@ -5,7 +5,7 @@ A row above and below the board naming each side, its captured pieces and whose 
 **Use** the engine's strip on the far side of the board, the human's on the near side; they swap
 with orientation.
 
-**The consumer supplies** the name (the engine's UCI `id name` such as "StratChess 0.8.0", its
+**The consumer supplies** the name (the engine's UCI `id name` such as "StratChess 0.9.0", its
 profile name until that is known or if it sends none; or "You"), the engine's limit ("depth 8",
 "1000 ms" — never a rating), the human's colour, captured pieces and material balance, and the
 phase and result.

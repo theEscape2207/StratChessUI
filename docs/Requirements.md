@@ -83,7 +83,7 @@ M2 and M3 are two views of one app, sharing game and engine handling. No configu
 
 ## StratChess UCI behaviour the UI must handle
 
-Checked against release `v0.8.0`: its `StratEngine/UCIHandler.cpp` and the running binary. Update
+Checked against release `v0.9.0`: its `StratEngine/UCIHandler.cpp` and the running binary. Update
 this when adopting a release labelled `uci-facing`.
 
 - **A bad FEN does not fail loudly.** The engine resets to the start position and reports only
