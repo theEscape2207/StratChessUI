@@ -12,8 +12,9 @@ export function gameOverText(game: Ended): GameOverText {
   if (!game.result) return { title: 'Game stopped', line: game.reason ?? '' };
   if (game.result === 'draw') return { title: 'Draw', line: `½-½ · by ${game.termination}` };
   const score = game.result === 'white' ? '1-0' : '0-1';
-  const title =
-    game.result === game.humanColor ? `You beat ${game.engineName}` : `${game.engineName} wins`;
-  const how = game.termination === 'resignation' ? 'you resigned' : `by ${game.termination}`;
+  const humanWon = game.result === game.humanColor;
+  const title = humanWon ? `You beat ${game.engineName}` : `${game.engineName} wins`;
+  const resigned = humanWon ? `${game.engineName} resigned` : 'you resigned';
+  const how = game.termination === 'resignation' ? resigned : `by ${game.termination}`;
   return { title, line: `${score} · ${how}` };
 }

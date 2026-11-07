@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { limitLabel, materialLead, sortCaptures, stripChip } from './strip.ts';
+import { strengthLabel, materialLead, sortCaptures, stripChip } from './strip.ts';
 
 describe('stripChip', () => {
   // Phase, result, then the engine's chip and the human's; * marks the raised one.
@@ -22,9 +22,10 @@ describe('stripChip', () => {
   });
 });
 
-it('labels the limit by depth or move time, never a rating', () => {
-  expect(limitLabel({ depth: 8 })).toBe('depth 8');
-  expect(limitLabel({ movetimeMs: 1000 })).toBe('1000 ms');
+it('labels the limit by depth or move time, and a level by its number, never a rating', () => {
+  expect(strengthLabel({ limit: { depth: 8 } })).toBe('depth 8');
+  expect(strengthLabel({ limit: { movetimeMs: 1000 } })).toBe('1000 ms');
+  expect(strengthLabel({ level: 2 })).toBe('level 2');
 });
 
 it('orders captures cheapest first', () => {

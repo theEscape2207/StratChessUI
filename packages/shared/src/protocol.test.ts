@@ -28,6 +28,22 @@ describe('protocol', () => {
     expect(newGame({ depth: 5 }, 'red')).toBeUndefined();
   });
 
+  it('accepts a level inside the range instead of a limit, but never both or neither', () => {
+    const request = (fields: object) =>
+      parseClientMessage(
+        JSON.stringify({ type: 'new-game', humanColor: 'white', engineId: 'x', ...fields }),
+      );
+    expect(request({ level: 2 })).toEqual({
+      type: 'new-game',
+      humanColor: 'white',
+      engineId: 'x',
+      level: 2,
+    });
+    for (const level of [0, 6, 2.5, '2', null]) expect(request({ level })).toBeUndefined();
+    expect(request({ level: 2, limit: { depth: 1 } })).toBeUndefined();
+    expect(request({})).toBeUndefined();
+  });
+
   it('passes a start FEN on for the server to check, refusing one far too long to be a FEN', () => {
     const request = (fen: unknown) =>
       parseClientMessage(

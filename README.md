@@ -66,6 +66,10 @@ Engines are configured on the host only, in `engines.json` in the host directory
 the server. The server logs each engine's `id name` when it starts, so a log shows which build ran,
 and the engine's strip shows it during a game.
 
+A profile with `"levels": true` also plays the beginner opponent's levels, which are calibrated for
+StratChess only. Point it at the same release as the normal profile: adopting a release rechecks
+the levels (#94).
+
 Run StratChess from a [release](https://github.com/theEscape2207/StratChess/releases), not a local
 build. Download it next to `engines.json` (PowerShell), then point the profile's `executable` and
 `cwd` at that folder; the release is one `.exe` that needs nothing else there:

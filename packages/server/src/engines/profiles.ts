@@ -13,6 +13,8 @@ export type EngineProfile = {
   /** Working directory; StratChess resolves its config and logs from it. */
   cwd?: string;
   options: Record<string, OptionValue>;
+  /** Plays the beginner opponent's levels, whose table is calibrated for StratChess only. */
+  levels: boolean;
 };
 
 /** Host-wide caps, applied whatever a profile asks for. */
@@ -69,6 +71,8 @@ function parseProfile(raw: unknown, where: string, baseDir: string): EngineProfi
       throw new ProfileError(`${where}.options.${name}: expected a string, number or boolean`);
     }
   }
+  if (p.levels !== undefined && typeof p.levels !== 'boolean')
+    throw new ProfileError(`${where}.levels: expected true or false`);
   const absolute = (path: string | undefined) =>
     path === undefined || isAbsolute(path) ? path : resolve(baseDir, path);
   return {
@@ -78,6 +82,7 @@ function parseProfile(raw: unknown, where: string, baseDir: string): EngineProfi
     args: args as string[],
     cwd: absolute(text('cwd', false)),
     options: capOptions(options as Record<string, OptionValue>),
+    levels: p.levels === true,
   };
 }
 

@@ -3,6 +3,7 @@ import {
   applyUciMove,
   capturedPieces,
   legalDests,
+  legalMoves,
   materialBalance,
   outcome,
   parseStartFen,
@@ -65,6 +66,39 @@ describe('rules', () => {
     const fen = 'r3k3/1P6/8/8/8/8/8/4K3 w - - 0 1';
     expect(applyUciMove(fen, 'b7a8n')).toMatchObject({ ok: true, fen: /^N3k3\//, uci: 'b7a8n' });
     expect(applyUciMove(fen, 'b7a8')).toEqual({ ok: false, reason: 'illegal move: b7a8' });
+  });
+
+  describe('legalMoves', () => {
+    it('lists the twenty opening moves with the position after each', () => {
+      const moves = legalMoves(START_FEN);
+      expect(moves).toHaveLength(20);
+      expect(moves).toContainEqual({
+        uci: 'e2e4',
+        fen: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
+      });
+    });
+
+    it('lists each castling move once, in standard UCI', () => {
+      const ucis = legalMoves('r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1').map((m) => m.uci);
+      expect(ucis.filter((u) => ['e1g1', 'e1c1', 'e1h1', 'e1a1'].includes(u)).sort()).toEqual([
+        'e1c1',
+        'e1g1',
+      ]);
+      expect(new Set(ucis).size).toBe(ucis.length);
+    });
+
+    it('lists each promotion piece as its own move, captures included', () => {
+      const ucis = legalMoves('r3k3/1P6/8/8/8/8/8/4K3 w - - 0 1').map((m) => m.uci);
+      for (const to of ['b7b8', 'b7a8'])
+        expect(ucis.filter((u) => u.startsWith(to)).sort()).toEqual(
+          ['b', 'n', 'q', 'r'].map((p) => `${to}${p}`),
+        );
+    });
+
+    it('lists nothing for a mated side or an invalid FEN', () => {
+      expect(legalMoves('7k/6Q1/6K1/8/8/8/8/8 b - - 0 1')).toEqual([]);
+      expect(legalMoves('not a fen')).toEqual([]);
+    });
   });
 
   describe('parseStartFen', () => {

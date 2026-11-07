@@ -28,8 +28,8 @@ separate open-source repository, and has no commercial goal.
   a reconnect, are backlog.
 - **Priority:** human vs engine, then analysis/statistics, then engine vs engine (single
   configurable games, including Stockfish; batches later).
-- **Clocks and difficulty:** human untimed; StratChess limited by depth or time. These limits are
-  never presented as Elo levels.
+- **Clocks and difficulty:** human untimed; StratChess limited by depth or time, or playing a level
+  of the beginner opponent. Neither is ever presented as Elo.
 - **Statistics:** standard UCI output first, StratChess-specific statistics later.
 - **Playing aids:** legal moves enforced from M1; legal-move highlighting in M2; takebacks and hints
   in M3. A takeback returns to the human's previous turn, not one ply (#69).
@@ -61,6 +61,7 @@ M2 and M3 are two views of one app, sharing game and engine handling. No configu
 | Pairing persistence | Browser keeps its token until revoked on the host                                 | One code per device, not per game                                                                                                                                                |
 | Disconnect          | Hold the game; after 60 s, end the engine process and restart it when next needed | Phones drop sockets when locked and networks drop; a game is cheap to hold, while an engine holds a slot, its Hash and a lock on its executable                                  |
 | UCI transcript      | Read-only                                                                         | Typed commands could desync the controller, which owns `position`/`go`/`stop`, and each would need the CR/LF guard and an allowlist                                              |
+| Beginner opponent   | The server scores every legal move with `go depth 1`, then chooses one by level   | Stock limits punish every blunder, even at `depth 1`. Plain UCI needs no engine change, and a level is a data change. Calibrated for StratChess only (#94, 2026-11-04)           |
 
 ## Architecture constraints (independent of stack)
 
@@ -84,7 +85,8 @@ M2 and M3 are two views of one app, sharing game and engine handling. No configu
 ## StratChess UCI behaviour the UI must handle
 
 Checked against release `v0.9.0`: its `StratEngine/UCIHandler.cpp` and the running binary. Update
-this when adopting a release labelled `uci-facing`.
+this when adopting a release labelled `uci-facing`. Adopting any release also rechecks the beginner
+opponent's levels, by #94's steps: score values are not part of the engine's UCI contract.
 
 - **A bad FEN does not fail loudly.** The engine resets to the start position and reports only
   `info string position: rejected FEN ...`. Validate FEN before sending it, and treat that line as
@@ -92,6 +94,11 @@ this when adopting a release labelled `uci-facing`.
 - **Commands sent during a search are ignored** (`info string <cmd>: ignored, a search is in
 progress`). The controller must send `stop` and wait for `bestmove` before the next `position`.
 - **`go` with no limit searches to depth 20.** Always send an explicit limit.
+- **A mated or stalemated position answers `bestmove 0000`**, which the controller treats as an
+  engine failure. Never search a position the rules already decide. The engine also does not treat
+  a threefold repetition by history as a draw at the root, so the rules decide that too.
+- **`stop` only cancels a search already running.** A turn made of several searches, like the
+  beginner opponent's, must check before each one that a takeback or resignation has not ended it.
 - Supported limits: `wtime/btime/winc/binc/movestogo`, `depth`, `movetime`, `nodes`, `infinite`.
   No `ponder`, `mate` or `searchmoves`.
 - Options: Threads, Hash, plus tuning options from `SearchTuning.def`. No MultiPV, Chess960 or
@@ -110,13 +117,13 @@ progress`). The controller must send `stop` and wait for `bestmove` before the n
 
 Fixed in the engine rather than worked around in the UI:
 
-| Issue                                  | Change                                                                                                          | Needed by                                |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| theEscape2207/StratChess#911           | Report `nps` and `seldepth`                                                                                     | M2                                       |
-| theEscape2207/StratChess#912           | Full PV on the final info line                                                                                  | M2                                       |
-| theEscape2207/StratChess#94 (reopened) | MultiPV                                                                                                         | M3: hint alternatives, weakened opponent |
-| theEscape2207/StratChess#913           | Beginner strength: probe depth 1-2 and small `nodes` budgets, then a skill option if needed. Largest risk to M3 | M3                                       |
-| theEscape2207/StratChess#914           | `currmove`/`currmovenumber` (optional)                                                                          | No milestone; M2 closed without it       |
+| Issue                                  | Change                                                                                                | Needed by                          |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| theEscape2207/StratChess#911           | Report `nps` and `seldepth`                                                                           | M2                                 |
+| theEscape2207/StratChess#912           | Full PV on the final info line                                                                        | M2                                 |
+| theEscape2207/StratChess#94 (reopened) | MultiPV                                                                                               | M3: hint alternatives              |
+| theEscape2207/StratChess#913 (closed)  | Beginner strength. Closed without an engine change: the beginner opponent runs on the UI server (#94) | M3                                 |
+| theEscape2207/StratChess#914           | `currmove`/`currmovenumber` (optional)                                                                | No milestone; M2 closed without it |
 
 ## External dependencies
 

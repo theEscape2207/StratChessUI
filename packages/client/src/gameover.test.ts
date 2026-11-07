@@ -10,6 +10,7 @@ describe('gameOverText', () => {
     ['draw', 'stalemate', 'Draw', '½-½ · by stalemate'],
     ['draw', 'threefold repetition', 'Draw', '½-½ · by threefold repetition'],
     ['white', 'resignation', 'StratChess wins', '1-0 · you resigned'],
+    ['black', 'resignation', 'You beat StratChess', '0-1 · StratChess resigned'],
   ] as const)('%s by %s: %s, %s', (result, termination, title, line) => {
     expect(gameOverText({ ...ended, result, termination })).toEqual({ title, line });
   });

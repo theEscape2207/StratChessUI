@@ -6,7 +6,7 @@ import {
   START_FEN,
   type ClientMessage,
   type GamePhase,
-  type GameState,
+  type SearchLimit,
   type ServerMessage,
 } from '@stratchess-ui/shared';
 import { buildApp, type AppOptions } from './app.ts';
@@ -147,7 +147,7 @@ function startedEngines(start: MockInstance<typeof UciEngine.start>) {
 }
 
 /** A paired browser in a game on `limit`, its turn to move, with its token for reconnecting. */
-async function tokenInGame(limit: GameState['limit'], fen?: string) {
+async function tokenInGame(limit: SearchLimit, fen?: string) {
   const token = await pairedToken();
   const client = await connect(app, token);
   client.send({ ...NEW_GAME, limit, fen });
@@ -213,12 +213,16 @@ describe('server', () => {
     expect(sandboxed.statusCode).toBe(403);
   });
 
-  it('offers its engines and plays a game over the socket', async () => {
-    await build();
+  it('offers its engines, saying which play levels, and plays a game over the socket', async () => {
+    const play = { ...fakeProfile('legal'), id: 'play', name: 'Play', levels: true };
+    await build({ profiles: [fakeProfile('legal'), play] });
     const { ws, next, yourMove } = await connect(app, await pairedToken());
     expect(await next()).toEqual({
       type: 'hello',
-      engines: [{ id: 'fake', name: 'StratChess (fake)' }],
+      engines: [
+        { id: 'fake', name: 'StratChess (fake)' },
+        { id: 'play', name: 'Play', levels: true },
+      ],
       hasGame: false,
     });
 
