@@ -6,6 +6,14 @@
       "executable": "engines/stratchess-0.9.0/StratChess-0.9.0-windows-x64.exe",
       "cwd": "engines/stratchess-0.9.0",
       "options": { "Threads": 2, "Hash": 256 }
+    },
+    {
+      "id": "stratchess-play",
+      "name": "StratChess (Play)",
+      "executable": "engines/stratchess-0.9.0/StratChess-0.9.0-windows-x64.exe",
+      "cwd": "engines/stratchess-0.9.0",
+      "options": { "Threads": 1, "Hash": 16 },
+      "levels": true
     }
   ]
 }
