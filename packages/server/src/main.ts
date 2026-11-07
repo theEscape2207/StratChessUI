@@ -13,9 +13,16 @@ const extraHosts = process.env.EXTRA_HOSTS?.split(',').filter(Boolean);
 const enginesFile = join(hostDir(), 'engines.json');
 const pairingsFile = join(hostDir(), 'pairings.json');
 
-/** `FAKE_ENGINE=<mode>` serves only the test engine, for Playwright. */
+/**
+ * `FAKE_ENGINE=<mode>` serves only test engines, for Playwright: the fake in that mode, then one
+ * that plays levels, second so that it is never the form's default.
+ */
 function profiles(): EngineProfile[] {
-  if (process.env.FAKE_ENGINE) return [fakeProfile(process.env.FAKE_ENGINE)];
+  if (process.env.FAKE_ENGINE)
+    return [
+      fakeProfile(process.env.FAKE_ENGINE),
+      { ...fakeProfile('scored'), id: 'fake-play', name: 'StratChess (fake play)', levels: true },
+    ];
   if (!existsSync(enginesFile)) {
     console.warn(`no ${enginesFile}; copy engines.example.json to play against an engine`);
     return [];
