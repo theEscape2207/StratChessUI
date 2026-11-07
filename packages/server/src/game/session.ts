@@ -19,7 +19,7 @@ import type { EngineProfile } from '../engines/profiles.ts';
 import { EngineError, SearchCancelledError, UciEngine, type Timeouts } from '../uci/engine.ts';
 import type { SearchInfo } from '../uci/protocol.ts';
 import type { EngineSlots } from './engine-slots.ts';
-import { chooseMove, levelOf, rankMoves, surrenders, type Level } from './opponent.ts';
+import { chooseMove, levelOf, rankMoves, resigns, surrenders, type Level } from './opponent.ts';
 import { searchReport } from './search-report.ts';
 import { Throttle } from './throttle.ts';
 import { TranscriptFeed } from './transcript.ts';
@@ -56,7 +56,7 @@ type Game = {
    * The moves of the turn a level game is ranking. Its child searches stay out of the transcript:
    * at hundreds of lines a turn they would evict everything else, and a reattach would resend them.
    */
-  ranking?: readonly string[];
+  rankingTurn?: readonly string[];
   /** A level game's turns in a row spent surrendering, towards resigning. */
   surrenderedTurns: number;
 };
@@ -64,7 +64,7 @@ type Game = {
 const TRANSCRIPT_TAIL = 20;
 const REPORT_INTERVAL_MS = 100;
 /** Deep enough to see a hanging piece or a mate in one, through quiescence at the horizon. */
-const DEPTH_1 = { depth: 1 };
+const RANKING_LIMIT = { depth: 1 };
 
 export class GameSession {
   private readonly options: SessionOptions;
@@ -238,7 +238,7 @@ export class GameSession {
         profile,
         this.options.timeouts,
         (line) => {
-          if (!game.ranking) game.transcript.push(line);
+          if (!game.rankingTurn) game.transcript.push(line);
         },
         () => this.options.slots.free(),
       );
@@ -321,24 +321,24 @@ export class GameSession {
       const { info } = await engine.search({
         fen: startFen,
         moves: [...moves, uci],
-        limit: DEPTH_1,
+        limit: RANKING_LIMIT,
       });
       if (!info?.score) throw new EngineError(`no score for ${uci}`, engine.transcript());
       return info.score;
     };
     let ranked;
-    game.ranking = moves;
+    game.rankingTurn = moves;
     try {
       ranked = await rankMoves([...game.positions], search, turnIsGone);
     } catch (error) {
       if (!(error instanceof SearchCancelledError)) this.fail(game, error);
       return;
     } finally {
-      if (game.ranking === moves) game.ranking = undefined;
+      if (game.rankingTurn === moves) game.rankingTurn = undefined;
     }
     if (!ranked || turnIsGone()) return;
     game.surrenderedTurns = surrenders(ranked, level) ? game.surrenderedTurns + 1 : 0;
-    if (level.resignAfterTurns !== null && game.surrenderedTurns >= level.resignAfterTurns) {
+    if (resigns(game.surrenderedTurns, level)) {
       return this.finish(game, { result: game.state.humanColor, termination: 'resignation' });
     }
     const uci = chooseMove(ranked, level, this.options.rng ?? Math.random);

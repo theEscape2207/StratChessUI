@@ -51,6 +51,8 @@ export type RankedMove = { uci: string; scoreCp: number };
 
 const MATE_CP = 30_000;
 const MATED_SOON_CP = -29_000;
+/** Beyond this, a score is a mate rather than material. */
+const MATE_ON_BOARD_CP = 10_000;
 const LOSS_CAP_CP = 3000;
 
 /** A score from the side to move in centipawns, a mate in N as ±(30000 − N). */
@@ -77,9 +79,10 @@ export async function rankMoves(
   search: SearchChild,
   isGone: () => boolean,
 ): Promise<RankedMove[] | undefined> {
-  const mover = turn(positions.at(-1)!);
+  const fen = positions.at(-1)!;
+  const mover = turn(fen);
   const ranked: RankedMove[] = [];
-  for (const child of legalMoves(positions.at(-1)!)) {
+  for (const child of legalMoves(fen)) {
     if (isGone()) return undefined;
     const decided = outcome([...positions, child.fen]);
     const scored = decided ? decidedCp(decided.result, mover) : -scoreCp(await search(child.uci));
@@ -98,13 +101,18 @@ export function surrenders(ranked: readonly RankedMove[], level: Level): boolean
   return level.surrenderBelowCp !== null && ranked[0]!.scoreCp <= level.surrenderBelowCp;
 }
 
+/** Whether the level resigns after this many turns in a row surrendering. */
+export function resigns(surrenderedTurns: number, level: Level): boolean {
+  return level.resignAfterTurns !== null && surrenderedTurns >= level.resignAfterTurns;
+}
+
 /** Chooses one of `ranked`, best first and not empty, by the level's settings. */
 export function chooseMove(ranked: readonly RankedMove[], level: Level, rng: () => number): string {
   const best = ranked[0]!.scoreCp;
   const pick = (moves: readonly RankedMove[]) => moves[Math.floor(rng() * moves.length)]!.uci;
   if (surrenders(ranked, level)) return pick(ranked);
   // Not when a mate is already on the board either way, where blindness has no threat to miss.
-  if (Math.abs(best) < 10_000 && rng() < level.mateBlindChance) {
+  if (Math.abs(best) < MATE_ON_BOARD_CP && rng() < level.mateBlindChance) {
     const allowsMate = ranked.filter((m) => m.scoreCp <= MATED_SOON_CP);
     if (allowsMate.length > 0) return pick(allowsMate);
   }

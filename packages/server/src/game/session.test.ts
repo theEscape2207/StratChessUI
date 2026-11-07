@@ -1046,6 +1046,10 @@ describe('GameSession', () => {
         session.move('e2e4');
         expect(await next()).toMatchObject({ game: { phase: 'thinking' } });
         await sleep(100);
+        // What a browser reattaching now is sent: no search line, and no child search.
+        expect(session.search).toBeUndefined();
+        const lines = session.takeTranscript()!.map((line) => line.text);
+        expect(lines.filter((text) => /^(position|go)/.test(text))).toEqual([]);
         session.takeBack();
         expect(await settled()).toMatchObject({ phase: 'human', moves: [] });
         // A held search still running would hold every search queued behind it.

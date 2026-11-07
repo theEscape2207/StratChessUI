@@ -27,6 +27,7 @@ const arg = (name: string) => process.argv.find((a) => a.startsWith(`--${name}=`
 const mode = arg('mode') ?? 'normal';
 const bias = Number(arg('bias') ?? 0);
 const hold = arg('hold');
+const scored = mode === 'scored' || mode === 'scoreless';
 
 const HANDSHAKE = [
   'id name StratChess',
@@ -60,7 +61,7 @@ function finishSearch() {
   if (!searching) return;
   clearTimeout(searching.timer);
   searching = undefined;
-  if (mode === 'scored' || mode === 'scoreless') return finishScored();
+  if (scored) return finishScored();
   SEARCH_END.map(withLegalPv).forEach(out);
   // Encodes the position it searched, so tests can tell which search a bestmove belongs to.
   if (position.includes(STALEMATE)) out('bestmove 0000');
@@ -178,7 +179,7 @@ createInterface({ input: process.stdin }).on('line', (line) => {
       if (mode === 'crash-on-go' || position.includes(CRASH)) process.exit(3);
       searching = {};
       if (hold && position.split(' moves ')[1]?.split(' ').includes(hold)) break;
-      if (mode === 'scored' || mode === 'scoreless') {
+      if (scored) {
         finishSearch();
         break;
       }
