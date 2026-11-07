@@ -1,4 +1,4 @@
-import type { Color, GameState, Role, SearchLimit } from '@stratchess-ui/shared';
+import type { Color, GameState, Role, Strength } from '@stratchess-ui/shared';
 
 export type Side = 'engine' | 'human';
 
@@ -25,7 +25,10 @@ export function stripChip(
   return { text: humanWon === (side === 'human') ? 'won' : 'lost', raised: false };
 }
 
-export function limitLabel(limit: SearchLimit): string {
+/** The engine's limit or level as what it is; never a rating. */
+export function strengthLabel(strength: Strength): string {
+  if ('level' in strength) return `level ${strength.level}`;
+  const { limit } = strength;
   return 'depth' in limit ? `depth ${limit.depth}` : `${limit.movetimeMs} ms`;
 }
 

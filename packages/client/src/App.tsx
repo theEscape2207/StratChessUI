@@ -24,7 +24,7 @@ import { PairForm } from './PairForm.tsx';
 import { PlayerStrip } from './PlayerStrip.tsx';
 import { ResignButton, ResignPrompt } from './Resign.tsx';
 import { SearchInfo } from './SearchInfo.tsx';
-import { limitLabel, materialLead, stripChip } from './strip.ts';
+import { materialLead, strengthLabel, stripChip } from './strip.ts';
 import { Transcript } from './Transcript.tsx';
 import { UndoButton } from './UndoButton.tsx';
 import { useGameSocket, type Link } from './useGameSocket.ts';
@@ -117,7 +117,7 @@ function playerStrips(game: GameState | undefined) {
       <PlayerStrip
         side="engine"
         name={game.engineIdName ?? game.engineName}
-        detail={limitLabel(game.limit)}
+        detail={strengthLabel(game)}
         captured={captured[engineColor]}
         capturedColor={game.humanColor}
         lead={materialLead(balance, engineColor)}

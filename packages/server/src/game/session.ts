@@ -12,12 +12,14 @@ import {
   type NewGameRequest,
   type SearchUpdate,
   type ServerMessage,
+  type Strength,
   type TranscriptLine,
 } from '@stratchess-ui/shared';
 import type { EngineProfile } from '../engines/profiles.ts';
 import { EngineError, SearchCancelledError, UciEngine, type Timeouts } from '../uci/engine.ts';
 import type { SearchInfo } from '../uci/protocol.ts';
 import type { EngineSlots } from './engine-slots.ts';
+import { chooseMove, levelOf, rankMoves, surrenders, type Level } from './opponent.ts';
 import { searchReport } from './search-report.ts';
 import { Throttle } from './throttle.ts';
 import { TranscriptFeed } from './transcript.ts';
@@ -32,6 +34,8 @@ export type SessionOptions = {
   timeouts?: Partial<Timeouts>;
   /** Where the build each game runs against, and engine failures with transcripts, are reported. */
   log: (text: string) => void;
+  /** The beginner opponent's dice; `Math.random` unless a test needs them fixed. */
+  rng?: () => number;
 };
 
 type Game = {
@@ -48,10 +52,19 @@ type Game = {
   /** The last search line sent, resent to a browser that reattaches. */
   search?: SearchUpdate;
   transcript: TranscriptFeed;
+  /**
+   * The moves of the turn a level game is ranking. Its child searches stay out of the transcript:
+   * at hundreds of lines a turn they would evict everything else, and a reattach would resend them.
+   */
+  ranking?: readonly string[];
+  /** A level game's turns in a row spent surrendering, towards resigning. */
+  surrenderedTurns: number;
 };
 
 const TRANSCRIPT_TAIL = 20;
 const REPORT_INTERVAL_MS = 100;
+/** Deep enough to see a hanging piece or a mate in one, through quiescence at the horizon. */
+const DEPTH_1 = { depth: 1 };
 
 export class GameSession {
   private readonly options: SessionOptions;
@@ -82,6 +95,10 @@ export class GameSession {
   async newGame(request: NewGameRequest): Promise<void> {
     const profile = this.options.profiles.find((p) => p.id === request.engineId);
     if (!profile) return this.error(`unknown engine: ${request.engineId}`);
+    const strength: Strength =
+      'level' in request ? { level: request.level } : { limit: request.limit };
+    if ('level' in strength && !profile.levels)
+      return this.error(`${profile.name} does not play levels`);
     const start = parseStartFen(request.fen ?? START_FEN);
     if (!start.ok) return this.error(start.reason);
     const { slots } = this.options;
@@ -93,12 +110,13 @@ export class GameSession {
     const game: Game = {
       profile,
       engineUnwanted: false,
+      surrenderedTurns: 0,
       state: {
         startFen: start.fen,
         fen: start.fen,
         humanColor: request.humanColor,
         engineName: profile.name,
-        limit: request.limit,
+        ...strength,
         phase: 'starting',
         moves: [],
       },
@@ -144,6 +162,7 @@ export class GameSession {
     const moves = game.state.moves.slice(0, -plies);
     game.positions.length -= plies;
     game.search = undefined;
+    game.surrenderedTurns = 0;
     game.state = {
       ...game.state,
       phase: 'human',
@@ -218,7 +237,9 @@ export class GameSession {
       engine = await UciEngine.start(
         profile,
         this.options.timeouts,
-        (line) => game.transcript.push(line),
+        (line) => {
+          if (!game.ranking) game.transcript.push(line);
+        },
         () => this.options.slots.free(),
       );
     } catch (error) {
@@ -258,7 +279,9 @@ export class GameSession {
 
   private async engineMove(game: Game): Promise<void> {
     if (!game.engine && !(await this.restartForTurn(game))) return;
-    const fen = game.state.fen;
+    const { state } = game;
+    if ('level' in state) return this.levelMove(game, levelOf(state.level));
+    const fen = state.fen;
     const feed = new Throttle<SearchInfo>(
       (info) => this.report(game, fen, info),
       REPORT_INTERVAL_MS,
@@ -267,7 +290,7 @@ export class GameSession {
     try {
       // The whole game rather than the position alone, so the engine can see repetitions.
       ({ bestMove } = await game.engine!.search(
-        { fen: game.state.startFen, moves: game.state.moves, limit: game.state.limit },
+        { fen: state.startFen, moves: state.moves, limit: state.limit },
         (info) => {
           // A line without a score (a future currmove line) would blank the display.
           if (info.score) feed.push(info);
@@ -281,11 +304,53 @@ export class GameSession {
     // The final line goes out before the move it led to.
     feed.flush();
     if (this.game !== game) return;
+    this.playEngineMove(game, bestMove);
+  }
+
+  /**
+   * Ranks every legal move with a search each, then plays the level's choice. No search lines are
+   * reported: each child's score is from the other side, so the eval bar would flip between them.
+   */
+  private async levelMove(game: Game, level: Level): Promise<void> {
+    const engine = game.engine!;
+    const { startFen, moves } = game.state;
+    // Every move and takeback makes a new array, as in `restartForTurn`.
+    const turnIsGone = () =>
+      this.game !== game || game.state.moves !== moves || game.state.phase !== 'thinking';
+    const search = async (uci: string) => {
+      const { info } = await engine.search({
+        fen: startFen,
+        moves: [...moves, uci],
+        limit: DEPTH_1,
+      });
+      if (!info?.score) throw new EngineError(`no score for ${uci}`, engine.transcript());
+      return info.score;
+    };
+    let ranked;
+    game.ranking = moves;
+    try {
+      ranked = await rankMoves([...game.positions], search, turnIsGone);
+    } catch (error) {
+      if (!(error instanceof SearchCancelledError)) this.fail(game, error);
+      return;
+    } finally {
+      if (game.ranking === moves) game.ranking = undefined;
+    }
+    if (!ranked || turnIsGone()) return;
+    game.surrenderedTurns = surrenders(ranked, level) ? game.surrenderedTurns + 1 : 0;
+    if (level.resignAfterTurns !== null && game.surrenderedTurns >= level.resignAfterTurns) {
+      return this.finish(game, { result: game.state.humanColor, termination: 'resignation' });
+    }
+    const uci = chooseMove(ranked, level, this.options.rng ?? Math.random);
+    if (!turnIsGone()) this.playEngineMove(game, uci);
+  }
+
+  private playEngineMove(game: Game, uci: string): void {
     // The engine is not trusted: its move goes through the same rules as the human's.
-    const result = applyUciMove(game.state.fen, bestMove);
+    const result = applyUciMove(game.state.fen, uci);
     if (!result.ok) {
       return this.finish(game, {
-        reason: `${game.state.engineName} played an illegal move: ${bestMove}`,
+        reason: `${game.state.engineName} played an illegal move: ${uci}`,
       });
     }
     this.play(game, result.uci, result.fen);

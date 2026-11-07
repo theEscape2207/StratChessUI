@@ -8,10 +8,25 @@
 //   chatty          like legal, with 1100 info strings in the handshake, the last 2000 characters
 //   no-id-name      like normal, but the handshake has no `id name`
 //   ignore-quit     like legal, but stays up after `quit` until it is killed
+//   scored          scores a position by material for the side to move, plus `--bias=<cp>`, or as
+//                   `mate 1` when it has one; a mated or stalemated root answers `bestmove 0000`
+//   scoreless       like scored, but its info line has no score
+// With `--hold=<uci>`, a `go` for a position whose moves include that move runs until `stop`.
 import { createInterface } from 'node:readline';
-import { applyUciMove, legalDests, START_FEN } from '@stratchess-ui/shared';
+import {
+  applyUciMove,
+  legalDests,
+  legalMoves,
+  materialBalance,
+  outcome,
+  START_FEN,
+  turn,
+} from '@stratchess-ui/shared';
 
-const mode = process.argv.find((a) => a.startsWith('--mode='))?.slice(7) ?? 'normal';
+const arg = (name: string) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1];
+const mode = arg('mode') ?? 'normal';
+const bias = Number(arg('bias') ?? 0);
+const hold = arg('hold');
 
 const HANDSHAKE = [
   'id name StratChess',
@@ -45,12 +60,29 @@ function finishSearch() {
   if (!searching) return;
   clearTimeout(searching.timer);
   searching = undefined;
+  if (mode === 'scored' || mode === 'scoreless') return finishScored();
   SEARCH_END.map(withLegalPv).forEach(out);
   // Encodes the position it searched, so tests can tell which search a bestmove belongs to.
   if (position.includes(STALEMATE)) out('bestmove 0000');
   else if (mode === 'legal' || mode === 'chatty' || mode === 'ignore-quit')
     out(`bestmove ${firstLegalMove(position)}`);
   else out(`bestmove ${position.includes('moves') ? 'g8f6' : 'b1c3'}`);
+}
+
+/** A depth 1 answer for the scored modes, scoring the position from the side to move. */
+function finishScored() {
+  const replayed = replay(position);
+  const fen = 'fen' in replayed ? replayed.fen : START_FEN;
+  const moves = legalMoves(fen);
+  if (moves.length === 0) {
+    out(`info depth 0 score ${outcome([fen]) ? 'mate 0' : 'cp 0'}`);
+    return out('bestmove 0000');
+  }
+  const mates = moves.some((m) => outcome([m.fen])?.termination === 'checkmate');
+  const material = (turn(fen) === 'white' ? 1 : -1) * materialBalance(fen) * 100 + bias;
+  const score = mode === 'scoreless' ? '' : mates ? ' score mate 1' : ` score cp ${material}`;
+  out(`info depth 1 seldepth 1${score} nodes 1 pv ${moves[0]!.uci}`);
+  out(`bestmove ${moves[0]!.uci}`);
 }
 
 /** Plays a `position` command's moves, failing on any StratChess would reject. */
@@ -144,8 +176,13 @@ createInterface({ input: process.stdin }).on('line', (line) => {
     }
     case 'go': {
       if (mode === 'crash-on-go' || position.includes(CRASH)) process.exit(3);
-      SEARCH.map(withLegalPv).forEach(out);
       searching = {};
+      if (hold && position.split(' moves ')[1]?.split(' ').includes(hold)) break;
+      if (mode === 'scored' || mode === 'scoreless') {
+        finishSearch();
+        break;
+      }
+      SEARCH.map(withLegalPv).forEach(out);
       const movetime = /movetime (\d+)/.exec(line);
       if (mode === 'ignore-stop') break;
       if (movetime) searching.timer = setTimeout(finishSearch, Number(movetime[1]));

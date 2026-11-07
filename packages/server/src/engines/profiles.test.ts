@@ -26,7 +26,16 @@ describe('engine profiles', () => {
       args: [],
       cwd: resolve(BASE, 'engines'),
       options: { Threads: LIMITS.maxThreads, Hash: LIMITS.maxHashMiB, Contempt: 10 },
+      levels: false,
     });
+  });
+
+  it('marks a profile that plays levels', () => {
+    const [profile] = parseProfiles(
+      { engines: [{ id: 'x', executable: 'e', levels: true }] },
+      BASE,
+    );
+    expect(profile!.levels).toBe(true);
   });
 
   it('rejects malformed profiles with the field at fault', () => {
@@ -41,6 +50,9 @@ describe('engine profiles', () => {
     expect(() =>
       parseProfiles({ engines: [{ id: 'x', executable: 'e', options: { Hash: [1] } }] }, BASE),
     ).toThrow('options.Hash');
+    expect(() =>
+      parseProfiles({ engines: [{ id: 'x', executable: 'e', levels: 'yes' }] }, BASE),
+    ).toThrow('engines[0].levels');
     expect(() =>
       parseProfiles(
         {

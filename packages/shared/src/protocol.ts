@@ -10,6 +10,15 @@ export const LIMIT_RANGES = {
   movetimeMs: { min: 100, max: 60_000 },
 };
 
+/**
+ * Levels of the beginner opponent, which the server's level table defines. Never shown as Elo: a
+ * level is a policy of deliberate mistakes, not a measured strength.
+ */
+export const LEVEL_RANGE = { min: 1, max: 5 };
+
+/** A plain search with a limit, or a level of the beginner opponent; never both or neither. */
+export type Strength = { limit: SearchLimit } | { level: number };
+
 /** A FEN is about 90 characters at most; anything far longer is not one. */
 export const MAX_FEN_LENGTH = 128;
 
@@ -17,9 +26,8 @@ export const MAX_FEN_LENGTH = 128;
 export type NewGameRequest = {
   humanColor: Color;
   engineId: string;
-  limit: SearchLimit;
   fen?: string;
-};
+} & Strength;
 
 export type ClientMessage =
   | { type: 'move'; uci: string }
@@ -28,7 +36,8 @@ export type ClientMessage =
   | { type: 'resign' }
   | ({ type: 'new-game' } & NewGameRequest);
 
-export type EngineChoice = { id: string; name: string };
+/** `levels`: the profile plays the beginner opponent's levels as well as limits. */
+export type EngineChoice = { id: string; name: string; levels?: true };
 
 export type GamePhase = 'starting' | 'human' | 'thinking' | 'over';
 
@@ -54,14 +63,13 @@ export type GameState = {
   engineName: string;
   /** The engine's own UCI `id name`, once its handshake is done, if it sent one. */
   engineIdName?: string;
-  limit: SearchLimit;
   phase: GamePhase;
   /** Set, with how it ended, when the game ended by rule. */
   result?: Color | 'draw';
   termination?: Termination;
   /** Set when the game ended for another reason, such as an engine failure. */
   reason?: string;
-};
+} & Strength;
 
 /**
  * Whether a takeback has a turn of the human's to return to. While the engine thinks, the last move
@@ -146,20 +154,33 @@ export function parseClientMessage(raw: string): ClientMessage | undefined {
   if (msg.type === 'takeback') return { type: 'takeback' };
   if (msg.type === 'resign') return { type: 'resign' };
   if (msg.type !== 'new-game') return undefined;
-  const limit = parseLimit(msg.limit);
+  const strength = parseStrength(msg);
   if (msg.humanColor !== 'white' && msg.humanColor !== 'black') return undefined;
-  if (typeof msg.engineId !== 'string' || !limit) return undefined;
-  const request: NewGameRequest = { humanColor: msg.humanColor, engineId: msg.engineId, limit };
+  if (typeof msg.engineId !== 'string' || !strength) return undefined;
+  const request: NewGameRequest = {
+    humanColor: msg.humanColor,
+    engineId: msg.engineId,
+    ...strength,
+  };
   if (msg.fen === undefined) return { type: 'new-game', ...request };
   if (typeof msg.fen !== 'string' || msg.fen.length > MAX_FEN_LENGTH) return undefined;
   return { type: 'new-game', ...request, fen: msg.fen };
 }
 
+const inRange = (n: unknown, range: { min: number; max: number }): n is number =>
+  Number.isInteger(n) && (n as number) >= range.min && (n as number) <= range.max;
+
+function parseStrength(msg: Record<string, unknown>): Strength | undefined {
+  if (msg.limit !== undefined && msg.level !== undefined) return undefined;
+  if (msg.level !== undefined)
+    return inRange(msg.level, LEVEL_RANGE) ? { level: msg.level } : undefined;
+  const limit = parseLimit(msg.limit);
+  return limit && { limit };
+}
+
 function parseLimit(value: unknown): SearchLimit | undefined {
   if (typeof value !== 'object' || value === null) return undefined;
   const limit = value as Record<string, unknown>;
-  const inRange = (n: unknown, range: { min: number; max: number }): n is number =>
-    Number.isInteger(n) && (n as number) >= range.min && (n as number) <= range.max;
   if (inRange(limit.depth, LIMIT_RANGES.depth)) return { depth: limit.depth };
   if (inRange(limit.movetimeMs, LIMIT_RANGES.movetimeMs)) return { movetimeMs: limit.movetimeMs };
   return undefined;

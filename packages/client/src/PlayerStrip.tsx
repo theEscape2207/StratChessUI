@@ -4,7 +4,7 @@ import { sortCaptures, type Chip, type Side } from './strip.ts';
 type PlayerStripProps = {
   side: Side;
   name: string;
-  /** The engine's limit, or the human's colour. */
+  /** The engine's limit or level, or the human's colour. */
   detail: string;
   /** The pieces this side took, which are the other colour. */
   captured: readonly Role[];

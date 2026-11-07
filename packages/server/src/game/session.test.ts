@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  applyUciMove,
+  legalMoves,
+  materialBalance,
+  outcome,
   sanMoves,
   START_FEN,
+  turn,
   type GameState,
   type NewGameRequest,
   type ServerMessage,
@@ -23,6 +28,21 @@ const PROFILES = [
   'no-id-name',
   'ignore-stop',
 ].map((mode) => ({ ...fakeProfile(mode), id: mode }));
+// The beginner opponent's profiles. `held` holds any search after 1.e4 until it is stopped; `losing`
+// sees every position as lost, so it surrenders on every turn.
+const LEVEL_PROFILES = {
+  play: [],
+  held: ['--hold=e2e4'],
+  losing: ['--bias=1000'],
+};
+PROFILES.push(
+  ...Object.entries(LEVEL_PROFILES).map(([id, args]) => ({
+    ...fakeProfile('scored', {}, args),
+    id,
+    levels: true,
+  })),
+  { ...fakeProfile('scoreless'), id: 'scoreless', levels: true },
+);
 // A cold Node spawn of the fake can take well over 300 ms on a Windows CI runner.
 const TIMEOUTS = { handshakeMs: 2000, readyMs: 1000, stopGraceMs: 300 };
 
@@ -39,6 +59,7 @@ afterEach(async () => {
 function open(
   timeouts: Partial<Timeouts> = TIMEOUTS,
   slots = new EngineSlots(Number.MAX_SAFE_INTEGER),
+  rng?: () => number,
 ) {
   const queue: ServerMessage[] = [];
   let wake = () => {};
@@ -49,6 +70,7 @@ function open(
     refused: () => {},
     timeouts,
     log: (text) => logged.push(text),
+    rng,
     send: (msg) => {
       queue.push(msg);
       wake();
@@ -912,4 +934,172 @@ describe('GameSession', () => {
       expect(long.text.endsWith('…')).toBe(true);
     });
   });
+  describe('levels', () => {
+    /** Dice that never err: no blindness, no mistake, the last of the moves equal to the best. */
+    const steady = () => 0.99;
+    const level = (engineId: string, humanColor: NewGameRequest['humanColor'], fen?: string) =>
+      ({ engineId, humanColor, level: 5, fen }) as NewGameRequest;
+    // Black, the engine, to move: its knight takes a loose queen, or its queen mates on g2.
+    const LOOSE_QUEEN = '4k3/pp6/5n2/3Q4/8/8/PP6/4K3 b - - 0 1';
+    const MATE_IN_ONE = '8/8/8/8/8/5k2/4q3/7K b - - 0 1';
+    const replied = (first: string) => ({ phase: 'human', moves: [first, expect.any(String)] });
+
+    it('refuses a level on a profile that does not play levels', async () => {
+      const { session, next } = open();
+      void session.newGame(level('legal', 'white'));
+      expect(await next()).toEqual({
+        type: 'error',
+        reason: 'StratChess (fake) does not play levels',
+      });
+      expect(session.state).toBeUndefined();
+    });
+
+    it('ranks the moves and takes a loose queen, reporting no search lines', async () => {
+      const { session, untilSettled } = open(TIMEOUTS, undefined, steady);
+      void session.newGame(level('play', 'white', LOOSE_QUEEN));
+      const messages = await untilSettled();
+      expect(messages.at(-1)).toMatchObject({
+        type: 'game',
+        game: { phase: 'human', level: 5, lastMove: 'f6d5' },
+      });
+      expect('limit' in session.state!).toBe(false);
+      expect(searches(messages)).toEqual([]);
+      expect(session.search).toBeUndefined();
+    });
+
+    it('mates in one from the rules, never sending the mated position', async () => {
+      const { session, settled } = open(TIMEOUTS, undefined, steady);
+      void session.newGame(level('play', 'white', MATE_IN_ONE));
+      expect(await settled()).toMatchObject({
+        phase: 'over',
+        result: 'black',
+        termination: 'checkmate',
+        lastMove: 'e2g2',
+      });
+    });
+
+    it('keeps its child searches out of the transcript', async () => {
+      const { session, settled } = open(TIMEOUTS, undefined, steady);
+      void session.newGame(level('play', 'white', LOOSE_QUEEN));
+      await settled();
+      const lines = session.takeTranscript()!.map((line) => line.text);
+      expect(lines).toContain('uciok');
+      expect(lines.filter((text) => /^(position|go|bestmove)/.test(text))).toEqual([]);
+    });
+
+    it('ends the game as a failure when a search reports no score', async () => {
+      const { session, settled } = open(TIMEOUTS, undefined, steady);
+      void session.newGame(level('scoreless', 'white', LOOSE_QUEEN));
+      expect(await settled()).toMatchObject({
+        phase: 'over',
+        reason: expect.stringMatching(/^StratChess \(fake\) failed: no score for /),
+      });
+    });
+
+    it('resigns after 40 turns in a row surrendering at level 1', async () => {
+      let seed = 1;
+      const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      const { session, settled } = open(TIMEOUTS, undefined, random);
+      void session.newGame({ engineId: 'losing', humanColor: 'white', level: 1 });
+      let state = await settled();
+      for (let turn = 1; turn <= 40; turn++) {
+        expect(state.phase).toBe('human');
+        session.move(steadyHumanMove(state));
+        state = await settled();
+      }
+      expect(state).toMatchObject({ phase: 'over', result: 'white', termination: 'resignation' });
+      expect(state.moves).toHaveLength(79);
+    }, 30_000);
+
+    it('stops a held game once the turn is played, restarting it for the next', async () => {
+      const { session, settled, logged } = open(TIMEOUTS, undefined, steady);
+      void session.newGame(level('play', 'white'));
+      await settled();
+      session.move('d2d4');
+      expect(session.stopEngineWhenIdle()).toBe(false);
+      expect(await settled()).toMatchObject(replied('d2d4'));
+      const running = () => logged.filter((line) => line.includes('running')).length;
+      expect(running()).toBe(1);
+
+      session.move('c2c4');
+      await settled();
+      expect(session.state!.moves).toHaveLength(4);
+      expect(running()).toBe(2);
+    });
+
+    describe('during the ranking', () => {
+      it('takes back a move the moment it is made, and plays on', async () => {
+        const { session, settled } = open(TIMEOUTS, undefined, steady);
+        void session.newGame(level('held', 'white'));
+        await settled();
+        session.move('e2e4');
+        session.takeBack();
+        expect(await settled()).toMatchObject({ phase: 'human', moves: [] });
+        session.move('d2d4');
+        expect(await settled()).toMatchObject(replied('d2d4'));
+      });
+
+      it('takes back a move while a child search runs, stopping it, and plays on', async () => {
+        const { session, next, settled } = open(TIMEOUTS, undefined, steady);
+        void session.newGame(level('held', 'white'));
+        await settled();
+        session.move('e2e4');
+        expect(await next()).toMatchObject({ game: { phase: 'thinking' } });
+        await sleep(100);
+        session.takeBack();
+        expect(await settled()).toMatchObject({ phase: 'human', moves: [] });
+        // A held search still running would hold every search queued behind it.
+        session.move('d2d4');
+        expect(await settled()).toMatchObject(replied('d2d4'));
+      });
+
+      it('plays nothing once the move is taken back before its choice is played', async () => {
+        let taken = false;
+        const { session, settled } = open(TIMEOUTS, undefined, () => {
+          if (!taken) session.takeBack();
+          taken = true;
+          return 0.99;
+        });
+        void session.newGame(level('play', 'white'));
+        await settled();
+        session.move('e2e4');
+        expect(await settled()).toMatchObject({ phase: 'human', moves: [] });
+        await sleep(100);
+        expect(session.state).toMatchObject({ phase: 'human', moves: [] });
+      });
+
+      it('plays nothing after the human resigns', async () => {
+        const { session, next, settled } = open(TIMEOUTS, undefined, steady);
+        void session.newGame(level('held', 'white'));
+        await settled();
+        session.move('e2e4');
+        expect(await next()).toMatchObject({ game: { phase: 'thinking' } });
+        await sleep(100);
+        session.resign();
+        const over = await settled();
+        expect(over).toMatchObject({ phase: 'over', result: 'black', moves: ['e2e4'] });
+        await sleep(100);
+        expect(session.state).toEqual(over);
+      });
+    });
+  });
 });
+
+/**
+ * A human move after which neither side's next move ends the game, so an engine that surrenders
+ * goes on doing so: the capture that gains the most, or else the first quiet move.
+ */
+function steadyHumanMove(game: GameState): string {
+  const positions = [game.startFen];
+  for (const move of game.moves)
+    positions.push((applyUciMove(positions.at(-1)!, move) as { fen: string }).fen);
+  const sign = turn(game.fen) === 'white' ? 1 : -1;
+  const moves = legalMoves(game.fen).filter(
+    (m) =>
+      !outcome([...positions, m.fen]) &&
+      legalMoves(m.fen).every((reply) => !outcome([...positions, m.fen, reply.fen])),
+  );
+  return moves.reduce((a, b) =>
+    sign * materialBalance(b.fen) > sign * materialBalance(a.fen) ? b : a,
+  ).uci;
+}

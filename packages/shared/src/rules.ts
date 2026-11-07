@@ -3,7 +3,7 @@ import { chessgroundDests } from 'chessops/compat';
 import { InvalidFen, makeFen, parseFen } from 'chessops/fen';
 import { makeSanAndPlay } from 'chessops/san';
 import { isNormal, type Role } from 'chessops/types';
-import { makeUci, opposite, parseUci, squareFile } from 'chessops/util';
+import { makeSquare, makeUci, opposite, parseUci, squareFile, squareRank } from 'chessops/util';
 import type { Color, Outcome } from './protocol.ts';
 
 export type { Role };
@@ -75,6 +75,30 @@ export function applyUciMove(fen: string, uci: string): MoveResult {
   const standard = side ? `${uci.slice(0, 2)}${side === 'h' ? 'g' : 'c'}${uci[1]}` : makeUci(move);
   pos.play(move);
   return { ok: true, fen: makeFen(pos.toSetup()), uci: standard };
+}
+
+export type LegalMove = { uci: string; fen: string };
+
+/**
+ * Every legal move in standard UCI, with the position after it: each promotion piece is a move of
+ * its own, and castling appears once. Built on `allDests`, as `legalDests` adds a second castling
+ * destination for Chessground.
+ */
+export function legalMoves(fen: string): LegalMove[] {
+  const pos = positionFromFen(fen);
+  if (typeof pos === 'string') return [];
+  const moves: LegalMove[] = [];
+  for (const [from, dests] of pos.allDests()) {
+    const pawn = pos.board.get(from)?.role === 'pawn';
+    for (const to of dests) {
+      const promotes = pawn && (squareRank(to) === 0 || squareRank(to) === 7);
+      for (const piece of promotes ? ['q', 'r', 'b', 'n'] : ['']) {
+        const result = applyUciMove(fen, `${makeSquare(from)}${makeSquare(to)}${piece}`);
+        if (result.ok) moves.push({ uci: result.uci, fen: result.fen });
+      }
+    }
+  }
+  return moves;
 }
 
 /** The SAN of each move of a game from `startFen`, stopping at any illegal move. */
