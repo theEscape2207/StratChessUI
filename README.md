@@ -49,7 +49,8 @@ Files left at the repository root by older versions are not read; move them ther
 
 ## Pairing
 
-The server prints a six-digit pairing code to its console; a browser enters it once and keeps a
+The server prints a six-digit pairing code to its console, or to `server.log` when it runs as a
+scheduled task (below); a browser enters it once and keeps a
 token. The code changes after each pairing and after five wrong attempts. Pairings are kept in
 `pairings.json` in the host directory (above); delete an entry, or the file, to revoke a browser.
 It applies the next time that browser connects.
@@ -104,6 +105,21 @@ If the page does not load:
 - The phone must be on the same subnet: a guest Wi-Fi network usually is not.
 - `unknown host` means the phone used a name the server does not know, such as `pc.fritz.box`:
   add it with `EXTRA_HOSTS=pc.fritz.box`.
+
+## Start with Windows
+
+To have the server start at boot with nobody logged on, run from an elevated PowerShell in the
+main checkout, after `npm run build`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\startup-task.ps1 -ExtraHosts pc.fritz.box
+```
+
+`-Port` and `-ExtraHosts` take the place of `PORT` and `EXTRA_HOSTS`; run the script again to
+change them, or with `-Remove` to delete the task. It registers and starts the `StratChessUI`
+task, whose settings go to `server.env` and whose output, the pairing code included, to
+`server.log`, both in the host directory; the log is replaced at each start. To update, stop the
+task (`Stop-ScheduledTask StratChessUI`, elevated), pull and build, then start it again.
 
 ## License
 

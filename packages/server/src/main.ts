@@ -6,7 +6,9 @@ import { hostDir } from './host-dir.ts';
 import { loadProfiles, ProfileError, type EngineProfile } from './engines/profiles.ts';
 import { fileStore, memoryStore, Pairings } from './pairing.ts';
 import { fakeProfile } from './uci/fake-profile.ts';
+import { logToFile } from './log-file.ts';
 
+if (process.env.LOG_FILE) logToFile(process.env.LOG_FILE);
 const port = Number(process.env.PORT ?? 8080);
 const staticRoot = fileURLToPath(new URL('../../client/dist', import.meta.url));
 const extraHosts = process.env.EXTRA_HOSTS?.split(',').filter(Boolean);
