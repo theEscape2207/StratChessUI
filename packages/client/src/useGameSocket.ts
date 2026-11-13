@@ -1,5 +1,6 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { CLOSE_CODES, type ClientMessage, type ServerMessage } from '@stratchess-ui/shared';
+import { gameSocketUrl } from './socketUrl.ts';
 
 export type Link = 'connecting' | 'connected' | 'reconnecting' | 'replaced';
 
@@ -21,7 +22,7 @@ export function useGameSocket(
   const unpaired = useEffectEvent(onUnpaired);
 
   useEffect(() => {
-    const ws = new WebSocket(`ws://${location.host}/ws?token=${encodeURIComponent(token)}`);
+    const ws = new WebSocket(gameSocketUrl(location, token));
     socket.current = ws;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     const reconnect = () => {
