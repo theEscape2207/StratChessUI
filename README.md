@@ -143,10 +143,11 @@ In the Cloudflare dashboard:
    run the `service install` command it shows from an elevated PowerShell as
    `& "C:\Program Files (x86)\cloudflared\cloudflared.exe" service install <token>`. That installs
    `cloudflared` as a service that starts with Windows. Add a route: Published application,
-   `chess.example.com`, service `http://localhost:8080`. Edit the route and turn on **Protect with
-   Access** with the team name and the AUD tag (press Enter after pasting it), so
-   `cloudflared` itself refuses a request without a valid Access token if the application is ever
-   deleted or mis-scoped.
+   `chess.example.com`, service type HTTP (not HTTPS), URL `127.0.0.1:8080` (not `localhost`,
+   which can resolve to IPv6, where the server does not listen); a wrong one shows a 502 "Host
+   error". Edit the route and turn on **Protect with Access** with the team name and the AUD tag
+   (press Enter after pasting it), so `cloudflared` itself refuses a request without a valid
+   Access token if the application is ever deleted or mis-scoped.
 
 On the host, add the hostname to the startup task's allowlist (see Start with Windows):
 
