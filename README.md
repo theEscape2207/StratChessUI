@@ -156,9 +156,9 @@ powershell -ExecutionPolicy Bypass -File scripts\startup-task.ps1 -ExtraHosts pc
 ```
 
 A player opens `https://chess.example.com`, enters their email and the PIN mailed to it, then
-pairs with the code from `server.log`. An address not in the policy gets no PIN, though the page
-says one was sent. Use that address at home too: a pairing and its game belong
-to the address they were made on, so the LAN address starts over.
+pairs with the code from `server.log`. Use that address at home too: a pairing and its game belong
+to the address they were made on, so the LAN address starts over. An address not in the policy
+gets no PIN, though the page says one was sent. Tested on iOS Safari and Android Firefox.
 
 To remove a player, take their address out of the policy and revoke their pairing (Pairing,
 above). `cloudflared` is the part facing the internet; keep it current from an elevated PowerShell
