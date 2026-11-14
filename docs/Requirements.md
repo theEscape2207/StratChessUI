@@ -16,7 +16,7 @@ separate open-source repository, and has no commercial goal.
 ## Confirmed requirements
 
 - **Platform:** local server on Windows only; engines run on the host; devices use a browser over
-  the LAN.
+  the LAN, or from anywhere through Cloudflare Access (#99).
 - **Integration:** UCI only; no coupling to engine code.
 - **Control:** one game per paired browser, so no device blocks another and two people can play at
   once. A game cannot move between devices, and two people sharing a browser share a game. At most
@@ -57,10 +57,11 @@ M2 and M3 are two views of one app, sharing game and engine handling. No configu
 | Board               | Chessground                                                                       | Lichess's board: proven touch handling on phones, arrows and square highlights for hints, PV and legal moves. Framework-neutral, so it needs a thin wrapper component            |
 | Rules               | chessops                                                                          | Same author as Chessground and designed to pair with it; FEN/SAN/UCI notation, PGN trees for later analysis. chess.js is a simpler fallback                                      |
 | Frontend            | React + Vite + TypeScript                                                         | Widest choice of UI components; Chessground removes React's board advantage, so Svelte is an equal alternative                                                                   |
-| Transport security  | Plain HTTP/WS, accepted for the home LAN                                          | Self-signed certificates on phones (iOS especially) cost more than the threat they address                                                                                       |
+| Transport security  | Plain HTTP/WS on the home LAN; HTTPS to Cloudflare for remote play                | Self-signed certificates on phones (iOS especially) cost more than the threat they address. Remote traffic is encrypted to the edge and through the tunnel to localhost          |
 | Pairing persistence | Browser keeps its token until revoked on the host                                 | One code per device, not per game                                                                                                                                                |
 | Disconnect          | Hold the game; after 60 s, end the engine process and restart it when next needed | Phones drop sockets when locked and networks drop; a game is cheap to hold, while an engine holds a slot, its Hash and a lock on its executable                                  |
 | UCI transcript      | Read-only                                                                         | Typed commands could desync the controller, which owns `position`/`go`/`stop`, and each would need the CR/LF guard and an allowlist                                              |
+| Remote access       | Cloudflare Tunnel to localhost, behind an Access email allow-list                 | No inbound port and nothing installed on a phone. Costs the domain's renewal; the Zero Trust Free plan needs a payment card on file. Tailscale is the fallback (#99, 2026-11-14) |
 | Beginner opponent   | The server scores every legal move with `go depth 1`, then chooses one by level   | Stock limits punish every blunder, even at `depth 1`. Plain UCI needs no engine change, and a level is a data change. Calibrated for StratChess only (#94, 2026-11-04)           |
 
 ## Architecture constraints (independent of stack)
@@ -79,8 +80,8 @@ M2 and M3 are two views of one app, sharing game and engine handling. No configu
 - **Bounded everything:** search duration, Threads, Hash, process count, message size, retained
   transcript; always drain stdout/stderr.
 - **Cheap network hygiene:** Windows Firewall Private profile, local subnet only; no port
-  forwarding; Host and WebSocket Origin allowlists; reject CR/LF in anything that becomes a UCI
-  command; render engine output as text. Serve built assets; never expose the Vite dev server.
+  forwarding; from outside only through the tunnel, behind Access; Host and WebSocket Origin
+  allowlists; reject CR/LF in anything that becomes a UCI command; render engine output as text. Serve built assets; never expose the Vite dev server.
 
 ## StratChess UCI behaviour the UI must handle
 
@@ -152,9 +153,10 @@ in build tooling (Vite, ESLint, TypeScript) rather than in the chess or server c
 
 - **Updates:** Dependabot opens one grouped minor/patch PR per week; merge it when CI is green.
   Take majors deliberately, one at a time. Expect two or three small migrations a year.
-- **Urgency is low.** The app is LAN-only, has no accounts and no internet exposure, so a skipped
-  month costs nothing. Quarterly is fine; `npm audit` findings are informational unless they affect
-  the server's request handling.
+- **Urgency is low.** Only the LAN and the email addresses Access lets through can reach the app,
+  so a skipped month costs nothing. Quarterly is fine; `npm audit` findings are informational
+  unless they affect the server's request handling. `cloudflared` is the exception: it faces the
+  internet, so keep it current.
 - **Node:** move to the next LTS line about every two years, before the current one reaches end
   of life.
 - **Keep the list short.** Every added package is future update work: prefer the platform and the
