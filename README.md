@@ -135,14 +135,18 @@ In the Cloudflare dashboard:
 2. **Access application:** Zero Trust → Access controls → Applications → Create new application →
    Self-hosted, public hostname `chess.example.com` (the whole hostname, no path). Session
    duration: 1 month. One policy, action Allow, Include → Emails: each player's address; no Bypass
-   policy. Login method: One-time PIN. Afterwards, copy the application's AUD tag from its
-   settings.
-3. **Tunnel:** Networking → Tunnels → Create a tunnel, Windows. Run the install command it shows
-   from an elevated prompt; it installs `cloudflared` as a service that starts with Windows. Add a
-   route: Published application, `chess.example.com`, service `http://localhost:8080`. Edit the
-   route and turn on **Protect with Access** with the team name (from
-   `<team>.cloudflareaccess.com`) and the AUD tag, so `cloudflared` itself refuses a request
-   without a valid Access token if the application is ever deleted or mis-scoped.
+   policy. Login method: One-time PIN. Under Additional settings, turn off "Show application in App
+   Launcher" (players open the hostname directly; a custom App Launcher domain fails to save) and
+   copy the "Application Audience (AUD) Tag".
+3. **Tunnel:** Networking → Tunnels → Create a tunnel, Windows. Run the installer it links; it
+   puts `cloudflared.exe` in `C:\Program Files (x86)\cloudflared` without adding it to `PATH`, so
+   run the `service install` command it shows from an elevated PowerShell as
+   `& "C:\Program Files (x86)\cloudflared\cloudflared.exe" service install <token>`. That installs
+   `cloudflared` as a service that starts with Windows. Add a route: Published application,
+   `chess.example.com`, service `http://localhost:8080`. Edit the route and turn on **Protect with
+   Access** with the team name (from `<team>.cloudflareaccess.com`) and the AUD tag, so
+   `cloudflared` itself refuses a request without a valid Access token if the application is ever
+   deleted or mis-scoped.
 
 On the host, add the hostname to the startup task's allowlist (see Start with Windows):
 
@@ -155,8 +159,9 @@ pairs with the code from `server.log`. Use that address at home too: a pairing a
 to the address they were made on, so the LAN address starts over.
 
 To remove a player, take their address out of the policy and revoke their pairing (Pairing,
-above). `cloudflared` is the part facing the internet; keep it current from an elevated prompt with
-`cloudflared update` followed by `Restart-Service cloudflared`.
+above). `cloudflared` is the part facing the internet; keep it current from an elevated PowerShell
+with `& "C:\Program Files (x86)\cloudflared\cloudflared.exe" update` followed by
+`Restart-Service cloudflared`.
 
 ## License
 
