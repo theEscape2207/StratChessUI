@@ -21,10 +21,12 @@ measure. Before adding a rule, script or doc, ask whether this project needs it.
 
 ## Threat model
 
-LAN-facing, no accounts, plain HTTP. Any device on the home network may send requests; the
-defences are the cheap ones in `docs/Requirements.md` → Architecture constraints (Host and Origin
-allowlists, pairing, profile IDs instead of paths, no CR/LF into UCI, bounded everything). A change
-that weakens one of those, or exposes the app beyond the LAN, needs the owner's agreement. Beyond
+LAN-facing, no accounts, plain HTTP; reachable from the internet only through a Cloudflare Tunnel
+behind Access, which admits listed email addresses (README → Play away from home). Any device on
+the home network may send requests; the defences are the cheap ones in `docs/Requirements.md` →
+Architecture constraints (Host and Origin allowlists, pairing, profile IDs instead of paths, no
+CR/LF into UCI, bounded everything). A change that weakens one of those, or exposes the app other
+than through Access, needs the owner's agreement. Beyond
 them, aim for robustness, not hardening against an attacker the project does not have.
 
 ## Testing

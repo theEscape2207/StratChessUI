@@ -121,6 +121,50 @@ task, whose settings go to `server.env` and whose output, the pairing code inclu
 `server.log`, both in the host directory; the log is replaced at each start. To update, stop the
 task (`Stop-ScheduledTask StratChessUI`, elevated), pull and build, then start it again.
 
+## Play away from home
+
+A Cloudflare Tunnel carries a hostname on the owner's domain to the server on localhost, and
+Cloudflare Access lets through only the email addresses listed in its policy. Nothing listens on
+the internet and phones need only a browser. It needs a domain whose nameservers point at
+Cloudflare (Free plan) and the Zero Trust Free plan, whose sign-up asks for a payment card. Below,
+`chess.example.com` stands for the chosen hostname.
+
+In the Cloudflare dashboard:
+
+1. **Login method:** Zero Trust → Integrations → Identity providers → add **One-time PIN**.
+2. **Access application:** Zero Trust → Access controls → Applications → Create new application →
+   Self-hosted, public hostname `chess.example.com` (the whole hostname, no path). Session
+   duration: 1 month. One policy, action Allow, Include → Emails: each player's address; no Bypass
+   policy. Login method: One-time PIN. Under Additional settings, turn off "Show application in App
+   Launcher" (players open the hostname directly; a custom App Launcher domain fails to save) and
+   copy the "Application Audience (AUD) Tag".
+3. **Tunnel:** Networking → Tunnels → Create a tunnel, Windows. Run the installer it links; it
+   puts `cloudflared.exe` in `C:\Program Files (x86)\cloudflared` without adding it to `PATH`, so
+   run the `service install` command it shows from an elevated PowerShell as
+   `& "C:\Program Files (x86)\cloudflared\cloudflared.exe" service install <token>`. That installs
+   `cloudflared` as a service that starts with Windows. Add a route: Published application,
+   `chess.example.com`, service type HTTP (not HTTPS), URL `127.0.0.1:8080` (not `localhost`,
+   which can resolve to IPv6, where the server does not listen); a wrong one shows a 502 "Host
+   error". Edit the route and turn on **Protect with Access** with the team name and the AUD tag
+   (press Enter after pasting it), so `cloudflared` itself refuses a request without a valid
+   Access token if the application is ever deleted or mis-scoped.
+
+On the host, add the hostname to the startup task's allowlist (see Start with Windows):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\startup-task.ps1 -ExtraHosts pc.fritz.box,chess.example.com
+```
+
+A player opens `https://chess.example.com`, enters their email and the PIN mailed to it, then
+pairs with the code from `server.log`. Use that address at home too: a pairing and its game belong
+to the address they were made on, so the LAN address starts over. An address not in the policy
+gets no PIN, though the page says one was sent. Tested on iOS Safari and Android Firefox.
+
+To remove a player, take their address out of the policy and revoke their pairing (Pairing,
+above). `cloudflared` is the part facing the internet; keep it current from an elevated PowerShell
+with `& "C:\Program Files (x86)\cloudflared\cloudflared.exe" update` followed by
+`Restart-Service cloudflared`.
+
 ## License
 
 GPL-3.0-or-later, as required by Chessground and chessops. See [LICENSE](LICENSE).
