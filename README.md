@@ -144,7 +144,7 @@ In the Cloudflare dashboard:
    `& "C:\Program Files (x86)\cloudflared\cloudflared.exe" service install <token>`. That installs
    `cloudflared` as a service that starts with Windows. Add a route: Published application,
    `chess.example.com`, service `http://localhost:8080`. Edit the route and turn on **Protect with
-   Access** with the team name (from `<team>.cloudflareaccess.com`) and the AUD tag, so
+   Access** with the team name and the AUD tag (press Enter after pasting it), so
    `cloudflared` itself refuses a request without a valid Access token if the application is ever
    deleted or mis-scoped.
 
