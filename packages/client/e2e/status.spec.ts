@@ -112,6 +112,38 @@ test('says a game in play is safe through the whole retry', async ({ page }) => 
   await expect(status(page)).toHaveText(safe);
 });
 
+test('offers a reload only while reconnecting keeps failing', async ({ page }) => {
+  const reload = page.getByRole('button', { name: 'Reload' });
+  let up = false;
+  let connections = 0;
+  let open: WebSocketRoute;
+  await scriptedServer(page, (ws, n) => {
+    connections = n;
+    if (!up) return void ws.close({ code: 1011 });
+    open = ws;
+    sendGame(ws, GAME);
+  });
+  // Counting connections, not time: a first drop that offered the reload would show it sooner.
+  await expect(reload).toBeVisible({ timeout: 15_000 });
+  expect(connections).toBeGreaterThanOrEqual(3);
+
+  up = true;
+  await expectYourMove(page);
+  await expect(reload).toHaveCount(0);
+
+  // A connection that opened starts the count again; its own drop is the first failure.
+  up = false;
+  const before = connections;
+  await open!.close({ code: 1011 });
+  await expect(reload).toBeVisible({ timeout: 15_000 });
+  expect(connections - before).toBeGreaterThanOrEqual(2);
+
+  up = true;
+  await Promise.all([page.waitForEvent('load'), reload.click()]);
+  await expectYourMove(page);
+  await expect(reload).toHaveCount(0);
+});
+
 test('a finished game does not claim to be safe while disconnected', async ({ page }) => {
   let first: WebSocketRoute;
   await scriptedServer(page, (ws, n) => {

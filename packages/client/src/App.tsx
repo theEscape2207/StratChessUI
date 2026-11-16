@@ -166,7 +166,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
     setUndoSent(false);
     setResignAsked(false);
   };
-  const { link, send, retry } = useGameSocket(
+  const { link, stalled, send, retry } = useGameSocket(
     token,
     (msg) => {
       if (msg.type === 'hello') {
@@ -257,6 +257,11 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
           {link === 'replaced' && (
             <button type="button" onClick={retry}>
               Play here
+            </button>
+          )}
+          {stalled && (
+            <button type="button" onClick={() => location.reload()}>
+              Reload
             </button>
           )}
           {notice && (
