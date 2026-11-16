@@ -15,6 +15,7 @@
 // `--hold-depth=<n>` as well, only a `go depth <n>` does.
 // With `--loss=<uci>:<cp>[,...]`, the scored modes score a position that move led to as so much
 // better for the side to move: the move lost that much.
+// With `--hash-max=<MiB>`, advertises a different Hash upper bound.
 import { createInterface } from 'node:readline';
 import {
   applyUciMove,
@@ -44,7 +45,7 @@ const HANDSHAKE = [
   'id name StratChess',
   'id author Thees',
   'option name Threads type spin default 1 min 1 max 32',
-  'option name Hash type spin default 192 min 1 max 1536',
+  `option name Hash type spin default 192 min 1 max ${arg('hash-max') ?? '1536'}`,
   'option name SingularExtensions type check default true',
   'option name Contempt type spin default 0 min 0 max 100',
 ];

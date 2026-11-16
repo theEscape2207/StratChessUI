@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { START_FEN } from '@stratchess-ui/shared';
+import { LIMITS, parseProfiles, ProfileError } from '../engines/profiles.ts';
 import {
   EngineError,
   PositionRejectedError,
@@ -16,7 +17,17 @@ let engine: UciEngine | undefined;
 afterEach(async () => {
   await engine?.quit();
   engine = undefined;
+  vi.restoreAllMocks();
 });
+
+async function startFromRawOptions(options: unknown, args: string[] = []): Promise<UciEngine> {
+  const [parsed] = parseProfiles(
+    { engines: [{ ...profile('normal', {}, args), options }] },
+    process.cwd(),
+  );
+  engine = await UciEngine.start(parsed!, FAST);
+  return engine;
+}
 
 describe('UciEngine', () => {
   it('completes the handshake and reads the announced options', async () => {
@@ -28,6 +39,70 @@ describe('UciEngine', () => {
       max: 1536,
     });
     expect(engine.transcript()).toContain('> setoption name Threads value 2');
+  });
+
+  describe('raw profile resource options', () => {
+    for (const [threads, hash] of [
+      ['Threads', 'Hash'],
+      ['threads', 'hash'],
+      ['tHrEaDs', 'HASH'],
+    ] as const) {
+      it.each([
+        [16, 1200],
+        ['16', '1200'],
+        [64, 4096],
+        ['6.4e1', '0x1000'],
+      ])(`caps ${threads}=%s and ${hash}=%s before setoption`, async (t, h) => {
+        const running = await startFromRawOptions({ [threads]: t, [hash]: h });
+        expect(running.transcript().filter((line) => line.startsWith('> setoption'))).toEqual([
+          `> setoption name ${threads} value ${LIMITS.maxThreads}`,
+          `> setoption name ${hash} value ${LIMITS.maxHashMiB}`,
+        ]);
+        expect(running.transcript()).toContain('< readyok');
+      });
+    }
+
+    it.each([
+      [2, 64],
+      ['2', '64'],
+      [' 2 ', '0x40'],
+      [LIMITS.maxThreads, LIMITS.maxHashMiB],
+    ])('preserves valid resources %s/%s and unrelated options through startup', async (t, h) => {
+      const running = await startFromRawOptions({
+        Threads: t,
+        Hash: h,
+        Contempt: '10',
+        SingularExtensions: false,
+      });
+      expect(running.transcript().filter((line) => line.startsWith('> setoption'))).toEqual([
+        `> setoption name Threads value ${Number(t)}`,
+        `> setoption name Hash value ${Number(h)}`,
+        '> setoption name Contempt value 10',
+        '> setoption name SingularExtensions value false',
+      ]);
+    });
+
+    it.each([
+      { Threads: 1, threads: 16 },
+      { threads: '16', Threads: 1 },
+      { Hash: 16, HASH: '1200' },
+      { HASH: '1200', hash: 16 },
+      { Threads: 2, THREADS: 2 },
+      { Hash: 64, hash: 64 },
+    ])('rejects duplicate resources before startup: %j', async (options) => {
+      const start = vi.spyOn(UciEngine, 'start');
+      const [first, second] = Object.keys(options);
+      await expect(startFromRawOptions(options)).rejects.toThrow(
+        new ProfileError(`engines[0].options.${second}: duplicates resource option ${first}`),
+      );
+      expect(start).not.toHaveBeenCalled();
+    });
+
+    it('retains announced-range validation after parsing a resource value', async () => {
+      await expect(startFromRawOptions({ Hash: '1200' }, ['--hash-max=512'])).rejects.toThrow(
+        'option Hash=1024 outside 1..512',
+      );
+    });
   });
 
   it('refuses an option the engine does not announce, or one out of range', async () => {
