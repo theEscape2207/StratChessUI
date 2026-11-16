@@ -27,6 +27,8 @@ export type NewGameRequest = {
   humanColor: Color;
   engineId: string;
   fen?: string;
+  /** Asks for a verdict on each of the human's moves. */
+  analysis?: true;
 } & Strength;
 
 export type ClientMessage =
@@ -51,6 +53,9 @@ export type Termination =
 
 export type Outcome = { result: Color | 'draw'; termination: Termination };
 
+/** How a move of the human's compares with the engine's best, by the win chance it gave up. */
+export type Verdict = 'best' | 'excellent' | 'inaccuracy' | 'mistake' | 'blunder';
+
 export type GameState = {
   /** The position the game started from, normalised. */
   startFen: string;
@@ -69,6 +74,13 @@ export type GameState = {
   termination?: Termination;
   /** Set when the game ended for another reason, such as an engine failure. */
   reason?: string;
+  /** The game was asked for verdicts. */
+  analysis?: true;
+  /**
+   * With `analysis`, one entry per move: `null` for the engine's moves, and for a move of the
+   * human's that has no verdict, or none yet.
+   */
+  verdicts?: (Verdict | null)[];
 } & Strength;
 
 /**
@@ -162,6 +174,8 @@ export function parseClientMessage(raw: string): ClientMessage | undefined {
     engineId: msg.engineId,
     ...strength,
   };
+  if (msg.analysis === true) request.analysis = true;
+  else if (msg.analysis !== undefined) return undefined;
   if (msg.fen === undefined) return { type: 'new-game', ...request };
   if (typeof msg.fen !== 'string' || msg.fen.length > MAX_FEN_LENGTH) return undefined;
   return { type: 'new-game', ...request, fen: msg.fen };

@@ -63,6 +63,7 @@ M2 and M3 are two views of one app, sharing game and engine handling. No configu
 | UCI transcript      | Read-only                                                                         | Typed commands could desync the controller, which owns `position`/`go`/`stop`, and each would need the CR/LF guard and an allowlist                                              |
 | Remote access       | Cloudflare Tunnel to localhost, behind an Access email allow-list                 | No inbound port and nothing installed on a phone. Costs the domain's renewal; the Zero Trust Free plan needs a payment card on file. Tailscale is the fallback (#99, 2026-11-14) |
 | Beginner opponent   | The server scores every legal move with `go depth 1`, then chooses one by level   | Stock limits punish every blunder, even at `depth 1`. Plain UCI needs no engine change, and a level is a data change. Calibrated for StratChess only (#94, 2026-11-04)           |
+| Move verdicts       | The game's own engine searches before and after each human move; off unless asked | The opponent's search is too weak to judge; a second process takes a slot and a Hash. Win chance given up decides: raw pawns fault a pawn lost in a won game (#91, 2026-11-16)   |
 
 ## Architecture constraints (independent of stack)
 
@@ -100,6 +101,10 @@ progress`). The controller must send `stop` and wait for `bestmove` before the n
   a threefold repetition by history as a draw at the root, so the rules decide that too.
 - **`stop` only cancels a search already running.** A turn made of several searches, like the
   beginner opponent's, must check before each one that a takeback or resignation has not ended it.
+- **`ucinewgame` clears the hash**, which otherwise lasts from one search to the next. A level's
+  depth-1 scores change when a deeper search has left its results there, so the server sends it
+  before a level's turn that follows analysis. It also resets the board, which costs nothing as
+  every search sends its position.
 - Supported limits: `wtime/btime/winc/binc/movestogo`, `depth`, `movetime`, `nodes`, `infinite`.
   No `ponder`, `mate` or `searchmoves`.
 - Options: Threads, Hash, plus tuning options from `SearchTuning.def`. No MultiPV, Chess960 or

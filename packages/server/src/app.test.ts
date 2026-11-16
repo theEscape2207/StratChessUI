@@ -492,6 +492,29 @@ describe('server', () => {
     expect(restarted!.alive).toBe(true);
   });
 
+  it('sends a reconnecting browser its verdicts, and judges on once the engine restarts', async () => {
+    const judged = fakeProfile('scored', {}, ['--loss=e2e4:200']);
+    await build({ graceMs: 20, profiles: [judged] });
+    const start = vi.spyOn(UciEngine, 'start');
+    const token = await pairedToken();
+    const client = await connect(app, token);
+    client.send({ ...NEW_GAME, analysis: true });
+    await client.yourMove();
+    client.send({ type: 'move', uci: 'e2e4' });
+    expect(await client.yourMove()).toMatchObject({ verdicts: ['blunder', null] });
+    const [stopped] = await startedEngines(start);
+    client.ws.terminate();
+    await engineStopped(stopped!);
+
+    const { client: again, game } = await reconnect(token);
+    expect(game).toMatchObject({ analysis: true, verdicts: ['blunder', null] });
+    again.send({ type: 'move', uci: 'd2d4' });
+    expect(await again.yourMove()).toMatchObject({
+      verdicts: ['blunder', null, 'excellent', null],
+    });
+    expect(start).toHaveBeenCalledTimes(2);
+  });
+
   it('forgets a browser with no game when its grace period runs out', async () => {
     const lines: string[] = [];
     await build({ graceMs: 20, log: (text) => lines.push(text) });

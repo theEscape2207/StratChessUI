@@ -48,13 +48,21 @@ export class PositionRejectedError extends EngineError {}
 /** The search was stopped or replaced by a newer one; its `bestmove` was discarded. */
 export class SearchCancelledError extends Error {}
 
-export type SearchRequest = { fen: string; moves?: readonly string[]; limit: SearchLimit };
+export type SearchRequest = {
+  fen: string;
+  moves?: readonly string[];
+  limit: SearchLimit;
+  /** Stops a search without a move time still running then, sooner than `maxSearchMs` would. */
+  capMs?: number;
+};
 
 export type SearchResult = {
   generation: number;
   bestMove: string;
   /** Last info line with a score, if the engine sent one. */
   info?: SearchInfo;
+  /** The search had to be stopped: a depth search's result is then from a shallower depth. */
+  capped: boolean;
 };
 
 type Waiter = {
@@ -167,6 +175,17 @@ export class UciEngine {
     return run;
   }
 
+  /** Clears the engine's hash with `ucinewgame`, once the searches asked for so far are done. */
+  clearHash(): Promise<void> {
+    const run = this.queue.then(async () => {
+      if (this.exitError) throw this.exitError;
+      this.send('ucinewgame');
+      await this.ready();
+    });
+    this.queue = run.catch(() => {});
+    return run;
+  }
+
   /** Cancels the running search, if any, and resolves once the engine is idle again. */
   async stop(): Promise<void> {
     this.generation++;
@@ -265,7 +284,7 @@ export class UciEngine {
     const hardLimitMs =
       'movetimeMs' in request.limit
         ? request.limit.movetimeMs + this.timeouts.stopGraceMs
-        : this.timeouts.maxSearchMs;
+        : Math.min(request.capMs ?? Infinity, this.timeouts.maxSearchMs);
     const hardStop = setTimeout(() => this.sendStop(search), hardLimitMs);
     let line: string;
     try {
@@ -289,7 +308,7 @@ export class UciEngine {
     if (!bestMove || bestMove === '(none)' || bestMove === '0000') {
       throw this.error(`engine returned no move: ${line}`);
     }
-    return { generation, bestMove, info: last };
+    return { generation, bestMove, info: last, capped: search.stopSent };
   }
 
   private checkLimit(limit: SearchLimit): SearchLimit {

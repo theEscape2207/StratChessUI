@@ -61,6 +61,15 @@ describe('protocol', () => {
     expect(request(42)).toBeUndefined();
   });
 
+  it('accepts a request for analysis only as true, and carries none unless asked', () => {
+    const base = { type: 'new-game', humanColor: 'white', engineId: 'x', level: 2 };
+    const request = (analysis: unknown) =>
+      parseClientMessage(JSON.stringify({ ...base, analysis }));
+    expect(request(true)).toEqual({ ...base, analysis: true });
+    expect(request(undefined)).toEqual(base);
+    for (const analysis of [false, 'true', 1, null]) expect(request(analysis)).toBeUndefined();
+  });
+
   it('accepts a resignation, dropping anything sent with it', () => {
     const raw = JSON.stringify({ type: 'resign', result: 'white' });
     expect(parseClientMessage(raw)).toEqual({ type: 'resign' });
