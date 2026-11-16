@@ -54,7 +54,7 @@ export function NewGameForm({ engines, hidden, onStart, onCancel, submitRef }: N
   const [engineId, setEngineId] = useState(engines[0]?.id ?? '');
   const [kind, setKind] = useState<LimitKind>(engines[0]?.levels ? 'level' : 'movetimeMs');
   const [value, setValue] = useState(LIMIT_DEFAULTS[kind]);
-  const [analysis, setAnalysis] = useState(false);
+  const [analysis, setAnalysis] = useState(true);
   const [fen, setFen] = useState('');
   const [fenError, setFenError] = useState('');
   const range = RANGES[kind];
@@ -165,7 +165,7 @@ export function NewGameForm({ engines, hidden, onStart, onCancel, submitRef }: N
       </label>
       <label className="check-field">
         <input type="checkbox" checked={analysis} onChange={(e) => setAnalysis(e.target.checked)} />
-        Judge my moves
+        Move Feedback
       </label>
       <label className="fen-field">
         Start position (FEN, empty for the standard one)

@@ -15,7 +15,7 @@ import {
 // one as a mate and anything else by material, so any other move gives up a won game: a blunder.
 const MATE_IN_ONE = '6k1/5ppp/8/8/8/8/r4PPP/1R4K1 w - - 0 1';
 
-const judge = (page: Page) => page.getByLabel('Judge my moves');
+const feedback = (page: Page) => page.getByLabel('Move Feedback');
 const boardBadge = (page: Page) => page.getByTestId('board-badge');
 const listBadges = (page: Page) => page.getByTestId('moves').getByTestId('quality-badge');
 const listed = (page: Page, side: 'white' | 'black', verdict: string) =>
@@ -31,7 +31,7 @@ async function newGameFrom(page: Page, fen: string, analysis: boolean) {
   await page.getByRole('combobox', { name: 'Engine' }).selectOption('fake-play');
   await page.getByRole('combobox', { name: 'Limit' }).selectOption('depth');
   await page.getByLabel('Start position').fill(fen);
-  await judge(page).setChecked(analysis);
+  await feedback(page).setChecked(analysis);
   await submitNewGame(page);
   // The game this browser resumed can read "your move" too, so wait for the new one's position.
   await expectFen(page, fen);
@@ -86,19 +86,19 @@ test('with the checkbox off, no move has a verdict', async ({ page, hasTouch }) 
   await expect(page.getByTestId('quality-badge')).toHaveCount(0);
 });
 
-test('the new game asks for verdicts only when checked, and keeps the choice', async ({ page }) => {
+test('the new game asks for verdicts unless unchecked, and keeps the choice', async ({ page }) => {
   const server = await scriptedServer(page);
   await showNewGameForm(page);
-  await expect(judge(page)).not.toBeChecked();
+  await expect(feedback(page)).toBeChecked();
   await submitNewGame(page);
   await expect.poll(() => server.newGames.length).toBe(1);
-  expect(server.newGames[0]).not.toHaveProperty('analysis');
+  expect(server.newGames[0]).toHaveProperty('analysis', true);
 
-  await judge(page).check();
+  await feedback(page).uncheck();
   await submitNewGame(page);
   await expect.poll(() => server.newGames.length).toBe(2);
-  expect(server.newGames[1]).toHaveProperty('analysis', true);
-  await expect(judge(page)).toBeChecked();
+  expect(server.newGames[1]).not.toHaveProperty('analysis');
+  await expect(feedback(page)).not.toBeChecked();
 });
 
 test("the board shows the human's latest verdict until the engine captures there", async ({

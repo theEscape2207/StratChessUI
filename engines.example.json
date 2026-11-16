@@ -1,19 +1,19 @@
 {
   "engines": [
     {
-      "id": "stratchess",
-      "name": "StratChess",
-      "executable": "engines/stratchess-0.9.0/StratChess-0.9.0-windows-x64.exe",
-      "cwd": "engines/stratchess-0.9.0",
-      "options": { "Threads": 2, "Hash": 256 }
-    },
-    {
       "id": "stratchess-play",
-      "name": "StratChess (Play)",
+      "name": "Beginner",
       "executable": "engines/stratchess-0.9.0/StratChess-0.9.0-windows-x64.exe",
       "cwd": "engines/stratchess-0.9.0",
       "options": { "Threads": 1, "Hash": 16 },
       "levels": true
+    },
+    {
+      "id": "stratchess",
+      "name": "Advanced",
+      "executable": "engines/stratchess-0.9.0/StratChess-0.9.0-windows-x64.exe",
+      "cwd": "engines/stratchess-0.9.0",
+      "options": { "Threads": 2, "Hash": 256 }
     }
   ]
 }

@@ -13,6 +13,7 @@ import {
   showNewGameForm,
   START,
   tapSquare,
+  turnOffFeedback,
 } from './helpers.ts';
 
 // Each test resumes whatever game its server last held; New game replaces it.
@@ -86,6 +87,7 @@ test("shows the engine's UCI lines in a panel that starts collapsed", async ({
   page,
   hasTouch,
 }) => {
+  await turnOffFeedback(page);
   await newGame(page);
   const transcript = page.getByTestId('transcript');
   await expect(transcript.getByRole('listitem').first()).toBeHidden();
