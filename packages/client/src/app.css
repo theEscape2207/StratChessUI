@@ -131,6 +131,53 @@ main {
   color: var(--board-light);
 }
 
+.quality-badge {
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  font: 800 10px / 1 var(--font-sans);
+  color: var(--q-ink);
+}
+
+.quality-badge.best {
+  color: var(--on-accent);
+  background: var(--q-best);
+}
+
+.quality-badge.excellent {
+  background: var(--q-excellent);
+}
+
+.quality-badge.inaccuracy {
+  background: var(--q-inaccuracy);
+}
+
+.quality-badge.mistake {
+  background: var(--q-mistake);
+}
+
+.quality-badge.blunder {
+  color: var(--on-accent);
+  background: var(--q-blunder);
+}
+
+/* On the square's top-right corner, 8px out, but never past the board's edge: on a phone the board
+   spans the page, so a badge out there would scroll it sideways. */
+.board-badge {
+  --size: 20px;
+  position: absolute;
+  left: min(calc((var(--column) + 1) * 12.5% + 8px - var(--size)), calc(100% - var(--size)));
+  top: max(calc(var(--row) * 12.5% - 8px), 0px);
+  z-index: var(--z-badge);
+  pointer-events: none;
+}
+
+.board-badge .quality-badge {
+  width: var(--size);
+  height: var(--size);
+  box-shadow: var(--shadow-badge);
+}
+
 /* Over the board; a tap outside the pieces cancels the move. */
 .promotion.cg-wrap {
   position: absolute;
@@ -474,6 +521,15 @@ main.game {
   background: var(--panel-raised);
 }
 
+.move-list .quality-badge {
+  display: inline-grid;
+  width: 16px;
+  height: 16px;
+  margin-right: var(--space-2);
+  font-size: 9px;
+  vertical-align: middle;
+}
+
 .actions {
   display: grid;
   grid-auto-flow: column;
@@ -783,6 +839,21 @@ button:disabled {
   font: var(--text-body);
   color: var(--ink);
   background: var(--bg);
+}
+
+.new-game .check-field {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--control-min-height);
+}
+
+.new-game .check-field input {
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  margin: 0;
+  accent-color: var(--accent);
 }
 
 /* The side picker as a two-way segmented control; each radio covers its own segment. */

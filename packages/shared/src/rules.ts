@@ -3,7 +3,15 @@ import { chessgroundDests } from 'chessops/compat';
 import { InvalidFen, makeFen, parseFen } from 'chessops/fen';
 import { makeSanAndPlay } from 'chessops/san';
 import { isNormal, type Role } from 'chessops/types';
-import { makeSquare, makeUci, opposite, parseUci, squareFile, squareRank } from 'chessops/util';
+import {
+  makeSquare,
+  makeUci,
+  opposite,
+  parseSquare,
+  parseUci,
+  squareFile,
+  squareRank,
+} from 'chessops/util';
 import type { Color, Outcome } from './protocol.ts';
 
 export type { Role };
@@ -137,6 +145,14 @@ export function capturedPieces(startFen: string, moves: readonly string[]): Reco
     pos.play(move);
   }
   return taken;
+}
+
+/** The colour of the piece on `square`, such as `e4`; undefined when empty or the FEN is bad. */
+export function pieceColorAt(fen: string, square: string): Color | undefined {
+  const pos = positionFromFen(fen);
+  const sq = parseSquare(square);
+  if (typeof pos === 'string' || sq === undefined) return undefined;
+  return pos.board.get(sq)?.color;
 }
 
 const PIECE_VALUES: Record<Role, number> = {

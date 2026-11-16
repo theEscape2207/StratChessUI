@@ -45,14 +45,16 @@ type NewGameFormProps = {
 };
 
 /**
- * Side, engine, search limit or level, and an optional start position. Limits and levels are shown
- * as what they are, never as Elo. The FEN is checked here for feedback; the server checks it again.
+ * Side, engine, search limit or level, verdicts, and an optional start position. Limits and levels
+ * are shown as what they are, never as Elo. The FEN is checked here for feedback; the server checks
+ * it again.
  */
 export function NewGameForm({ engines, hidden, onStart, onCancel, submitRef }: NewGameFormProps) {
   const [humanColor, setHumanColor] = useState<Color>('white');
   const [engineId, setEngineId] = useState(engines[0]?.id ?? '');
   const [kind, setKind] = useState<LimitKind>(engines[0]?.levels ? 'level' : 'movetimeMs');
   const [value, setValue] = useState(LIMIT_DEFAULTS[kind]);
+  const [analysis, setAnalysis] = useState(false);
   const [fen, setFen] = useState('');
   const [fenError, setFenError] = useState('');
   const range = RANGES[kind];
@@ -73,11 +75,17 @@ export function NewGameForm({ engines, hidden, onStart, onCancel, submitRef }: N
     event.preventDefault();
     const bounded = Math.min(range.max, Math.max(range.min, Math.round(value)));
     setValue(bounded);
-    const strength = strengthOf(kind, bounded);
-    if (!fen.trim()) return onStart({ humanColor, engineId, ...strength });
+    // The server accepts only `true`; off is the key left out.
+    const request = {
+      humanColor,
+      engineId,
+      ...strengthOf(kind, bounded),
+      ...(analysis && { analysis }),
+    };
+    if (!fen.trim()) return onStart(request);
     const start = parseStartFen(fen);
     if (!start.ok) return setFenError(start.reason);
-    onStart({ humanColor, engineId, ...strength, fen: start.fen });
+    onStart({ ...request, fen: start.fen });
   };
 
   const changeKind = (next: LimitKind) => {
@@ -154,6 +162,10 @@ export function NewGameForm({ engines, hidden, onStart, onCancel, submitRef }: N
             onChange={(e) => setValue(Number(e.target.value))}
           />
         )}
+      </label>
+      <label className="check-field">
+        <input type="checkbox" checked={analysis} onChange={(e) => setAnalysis(e.target.checked)} />
+        Judge my moves
       </label>
       <label className="fen-field">
         Start position (FEN, empty for the standard one)

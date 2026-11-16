@@ -7,6 +7,7 @@ import {
   materialBalance,
   outcome,
   parseStartFen,
+  pieceColorAt,
   sanMoves,
   START_FEN,
   turn,
@@ -239,5 +240,13 @@ describe('rules', () => {
     expect(materialBalance('4k3/2nb4/8/8/8/8/P7/3QK3 w - - 0 1')).toBe(4);
     expect(materialBalance('4k3/8/8/8/8/8/8/r3K3 w - - 0 1')).toBe(-5);
     expect(materialBalance('not a fen')).toBe(0);
+  });
+
+  it('tells the colour of the piece on a square, if any', () => {
+    expect(pieceColorAt(START_FEN, 'e2')).toBe('white');
+    expect(pieceColorAt(START_FEN, 'h8')).toBe('black');
+    expect(pieceColorAt(START_FEN, 'e4')).toBeUndefined();
+    expect(pieceColorAt(START_FEN, 'z9')).toBeUndefined();
+    expect(pieceColorAt('not a fen', 'e2')).toBeUndefined();
   });
 });
