@@ -328,6 +328,8 @@ export class GameSession {
   private stopEngine(game: Game): void {
     void game.engine?.quit();
     game.engine = undefined;
+    // Its position search is cancelled, and may settle only after a restarted engine's move asks.
+    if (game.analysis) game.analysis.running = undefined;
   }
 
   /**

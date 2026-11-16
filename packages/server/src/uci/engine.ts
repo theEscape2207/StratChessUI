@@ -52,7 +52,7 @@ export type SearchRequest = {
   fen: string;
   moves?: readonly string[];
   limit: SearchLimit;
-  /** Stops a depth search still running then, sooner than `maxSearchMs` would. */
+  /** Stops a search without a move time still running then, sooner than `maxSearchMs` would. */
   capMs?: number;
 };
 
