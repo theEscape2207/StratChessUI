@@ -160,6 +160,9 @@ pairs with the code from `server.log`. Use that address at home too: a pairing a
 to the address they were made on, so the LAN address starts over. An address not in the policy
 gets no PIN, though the page says one was sent. Tested on iOS Safari and Android Firefox.
 
+When the Access session runs out, an open page can no longer reconnect and offers **Reload**,
+which leads to the login; the game is still there afterwards.
+
 To remove a player, take their address out of the policy and revoke their pairing (Pairing,
 above). `cloudflared` is the part facing the internet; keep it current from an elevated PowerShell
 with `& "C:\Program Files (x86)\cloudflared\cloudflared.exe" update` followed by
