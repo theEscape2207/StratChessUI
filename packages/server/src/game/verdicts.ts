@@ -1,7 +1,7 @@
 // Verdicts on the human's moves: how much win chance a move gave up against the engine's best. The
 // scores come from two searches of the game's own engine, one of the position before the move and
 // one of the position after it.
-import type { Verdict } from '@stratchess-ui/shared';
+import { START_FEN, type Verdict } from '@stratchess-ui/shared';
 
 /**
  * The analysis searches, the curve and the thresholds. The steepness is Lichess's, fitted to
@@ -13,6 +13,7 @@ export const ANALYSIS: {
   capMs: number;
   steepness: number;
   excellentBelow: number;
+  openingMoves: number;
   drops: readonly { verdict: Verdict; from: number }[];
 } = {
   /**
@@ -25,6 +26,8 @@ export const ANALYSIS: {
   steepness: 0.00368208,
   /** A move other than the best that drops less than this, in percentage points, is excellent. */
   excellentBelow: 2,
+  /** The human's first moves from the standard start that get no praise, only faults. */
+  openingMoves: 6,
   /** The smallest drop for each verdict, in percentage points, worst first. */
   drops: [
     { verdict: 'blunder', from: 15 },
@@ -49,4 +52,19 @@ export function verdictOf(bestCp: number, playedCp: number): Verdict | undefined
   const drop = winChance(bestCp) - winChance(playedCp);
   if (drop < ANALYSIS.excellentBelow) return 'excellent';
   return ANALYSIS.drops.find(({ from }) => drop >= from)?.verdict;
+}
+
+/**
+ * The verdict to show for the move at `ply`: none for praise in the opening, where every sensible
+ * move is close to the engine's best. A game from another position has no opening.
+ */
+export function withoutOpeningPraise(
+  verdict: Verdict | undefined,
+  startFen: string,
+  ply: number,
+): Verdict | undefined {
+  const praise = verdict === 'best' || verdict === 'excellent';
+  // Either colour's own moves so far: white moves first from the standard start.
+  const opening = startFen === START_FEN && Math.floor(ply / 2) < ANALYSIS.openingMoves;
+  return praise && opening ? undefined : verdict;
 }

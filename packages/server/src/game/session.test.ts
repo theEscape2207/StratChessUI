@@ -18,6 +18,7 @@ import type { Timeouts } from '../uci/engine.ts';
 import { fakeProfile } from '../uci/fake-profile.ts';
 import { EngineSlots } from './engine-slots.ts';
 import { GameSession } from './session.ts';
+import { ANALYSIS } from './verdicts.ts';
 
 const PROFILES = [
   'legal',
@@ -1108,10 +1109,13 @@ describe('GameSession', () => {
   });
 
   describe('verdicts', () => {
-    const analysed = (engineId: string): NewGameRequest => ({
+    const analysed = (engineId: string, fen?: string): NewGameRequest => ({
       ...game(engineId, 'white'),
       analysis: true,
+      fen,
     });
+    // The standard start but for its castling rights: the same moves, in a game with no opening.
+    const NO_OPENING = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1';
     const BEST = legalMoves(START_FEN)[0]!.uci;
     const lines = (session: GameSession) => session.takeTranscript()!.map((line) => line.text);
     const sent = (session: GameSession, command: string) =>
@@ -1145,11 +1149,45 @@ describe('GameSession', () => {
       ['h2h4', 'blunder'],
     ])('judges %s as %s, searching the reply to any move but the best', async (move, verdict) => {
       const { session, settled } = open();
-      void session.newGame(analysed('judged'));
+      void session.newGame(analysed('judged', NO_OPENING));
       expect(await settled()).toMatchObject({ analysis: true, verdicts: [] });
       session.move(move);
       expect((await settled()).verdicts).toEqual([verdict, null]);
       expect(sent(session, 'go depth 9')).toBe(move === BEST ? 0 : 1);
+    });
+
+    describe('from the standard start', () => {
+      it.each([
+        [BEST, null],
+        ['a2a3', null],
+        ['b2b3', null],
+        ['c2c3', 'inaccuracy'],
+        ['h2h4', 'blunder'],
+      ])('judges %s in the opening as %s: faults only', async (move, verdict) => {
+        const { session, settled } = open();
+        void session.newGame(analysed('judged'));
+        await settled();
+        session.move(move);
+        expect((await settled()).verdicts).toEqual([verdict, null]);
+      });
+
+      it.each(['white', 'black'] as const)(
+        "praises the best move again once %s's opening moves are played",
+        async (humanColor) => {
+          const { session, settled } = open();
+          void session.newGame({ ...analysed('judged'), humanColor });
+          let state = await settled();
+          for (let own = 0; own <= ANALYSIS.openingMoves; own++) {
+            session.move(legalMoves(state.fen)[0]!.uci);
+            state = await settled();
+          }
+          expect(state.phase).toBe('human');
+          const ownVerdicts = state.verdicts!.filter(
+            (_, ply) => (ply % 2 === 0) === (humanColor === 'white'),
+          );
+          expect(ownVerdicts).toEqual([...Array(ANALYSIS.openingMoves).fill(null), 'best']);
+        },
+      );
     });
 
     it('publishes the move at once, then the verdict, then lets the opponent search', async () => {
@@ -1208,7 +1246,7 @@ describe('GameSession', () => {
     describe('in a level game', () => {
       const steady = () => 0.99;
       const level = (humanColor: NewGameRequest['humanColor'], analysis?: true) =>
-        ({ engineId: 'judged', humanColor, level: 5, analysis }) as NewGameRequest;
+        ({ engineId: 'judged', humanColor, level: 5, analysis, fen: NO_OPENING }) as NewGameRequest;
 
       it("clears the hash before each of the opponent's turns that follows analysis", async () => {
         const { session, settled } = open(TIMEOUTS, undefined, steady);
@@ -1261,7 +1299,7 @@ describe('GameSession', () => {
 
       it('forgets the searches of the turns it removes, which other moves may reach', async () => {
         const { session, settled } = open();
-        void session.newGame(analysed('judged'));
+        void session.newGame(analysed('judged', NO_OPENING));
         await settled();
         session.move('e2e4');
         const stale = legalMoves((await settled()).fen)[0]!.uci;
@@ -1305,7 +1343,7 @@ describe('GameSession', () => {
 
       it("during the next turn's position search stops it, and the game plays on", async () => {
         const { session, settled } = open();
-        void session.newGame(analysed('held-position'));
+        void session.newGame(analysed('held-position', NO_OPENING));
         await settled();
         session.move('e2e4');
         expect((await settled()).verdicts).toEqual(['excellent', null]);
@@ -1324,7 +1362,7 @@ describe('GameSession', () => {
         ["the next turn's position search", 'held-position', 10, 2, ['excellent', null]],
       ] as const)('during %s ends the game there', async (_, engineId, depth, count, verdicts) => {
         const { session, take } = open();
-        void session.newGame(analysed(engineId));
+        void session.newGame(analysed(engineId, NO_OPENING));
         await take((msg) => msg.type === 'game' && msg.game.phase === 'human');
         session.move('e2e4');
         await searching(session, depth, count);
@@ -1379,7 +1417,7 @@ describe('GameSession', () => {
 
     it('gives no verdict to a move whose position search was capped, which it waits for', async () => {
       const { session, settled } = open({ ...TIMEOUTS, maxSearchMs: 300 });
-      void session.newGame(analysed('held-position'));
+      void session.newGame(analysed('held-position', NO_OPENING));
       await settled();
       session.move('e2e4');
       await settled();
