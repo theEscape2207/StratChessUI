@@ -22,12 +22,14 @@ import { MoveList } from './MoveList.tsx';
 import { NewGameForm } from './NewGameForm.tsx';
 import { PairForm } from './PairForm.tsx';
 import { PlayerStrip } from './PlayerStrip.tsx';
+import { BoardBadge } from './QualityBadge.tsx';
 import { ResignButton, ResignPrompt } from './Resign.tsx';
 import { SearchInfo } from './SearchInfo.tsx';
 import { materialLead, strengthLabel, stripChip } from './strip.ts';
 import { Transcript } from './Transcript.tsx';
 import { UndoButton } from './UndoButton.tsx';
 import { useGameSocket, type Link } from './useGameSocket.ts';
+import { boardVerdict } from './verdicts.ts';
 
 const TOKEN_KEY = 'pairing-token';
 
@@ -218,6 +220,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
   const formHidden = playing && !formOpen;
   // Replays the game, so once per game state rather than on each search line.
   const strips = useMemo(() => playerStrips(game), [game]);
+  const verdict = game && boardVerdict(game);
   const status = statusLine(link, game, gameOverOpen);
 
   return (
@@ -235,6 +238,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
           }
           onMove={(uci) => send({ type: 'move', uci })}
         >
+          {verdict && <BoardBadge {...verdict} orientation={humanColor} />}
           {gameOverOpen && game?.phase === 'over' && (
             <GameOverDialog
               {...gameOverText(game)}
@@ -274,7 +278,11 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
       <aside className="sidebar" aria-label="Game">
         <h2 className="sidebar-title">{game ? `Play ${game.engineName}` : 'New game'}</h2>
         {game && search && <SearchInfo fen={search.fen} info={search.info} />}
-        <MoveList startFen={game?.startFen ?? START_FEN} moves={game?.moves ?? []} />
+        <MoveList
+          startFen={game?.startFen ?? START_FEN}
+          moves={game?.moves ?? []}
+          verdicts={game?.verdicts}
+        />
         {game && resignAsked && (
           <ResignPrompt
             disabled={link !== 'connected'}

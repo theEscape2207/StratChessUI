@@ -18,6 +18,7 @@ same design system. Piece images live in the design system and are hidden here.
 | [EvalBar](EvalBar/README.md)                 | Evaluation bar beside the board        |
 | [PlayerStrip](PlayerStrip/README.md)         | Rows above and below the board         |
 | [GameOverDialog](GameOverDialog/README.md)   | Over the board when the game ends      |
+| [QualityBadge](QualityBadge/README.md)       | Verdict on a move, board and move list |
 
 The design's game lifecycle: each stage shows only its own actions.
 

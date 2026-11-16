@@ -107,9 +107,9 @@ export async function playAndAwaitReply(page: Page, uci: string, touch: boolean,
   await expectYourMove(page);
 }
 
-/** The move list shows exactly these moves in SAN, white's and black's in turn. */
+/** The move list shows exactly these moves in SAN, white's and black's in turn, verdicts aside. */
 export async function expectMoves(page: Page, sans: string[]) {
-  await expect(page.getByTestId('moves').locator('.white, .black')).toHaveText(sans);
+  await expect(page.getByTestId('moves').locator('.san')).toHaveText(sans);
 }
 
 const SCRIPTED_GAME: GameState = {

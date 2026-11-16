@@ -1,0 +1,20 @@
+<!-- @dsCard group="Analysis" height=96 subtitle="All five verdicts" -->
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../../../packages/client/src/tokens.css"><style>img[src^="/_blob/"] { visibility: hidden; }</style><style>
+  body { margin: 0; padding: 16px; background: var(--panel); color: var(--ink); font-family: var(--font-sans); display: flex; flex-wrap: wrap; gap: var(--space-5); }
+  .item { display: flex; align-items: center; gap: var(--space-3); font-size: 13px; font-weight: 600; }
+  .b { width: var(--badge-size); height: var(--badge-size); border-radius: var(--radius-full); display: grid; place-items: center;
+    font: 800 12px/1 var(--font-sans); box-shadow: var(--shadow-badge); }
+  .best { background: var(--q-best); color: var(--on-accent); }
+  .excellent { background: var(--q-excellent); color: var(--q-ink); }
+  .inaccuracy { background: var(--q-inaccuracy); color: var(--q-ink); }
+  .mistake { background: var(--q-mistake); color: var(--q-ink); }
+  .blunder { background: var(--q-blunder); color: var(--on-accent); }
+</style></head>
+<body>
+  <span class="item"><span class="b best">★</span>Best</span>
+  <span class="item"><span class="b excellent">!</span>Excellent</span>
+  <span class="item"><span class="b inaccuracy">?!</span>Inaccuracy</span>
+  <span class="item"><span class="b mistake">?</span>Mistake</span>
+  <span class="item"><span class="b blunder">??</span>Blunder</span>
+</body></html>
