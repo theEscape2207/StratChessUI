@@ -11,7 +11,10 @@
 //   scored          scores a position by material for the side to move, plus `--bias=<cp>`, or as
 //                   `mate 1` when it has one; a mated or stalemated root answers `bestmove 0000`
 //   scoreless       like scored, but its info line has no score
-// With `--hold=<uci>`, a `go` for a position whose moves include that move runs until `stop`.
+// With `--hold=<uci>`, a `go` for a position whose moves include that move runs until `stop`; with
+// `--hold-depth=<n>` as well, only a `go depth <n>` does.
+// With `--loss=<uci>:<cp>[,...]`, the scored modes score a position that move led to as so much
+// better for the side to move: the move lost that much.
 import { createInterface } from 'node:readline';
 import {
   applyUciMove,
@@ -27,6 +30,14 @@ const arg = (name: string) => process.argv.find((a) => a.startsWith(`--${name}=`
 const mode = arg('mode') ?? 'normal';
 const bias = Number(arg('bias') ?? 0);
 const hold = arg('hold');
+const holdDepth = arg('hold-depth');
+const losses = new Map(
+  (arg('loss') ?? '')
+    .split(',')
+    .filter(Boolean)
+    .map((loss) => loss.split(':'))
+    .map(([uci, cp]) => [uci!, Number(cp)]),
+);
 const scored = mode === 'scored' || mode === 'scoreless';
 
 const HANDSHAKE = [
@@ -81,9 +92,15 @@ function finishScored() {
   }
   const mates = moves.some((m) => outcome([m.fen])?.termination === 'checkmate');
   const material = (turn(fen) === 'white' ? 1 : -1) * materialBalance(fen) * 100 + bias;
-  const score = mode === 'scoreless' ? '' : mates ? ' score mate 1' : ` score cp ${material}`;
+  const lost = losses.get(movesOf(position).at(-1) ?? '') ?? 0;
+  const score =
+    mode === 'scoreless' ? '' : mates ? ' score mate 1' : ` score cp ${material + lost}`;
   out(`info depth 1 seldepth 1${score} nodes 1 pv ${moves[0]!.uci}`);
   out(`bestmove ${moves[0]!.uci}`);
+}
+
+function movesOf(command: string): string[] {
+  return command.split(' moves ')[1]?.split(' ') ?? [];
 }
 
 /** Plays a `position` command's moves, failing on any StratChess would reject. */
@@ -178,7 +195,8 @@ createInterface({ input: process.stdin }).on('line', (line) => {
     case 'go': {
       if (mode === 'crash-on-go' || position.includes(CRASH)) process.exit(3);
       searching = {};
-      if (hold && position.split(' moves ')[1]?.split(' ').includes(hold)) break;
+      const held = hold !== undefined && movesOf(position).includes(hold);
+      if (held && (!holdDepth || line === `go depth ${holdDepth}`)) break;
       if (scored) {
         finishSearch();
         break;

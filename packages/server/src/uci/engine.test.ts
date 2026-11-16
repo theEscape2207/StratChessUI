@@ -95,6 +95,26 @@ describe('UciEngine', () => {
     expect((await engine.search({ fen: START_FEN, limit: { depth: 1 } })).bestMove).toBe('b1c3');
   });
 
+  it('stops a depth search at a cap of its own, well inside the host cap, and says so', async () => {
+    // The host cap is a minute; the fake searches any position after 1.e4 until it is stopped.
+    engine = await UciEngine.start(profile('normal', {}, ['--hold=e2e4']), FAST);
+    const capped = { fen: START_FEN, limit: { depth: 3 }, capMs: 100 };
+    expect(await engine.search({ ...capped, moves: ['e2e4'] })).toMatchObject({
+      bestMove: 'g8f6',
+      capped: true,
+    });
+    expect((await engine.search(capped)).capped).toBe(false);
+  });
+
+  it('clears the hash with ucinewgame, once the search asked for before it is done', async () => {
+    engine = await UciEngine.start(profile(), FAST);
+    const searched = engine.search({ fen: START_FEN, limit: { depth: 3 } });
+    await engine.clearHash();
+    expect((await searched).bestMove).toBe('b1c3');
+    const lines = engine.transcript();
+    expect(lines.slice(-4)).toEqual(['< bestmove b1c3', '> ucinewgame', '> isready', '< readyok']);
+  });
+
   it('treats a rejected FEN or move list as an error, not a search of the start position', async () => {
     engine = await UciEngine.start(profile(), FAST);
     await expect(engine.search({ fen: '8/8/8/8 w', limit: { depth: 1 } })).rejects.toBeInstanceOf(

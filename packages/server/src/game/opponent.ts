@@ -91,7 +91,8 @@ export async function rankMoves(
   return ranked.sort((a, b) => b.scoreCp - a.scoreCp);
 }
 
-function decidedCp(result: Color | 'draw', mover: Color): number {
+/** The score for `mover` of a position the rules decide, on `scoreCp`'s scale. */
+export function decidedCp(result: Color | 'draw', mover: Color): number {
   if (result === 'draw') return 0;
   return result === mover ? MATE_CP : -MATE_CP;
 }

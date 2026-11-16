@@ -43,6 +43,25 @@ PROFILES.push(
   })),
   { ...fakeProfile('scoreless'), id: 'scoreless', levels: true },
 );
+// The verdict profiles. Scored, so the start position is even and its best move the first legal
+// one; each of these moves then loses so many centipawns. The held ones hold one of the two analysis
+// searches, which differ in depth, of any position after 1.e4.
+const LOSSES = { a2a3: 10, b2b3: 30, c2c3: 60, d2d3: 120, h2h4: 200 };
+const LOSS_ARG = `--loss=${Object.entries(LOSSES)
+  .map(([uci, cp]) => `${uci}:${cp}`)
+  .join(',')}`;
+const VERDICT_PROFILES = {
+  judged: [LOSS_ARG],
+  'held-position': [LOSS_ARG, '--hold=e2e4', '--hold-depth=10'],
+  'held-reply': [LOSS_ARG, '--hold=e2e4', '--hold-depth=9'],
+};
+PROFILES.push(
+  ...Object.entries(VERDICT_PROFILES).map(([id, args]) => ({
+    ...fakeProfile('scored', {}, args),
+    id,
+    levels: true,
+  })),
+);
 // A cold Node spawn of the fake can take well over 300 ms on a Windows CI runner.
 const TIMEOUTS = { handshakeMs: 2000, readyMs: 1000, stopGraceMs: 300 };
 
@@ -1085,6 +1104,289 @@ describe('GameSession', () => {
         await sleep(100);
         expect(session.state).toEqual(over);
       });
+    });
+  });
+
+  describe('verdicts', () => {
+    const analysed = (engineId: string): NewGameRequest => ({
+      ...game(engineId, 'white'),
+      analysis: true,
+    });
+    const BEST = legalMoves(START_FEN)[0]!.uci;
+    const lines = (session: GameSession) => session.takeTranscript()!.map((line) => line.text);
+    const sent = (session: GameSession, command: string) =>
+      session.takeTranscript()!.filter((l) => l.dir === 'sent' && l.text === command).length;
+    /** Waits until the engine has answered this many searches, the last of which is then in. */
+    const answered = (session: GameSession, searches: number) =>
+      vi.waitFor(() =>
+        expect(lines(session).filter((text) => text.startsWith('bestmove'))).toHaveLength(searches),
+      );
+    /** Waits until this many searches to the depth have reached the engine. */
+    const searching = (session: GameSession, depth: number, searches: number) =>
+      vi.waitFor(() => expect(sent(session, `go depth ${depth}`)).toBe(searches));
+
+    it('gives none, and searches nothing of its own, unless the game asks for them', async () => {
+      const { session, settled } = open();
+      void session.newGame(game('judged', 'white'));
+      await settled();
+      session.move('h2h4');
+      const state = await settled();
+      expect(state.moves).toHaveLength(2);
+      expect('analysis' in state || 'verdicts' in state).toBe(false);
+      expect(lines(session).filter((text) => /^go depth (9|10)$/.test(text))).toEqual([]);
+    });
+
+    it.each([
+      [BEST, 'best'],
+      ['a2a3', 'excellent'],
+      ['b2b3', null],
+      ['c2c3', 'inaccuracy'],
+      ['d2d3', 'mistake'],
+      ['h2h4', 'blunder'],
+    ])('judges %s as %s, searching the reply to any move but the best', async (move, verdict) => {
+      const { session, settled } = open();
+      void session.newGame(analysed('judged'));
+      expect(await settled()).toMatchObject({ analysis: true, verdicts: [] });
+      session.move(move);
+      expect((await settled()).verdicts).toEqual([verdict, null]);
+      expect(sent(session, 'go depth 9')).toBe(move === BEST ? 0 : 1);
+    });
+
+    it('publishes the move at once, then the verdict, then lets the opponent search', async () => {
+      const { session, settled, nextAny } = open();
+      void session.newGame(analysed('judged'));
+      await settled();
+      session.move('h2h4');
+      const events: unknown[] = [];
+      for (;;) {
+        const msg = await nextAny();
+        if (msg.type === 'transcript') {
+          const searches = msg.lines.filter((l) => /^go depth (9|3)$/.test(l.text));
+          events.push(...searches.map((l) => l.text));
+        }
+        if (msg.type !== 'game') continue;
+        events.push([msg.game.phase, msg.game.verdicts]);
+        if (msg.game.phase === 'human') break;
+      }
+      expect(events).toEqual([
+        ['thinking', [null]],
+        'go depth 9',
+        ['thinking', ['blunder']],
+        'go depth 3',
+        ['human', ['blunder', null]],
+      ]);
+    });
+
+    it('sends no search lines of its own, leaving the eval bar to the opponent', async () => {
+      const { session, settled, untilSettled } = open();
+      void session.newGame(analysed('judged'));
+      await settled();
+      await answered(session, 1);
+      expect(session.search).toBeUndefined();
+      session.move('h2h4');
+      const fens = searches(await untilSettled()).map((msg) => (msg as { fen: string }).fen);
+      expect(new Set(fens)).toEqual(
+        new Set([(applyUciMove(START_FEN, 'h2h4') as { fen: string }).fen]),
+      );
+    });
+
+    it('judges a move that ends the game by its result, with no reply search', async () => {
+      // White mates on f8, or stalemates on f7.
+      const { session, settled } = open();
+      void session.newGame({ ...analysed('judged'), fen: '7k/8/6K1/8/8/8/8/5Q2 w - - 0 1' });
+      await settled();
+      await answered(session, 1);
+      session.move('f1f7');
+      expect(await settled()).toMatchObject({
+        phase: 'over',
+        termination: 'stalemate',
+        verdicts: ['blunder'],
+      });
+      expect(sent(session, 'go depth 9')).toBe(0);
+    });
+
+    describe('in a level game', () => {
+      const steady = () => 0.99;
+      const level = (humanColor: NewGameRequest['humanColor'], analysis?: true) =>
+        ({ engineId: 'judged', humanColor, level: 5, analysis }) as NewGameRequest;
+
+      it("clears the hash before each of the opponent's turns that follows analysis", async () => {
+        const { session, settled } = open(TIMEOUTS, undefined, steady);
+        void session.newGame(level('black', true));
+        await settled();
+        // The opponent opened, with nothing analysed yet.
+        expect(sent(session, 'ucinewgame')).toBe(0);
+        session.move('e7e5');
+        expect((await settled()).verdicts).toEqual([null, 'excellent', null]);
+        const sentLines = session.takeTranscript()!.filter((l) => l.dir === 'sent');
+        expect(sentLines.map((l) => l.text).filter((t) => /^(go|ucinewgame)/.test(t))).toEqual([
+          'go depth 10',
+          'go depth 9',
+          'ucinewgame',
+        ]);
+      });
+
+      it('leaves the hash alone without analysis', async () => {
+        const { session, settled } = open(TIMEOUTS, undefined, steady);
+        void session.newGame(level('white'));
+        await settled();
+        session.move('e2e4');
+        expect((await settled()).moves).toHaveLength(2);
+        expect(sent(session, 'ucinewgame')).toBe(0);
+      });
+    });
+
+    it('leaves the hash alone in a limit game, analysis or not', async () => {
+      const { session, settled } = open();
+      void session.newGame(analysed('judged'));
+      await settled();
+      session.move('h2h4');
+      expect((await settled()).verdicts).toEqual(['blunder', null]);
+      expect(sent(session, 'ucinewgame')).toBe(0);
+    });
+
+    describe('takeback', () => {
+      it('drops the verdicts with their moves, searching nothing for the turn it returns to', async () => {
+        const { session, settled } = open();
+        void session.newGame(analysed('judged'));
+        await settled();
+        session.move('h2h4');
+        expect((await settled()).verdicts).toEqual(['blunder', null]);
+        session.takeBack();
+        expect(await settled()).toMatchObject({ moves: [], verdicts: [] });
+        session.move('d2d3');
+        expect((await settled()).verdicts).toEqual(['mistake', null]);
+        expect(sent(session, `position fen ${START_FEN}`)).toBe(1);
+      });
+
+      it('forgets the searches of the turns it removes, which other moves may reach', async () => {
+        const { session, settled } = open();
+        void session.newGame(analysed('judged'));
+        await settled();
+        session.move('e2e4');
+        const stale = legalMoves((await settled()).fen)[0]!.uci;
+        // Its own position search, the reply search, the opponent's, and the next turn's.
+        await answered(session, 4);
+        session.takeBack();
+        await settled();
+        session.move(BEST);
+        const fresh = legalMoves((await settled()).fen)[0]!.uci;
+        expect(fresh).not.toBe(stale);
+        session.move(fresh);
+        expect((await settled()).verdicts).toEqual(['best', null, 'best', null]);
+      });
+
+      it('judges a move replayed straight after one taken back during its position search', async () => {
+        const { session, settled } = open();
+        void session.newGame(analysed('judged'));
+        await settled();
+        // The search has not reached the engine yet, so the first move waits for it.
+        session.move('h2h4');
+        session.takeBack();
+        session.move('h2h4');
+        expect(await settled()).toMatchObject({ moves: [], verdicts: [] });
+        expect((await settled()).verdicts).toEqual(['blunder', null]);
+      });
+
+      it('during a reply search leaves no verdict behind, and the game plays on', async () => {
+        const { session, next, settled } = open();
+        void session.newGame(analysed('held-reply'));
+        await settled();
+        session.move('e2e4');
+        expect(await next()).toMatchObject({ game: { phase: 'thinking', verdicts: [null] } });
+        await searching(session, 9, 1);
+        session.takeBack();
+        expect(await settled()).toMatchObject({ phase: 'human', moves: [], verdicts: [] });
+        session.move('h2h4');
+        const state = await settled();
+        expect(state).toMatchObject({ phase: 'human', verdicts: ['blunder', null] });
+        expect(state.moves).toHaveLength(2);
+      });
+
+      it("during the next turn's position search stops it, and the game plays on", async () => {
+        const { session, settled } = open();
+        void session.newGame(analysed('held-position'));
+        await settled();
+        session.move('e2e4');
+        expect((await settled()).verdicts).toEqual(['excellent', null]);
+        await searching(session, 10, 2);
+        session.takeBack();
+        expect(await settled()).toMatchObject({ phase: 'human', moves: [], verdicts: [] });
+        // A held search still running would hold the reply search queued behind it.
+        session.move('h2h4');
+        expect((await settled()).verdicts).toEqual(['blunder', null]);
+      });
+    });
+
+    describe('resign', () => {
+      it.each([
+        ['a reply search', 'held-reply', 9, 1, [null]],
+        ["the next turn's position search", 'held-position', 10, 2, ['excellent', null]],
+      ] as const)('during %s ends the game there', async (_, engineId, depth, count, verdicts) => {
+        const { session, take } = open();
+        void session.newGame(analysed(engineId));
+        await take((msg) => msg.type === 'game' && msg.game.phase === 'human');
+        session.move('e2e4');
+        await searching(session, depth, count);
+        session.resign();
+        const over = await take((msg) => msg.type === 'game' && msg.game.phase === 'over');
+        expect(over).toMatchObject({ game: { termination: 'resignation', verdicts } });
+        await sleep(100);
+        expect(session.state).toEqual((over as { game: GameState }).game);
+      });
+    });
+
+    it('searches the position first for a move that restarts a stopped engine', async () => {
+      const { session, settled, logged } = open();
+      void session.newGame(analysed('judged'));
+      await settled();
+      // Stopping the engine cancels the position search, which has not reached it yet.
+      expect(session.stopEngineWhenIdle()).toBe(true);
+      session.move('h2h4');
+      expect((await settled()).verdicts).toEqual(['blunder', null]);
+      expect(logged.filter((line) => line.includes('running'))).toHaveLength(2);
+    });
+
+    it('searches nothing at a takeback while a held game restarts its engine', async () => {
+      const { session, settled } = open();
+      void session.newGame(analysed('judged'));
+      await settled();
+      session.move('h2h4');
+      expect((await settled()).verdicts).toEqual(['blunder', null]);
+      // Stopping the engine cancels this turn's position search, so the takeback finds none kept.
+      expect(session.stopEngineWhenIdle()).toBe(true);
+      session.move('d2d3');
+      session.takeBack();
+      const back = await settled();
+      expect(back).toMatchObject({ phase: 'human', verdicts: ['blunder', null] });
+      await sleep(100);
+      expect(session.state).toEqual(back);
+      session.move('d2d3');
+      expect((await settled()).verdicts).toEqual(['blunder', null, 'mistake', null]);
+    });
+
+    it('gives no verdict from a reply search stopped at its cap, logs it, and plays on', async () => {
+      // The engine's own limit is a minute, so only the analysis cap ends this search in time.
+      const { session, settled, logged } = open();
+      void session.newGame(analysed('held-reply'));
+      await settled();
+      session.move('e2e4');
+      const state = await settled();
+      expect(state.verdicts).toEqual([null, null]);
+      expect(state.moves).toHaveLength(2);
+      expect(logged).toContain('StratChess (fake): analysis to depth 9 capped at 2000 ms');
+    }, 15_000);
+
+    it('gives no verdict to a move whose position search was capped, which it waits for', async () => {
+      const { session, settled } = open({ ...TIMEOUTS, maxSearchMs: 300 });
+      void session.newGame(analysed('held-position'));
+      await settled();
+      session.move('e2e4');
+      await settled();
+      session.move('h2h4');
+      expect((await settled()).verdicts).toEqual(['excellent', null, null, null]);
+      // With no best move to compare with, the reply is not searched either.
+      expect(sent(session, 'go depth 9')).toBe(1);
     });
   });
 });
