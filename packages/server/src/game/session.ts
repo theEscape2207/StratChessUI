@@ -34,7 +34,7 @@ import {
 import { searchReport } from './search-report.ts';
 import { Throttle } from './throttle.ts';
 import { TranscriptFeed } from './transcript.ts';
-import { ANALYSIS, verdictOf } from './verdicts.ts';
+import { ANALYSIS, verdictOf, withoutOpeningPraise } from './verdicts.ts';
 
 export type SessionOptions = {
   profiles: readonly EngineProfile[];
@@ -421,10 +421,7 @@ export class GameSession {
       if (this.turnIsGone(game, moves)) return false;
       verdict = reply ? verdictOf(best.cp, -reply.cp) : undefined;
     }
-    if (verdict) {
-      this.setVerdict(game, ply, verdict);
-      this.publish(game);
-    }
+    if (this.setVerdict(game, ply, verdict)) this.publish(game);
     return true;
   }
 
@@ -442,11 +439,15 @@ export class GameSession {
       moves[ply] === best.bestMove
         ? 'best'
         : verdictOf(best.cp, decidedCp(ended.result, humanColor));
-    if (verdict) this.setVerdict(game, ply, verdict);
+    this.setVerdict(game, ply, verdict);
   }
 
-  private setVerdict(game: Game, ply: number, verdict: Verdict): void {
+  /** Records the verdict the move at `ply` is to show, if any; false if it shows none. */
+  private setVerdict(game: Game, ply: number, judged: Verdict | undefined): boolean {
+    const verdict = withoutOpeningPraise(judged, game.state.startFen, ply);
+    if (!verdict) return false;
     game.state = { ...game.state, verdicts: game.state.verdicts!.with(ply, verdict) };
+    return true;
   }
 
   private async engineMove(game: Game): Promise<void> {

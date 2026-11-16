@@ -493,7 +493,7 @@ describe('server', () => {
   });
 
   it('sends a reconnecting browser its verdicts, and judges on once the engine restarts', async () => {
-    const judged = fakeProfile('scored', {}, ['--loss=e2e4:200']);
+    const judged = fakeProfile('scored', {}, ['--loss=e2e4:200,d2d4:120']);
     await build({ graceMs: 20, profiles: [judged] });
     const start = vi.spyOn(UciEngine, 'start');
     const token = await pairedToken();
@@ -510,7 +510,7 @@ describe('server', () => {
     expect(game).toMatchObject({ analysis: true, verdicts: ['blunder', null] });
     again.send({ type: 'move', uci: 'd2d4' });
     expect(await again.yourMove()).toMatchObject({
-      verdicts: ['blunder', null, 'excellent', null],
+      verdicts: ['blunder', null, 'mistake', null],
     });
     expect(start).toHaveBeenCalledTimes(2);
   });
