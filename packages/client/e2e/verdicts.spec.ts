@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './fixtures.ts';
 import {
+  expectFen,
   expectMoves,
   expectYourMove,
   openSettled,
@@ -32,6 +33,8 @@ async function newGameFrom(page: Page, fen: string, analysis: boolean) {
   await page.getByLabel('Start position').fill(fen);
   await judge(page).setChecked(analysis);
   await submitNewGame(page);
+  // The game this browser resumed can read "your move" too, so wait for the new one's position.
+  await expectFen(page, fen);
   await expectYourMove(page);
 }
 
