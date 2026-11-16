@@ -81,20 +81,43 @@ function parseProfile(raw: unknown, where: string, baseDir: string): EngineProfi
     executable: absolute(text('executable', true))!,
     args: args as string[],
     cwd: absolute(text('cwd', false)),
-    options: capOptions(options as Record<string, OptionValue>),
+    options: capOptions(options as Record<string, OptionValue>, `${where}.options`),
     levels: p.levels === true,
   };
 }
 
 /** Clamps the options every engine shares to the host caps. */
-function capOptions(options: Record<string, OptionValue>): Record<string, OptionValue> {
+function capOptions(
+  options: Record<string, OptionValue>,
+  where: string,
+): Record<string, OptionValue> {
   const capped = { ...options };
-  for (const [name, max] of [
-    ['Threads', LIMITS.maxThreads],
-    ['Hash', LIMITS.maxHashMiB],
-  ] as const) {
-    const value = capped[name];
-    if (typeof value === 'number' && value > max) capped[name] = max;
+  const seen = new Map<string, string>();
+  for (const [name, value] of Object.entries(options)) {
+    const resource = name.toLowerCase();
+    const max =
+      resource === 'threads'
+        ? LIMITS.maxThreads
+        : resource === 'hash'
+          ? LIMITS.maxHashMiB
+          : undefined;
+    if (max === undefined) continue;
+    const previous = seen.get(resource);
+    if (previous !== undefined) {
+      throw new ProfileError(`${where}.${name}: duplicates resource option ${previous}`);
+    }
+    seen.set(resource, name);
+    const numeric = Number(value);
+    if (
+      (typeof value !== 'number' && typeof value !== 'string') ||
+      (typeof value === 'string' && (value.trim() === '' || /[\r\n\0]/.test(value))) ||
+      !Number.isInteger(numeric) ||
+      numeric < 1
+    ) {
+      throw new ProfileError(`${where}.${name}: expected a positive integer number or string`);
+    }
+    // Engines must receive the same integer we validated, even for exponent or hex strings.
+    capped[name] = Math.min(numeric, max);
   }
   return capped;
 }

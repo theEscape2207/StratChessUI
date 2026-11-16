@@ -38,6 +38,64 @@ describe('engine profiles', () => {
     expect(profile!.levels).toBe(true);
   });
 
+  it.each(['Threads', 'hAsH'])(
+    'rejects invalid %s values with the profile field identified',
+    (name) => {
+      for (const value of [
+        true,
+        false,
+        '',
+        ' \t ',
+        0,
+        -1,
+        1.5,
+        4096.5,
+        NaN,
+        Infinity,
+        -Infinity,
+        'NaN',
+        'Infinity',
+        'many',
+        '0',
+        '-1',
+        '1.5',
+        '4096.5',
+        '8\r',
+        '8\n',
+        '8\0',
+        null,
+        [],
+        {},
+      ]) {
+        expect(() =>
+          parseProfiles(
+            { engines: [{ id: 'x', executable: 'e', options: { [name]: value } }] },
+            BASE,
+          ),
+        ).toThrow(`engines[0].options.${name}`);
+      }
+    },
+  );
+
+  it('leaves unrelated option types and case variants unchanged without mutating raw options', () => {
+    const options = {
+      Threads: '64',
+      Hash: '4096',
+      Contempt: '10',
+      contempt: 20,
+      SingularExtensions: false,
+      Style: 'quiet',
+    };
+    const [profile] = parseProfiles({ engines: [{ id: 'x', executable: 'e', options }] }, BASE);
+    expect(profile!.options).toEqual({
+      ...options,
+      Threads: LIMITS.maxThreads,
+      Hash: LIMITS.maxHashMiB,
+    });
+    expect(options.Threads).toBe('64');
+    expect(options.Hash).toBe('4096');
+  });
+
   it('rejects malformed profiles with the field at fault', () => {
     expect(() => parseProfiles({}, BASE)).toThrow('expected { "engines"');
     expect(() => parseProfiles({ engines: [{ id: 'x' }] }, BASE)).toThrow('engines[0].executable');
