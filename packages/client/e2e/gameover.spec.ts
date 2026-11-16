@@ -10,6 +10,7 @@ import {
   playMove,
   showNewGameForm,
   submitNewGame,
+  turnOffFeedback,
 } from './helpers.ts';
 
 test.beforeEach(async ({ page }) => openSettled(page));
@@ -56,6 +57,7 @@ test("stops with the server's reason when the engine fails, and a scrim tap clos
   page,
   hasTouch,
 }) => {
+  await turnOffFeedback(page);
   await newGameFrom(page, CRASH);
   await expectYourMove(page);
   await playMove(page, 'e2e4', hasTouch);

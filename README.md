@@ -64,8 +64,8 @@ or a move needing a restart, is refused with a reason.
 
 Engines are configured on the host only, in `engines.json` in the host directory (copy
 `engines.example.json`). Relative paths resolve against the file. Threads and Hash are capped by
-the server. The server logs each engine's `id name` when it starts, so a log shows which build ran,
-and the engine's strip shows it during a game.
+the server. The new-game form starts on the first profile. The server logs each engine's `id name`
+when it starts, so a log shows which build ran, and the engine's strip shows it during a game.
 
 A profile with `"levels": true` also plays the beginner opponent's levels, which are calibrated for
 StratChess only. Point it at the same release as the normal profile: adopting a release rechecks

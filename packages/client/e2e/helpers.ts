@@ -64,6 +64,15 @@ export async function showNewGameForm(page: Page) {
   if (await reveal.isVisible()) await reveal.click();
 }
 
+/**
+ * For a test of the opponent's own searches: with feedback on, the engine also searches on the
+ * human's turn, and its lines join the transcript.
+ */
+export async function turnOffFeedback(page: Page) {
+  await showNewGameForm(page);
+  await page.getByLabel('Move Feedback').uncheck();
+}
+
 /** The form's submit, not the game-over dialog's New game, which only opens the form. */
 export async function submitNewGame(page: Page) {
   await page.locator('form.new-game').getByRole('button', { name: 'New game' }).click();
