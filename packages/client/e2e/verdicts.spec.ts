@@ -130,3 +130,20 @@ test("the board shows the human's latest verdict until the engine captures there
   await expect(listed(page, 'black', 'mistake')).toHaveText('?');
   await expect(boardBadge(page)).toHaveCount(0);
 });
+
+test('a game black opens keeps each verdict on its own move in the list', async ({ page }) => {
+  const server = await scriptedServer(page);
+  // From the position after 1. e4: 1... e5 2. Nf3, the human playing white.
+  server.game({
+    startFen: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
+    humanColor: 'white',
+    moves: ['e7e5', 'g1f3'],
+    verdicts: [null, 'inaccuracy'],
+    fen: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2',
+    lastMove: 'g1f3',
+    phase: 'thinking',
+  });
+  await expectMoves(page, ['e5', 'Nf3']);
+  await expect(listBadges(page)).toHaveCount(1);
+  await expect(listed(page, 'white', 'inaccuracy')).toHaveText('?!');
+});
