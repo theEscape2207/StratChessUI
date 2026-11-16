@@ -5,10 +5,14 @@ import { gameSocketUrl } from './socketUrl.ts';
 export type Link = 'connecting' | 'connected' | 'reconnecting' | 'replaced';
 
 const RETRY_MS = 2000;
+const STALLED_AFTER = 3;
 
 /**
  * The game WebSocket for a paired browser. A dropped socket is retried, so a phone that locks gets
  * its game back; a socket the server closed on purpose is not.
+ *
+ * `stalled` says the retries keep failing. Retrying cannot get past an expired Cloudflare Access
+ * session: the upgrade is answered with a redirect to the login, which only a page load follows.
  */
 export function useGameSocket(
   token: string,
@@ -18,6 +22,7 @@ export function useGameSocket(
   const socket = useRef<WebSocket | undefined>(undefined);
   const [link, setLink] = useState<Link>('connecting');
   const [attempt, setAttempt] = useState(0);
+  const [failures, setFailures] = useState(0);
   const received = useEffectEvent(onMessage);
   const unpaired = useEffectEvent(onUnpaired);
 
@@ -33,13 +38,17 @@ export function useGameSocket(
     const onVisible = () => {
       if (!document.hidden && retryTimer !== undefined) reconnect();
     };
-    ws.onopen = () => setLink('connected');
+    ws.onopen = () => {
+      setLink('connected');
+      setFailures(0);
+    };
     ws.onmessage = (event: MessageEvent<string>) =>
       received(JSON.parse(event.data) as ServerMessage);
     ws.onclose = (event) => {
       if (event.code === CLOSE_CODES.notPaired) return unpaired();
       if (event.code === CLOSE_CODES.replaced) return setLink('replaced');
       setLink('reconnecting');
+      setFailures((f) => f + 1);
       retryTimer = setTimeout(reconnect, RETRY_MS);
     };
     document.addEventListener('visibilitychange', onVisible);
@@ -56,5 +65,5 @@ export function useGameSocket(
     setLink('connecting');
     setAttempt((a) => a + 1);
   };
-  return { link, send, retry };
+  return { link, stalled: failures >= STALLED_AFTER, send, retry };
 }
