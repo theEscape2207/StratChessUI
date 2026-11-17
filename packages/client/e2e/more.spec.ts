@@ -3,6 +3,7 @@ import { expect, test } from './fixtures.ts';
 import {
   expectFen,
   expectYourMove,
+  moreSummary as summary,
   openSettled,
   playAndAwaitReply,
   submitNewGame,
@@ -11,8 +12,6 @@ import {
 test.use({ more: 'untouched' });
 test.beforeEach(async ({ page }) => openSettled(page));
 
-const more = (page: Page) => page.getByTestId('more');
-const summary = (page: Page) => more(page).getByText('More', { exact: true });
 const searchLine = (page: Page) => page.getByLabel('Show engine search line');
 const startPosition = (page: Page) => page.getByLabel('Start position');
 
@@ -54,6 +53,7 @@ test('the search line shows once asked for, and More stays as it was left', asyn
 
   // The page keeps no search across a reload, so the engine has to report another.
   await page.reload();
+  await expect(searchLine(page)).toBeVisible();
   await expect(searchLine(page)).toBeChecked();
   await playAndAwaitReply(page, 'd2d4', hasTouch);
   await expect(page.getByTestId('search')).toBeVisible();

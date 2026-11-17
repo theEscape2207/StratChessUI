@@ -75,11 +75,14 @@ export async function turnOffFeedback(page: Page) {
 
 /** For a browser that started without the fixture's stored choice, such as a fresh pairing. */
 export async function openMore(page: Page) {
-  const more = page.getByTestId('more');
-  if (!(await more.evaluate((el: HTMLDetailsElement) => el.open))) {
-    await more.getByText('More', { exact: true }).click();
+  if (!(await page.getByTestId('more').evaluate((el: HTMLDetailsElement) => el.open))) {
+    await moreSummary(page).click();
   }
 }
+
+/** Opens or closes More. */
+export const moreSummary = (page: Page) =>
+  page.getByTestId('more').getByText('More', { exact: true });
 
 /** The form's submit, not the game-over dialog's New game, which only opens the form. */
 export async function submitNewGame(page: Page) {

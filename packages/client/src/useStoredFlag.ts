@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 function read(key: string): boolean {
   try {
@@ -20,11 +20,12 @@ function write(key: string, on: boolean): void {
 /** A choice this browser remembers, off until made. Storage can be unavailable, as for the token. */
 export function useStoredFlag(key: string): [boolean, (on: boolean) => void] {
   const [on, setOn] = useState(() => read(key));
-  return [
-    on,
-    (next) => {
+  const set = useCallback(
+    (next: boolean) => {
       write(key, next);
       setOn(next);
     },
-  ];
+    [key],
+  );
+  return [on, set];
 }

@@ -32,6 +32,12 @@ const LEVELS = Array.from(
 /** Ties the fields outside the form element to it, so Enter in one still starts the game. */
 const FORM_ID = 'new-game';
 
+/** The kind chosen while the engine plays it, else the engine's own: level if it has levels. */
+export function limitKind(chosen: LimitKind | undefined, levels: boolean): LimitKind {
+  if (chosen && (chosen !== 'level' || levels)) return chosen;
+  return levels ? 'level' : 'movetimeMs';
+}
+
 function strengthOf(kind: LimitKind, value: number): Strength {
   if (kind === 'level') return { level: value };
   return { limit: kind === 'depth' ? { depth: value } : { movetimeMs: value } };
@@ -59,8 +65,7 @@ export function useNewGameSettings(
   const hasLevels = (id: string) => engines.find((engine) => engine.id === id)?.levels === true;
   const engineId = engines.find((engine) => engine.id === engineChoice)?.id ?? engines[0]?.id ?? '';
   const levels = hasLevels(engineId);
-  const kind: LimitKind =
-    kindChoice && (kindChoice !== 'level' || levels) ? kindChoice : levels ? 'level' : 'movetimeMs';
+  const kind = limitKind(kindChoice, levels);
   const value = valueChoice ?? LIMIT_DEFAULTS[kind];
   const range = RANGES[kind];
 
@@ -216,7 +221,7 @@ export function FeedbackField({ settings }: { settings: Settings }) {
 }
 
 /** The limit's kind and an optional start position. */
-export function StartFields({ settings }: { settings: Settings }) {
+export function LimitAndStartFields({ settings }: { settings: Settings }) {
   const { kind, kinds, fen, fenError } = settings;
   return (
     <>

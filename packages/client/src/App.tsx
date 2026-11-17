@@ -19,7 +19,12 @@ import { GameOverDialog } from './GameOverDialog.tsx';
 import { gameOverText } from './gameover.ts';
 import { nextEval } from './eval.ts';
 import { MoveList } from './MoveList.tsx';
-import { FeedbackField, NewGameForm, StartFields, useNewGameSettings } from './NewGameForm.tsx';
+import {
+  FeedbackField,
+  NewGameForm,
+  LimitAndStartFields,
+  useNewGameSettings,
+} from './NewGameForm.tsx';
 import { PairForm } from './PairForm.tsx';
 import { PlayerStrip } from './PlayerStrip.tsx';
 import { BoardBadge } from './QualityBadge.tsx';
@@ -356,7 +361,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
               />
               Show engine search line
             </label>
-            {settingsShown && <StartFields settings={settings} />}
+            {settingsShown && <LimitAndStartFields settings={settings} />}
           </div>
           {/* Kept through a new game, so an open panel stays open; the server resets its lines. */}
           {(game || transcript.length > 0) && <Transcript lines={transcript} />}
