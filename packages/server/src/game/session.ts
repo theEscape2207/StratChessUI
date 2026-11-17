@@ -2,6 +2,7 @@
 // plays the other side.
 import {
   applyUciMove,
+  canHint,
   canResign,
   canTakeBack,
   outcome,
@@ -9,6 +10,7 @@ import {
   START_FEN,
   turn,
   type GameState,
+  type Hint,
   type NewGameRequest,
   type Outcome,
   type SearchUpdate,
@@ -34,7 +36,7 @@ import {
 import { searchReport } from './search-report.ts';
 import { Throttle } from './throttle.ts';
 import { TranscriptFeed } from './transcript.ts';
-import { ANALYSIS, verdictOf, withoutOpeningPraise } from './verdicts.ts';
+import { ANALYSIS, verdictOf, withoutOpeningPraise, withoutPraise } from './verdicts.ts';
 
 export type SessionOptions = {
   profiles: readonly EngineProfile[];
@@ -56,11 +58,14 @@ type Scored = { bestMove: string; cp: number };
 /** `null`: the search ran and gave nothing to judge a move by. Undefined: it was cancelled. */
 type Analysed = Scored | null | undefined;
 
-/** The analysis of a game asked for verdicts, run in the game's own engine between its turns. */
+/**
+ * The analysis behind verdicts and hints, run in the game's own engine between its turns: a plain
+ * search, so neither inherits a level's deliberate mistakes.
+ */
 type Analysis = {
   /**
    * Each human turn's position search, by the number of moves before the turn. Kept past the turn,
-   * so a takeback to it searches nothing.
+   * so a takeback to it searches nothing and hints the same move.
    */
   best: Analysed[];
   /** The position search under way, which a move made meanwhile waits for. */
@@ -90,13 +95,20 @@ type Game = {
   rankingTurn?: readonly string[];
   /** A level game's turns in a row spent surrendering, towards resigning. */
   surrenderedTurns: number;
-  analysis?: Analysis;
+  /** Behind verdicts when `state.analysis` asks for them, and behind hints in any game. */
+  searches: Analysis;
+  /** The hint shown at each human turn, by the number of moves before the turn. */
+  hints: (Hint | undefined)[];
+  /** The moves of the turn a hint is being found for, which a second request must not overtake. */
+  hinting?: readonly string[];
 };
 
 const TRANSCRIPT_TAIL = 20;
 const REPORT_INTERVAL_MS = 100;
 /** Deep enough to see a hanging piece or a mate in one, through quiescence at the horizon. */
 const RANKING_LIMIT = { depth: 1 };
+/** Per game rather than per turn: a beginner who needs one every turn wants an easier level. */
+export const HINTS_PER_GAME = 3;
 
 export class GameSession {
   private readonly options: SessionOptions;
@@ -152,8 +164,10 @@ export class GameSession {
         phase: 'starting',
         moves: [],
         ...(request.analysis && { analysis: true, verdicts: [] }),
+        hintsLeft: HINTS_PER_GAME,
       },
-      analysis: request.analysis && { best: [], inHash: false },
+      searches: { best: [], inHash: false },
+      hints: [],
       positions: [start.fen],
       // A replaced game's engine still logs its `quit`, which must not reach the browser.
       transcript: new TranscriptFeed((lines) => {
@@ -186,7 +200,7 @@ export class GameSession {
    * Returns to the human's previous turn, which depends on the server's phase rather than the
    * browser's, so an Undo that crosses the engine's reply lands on the same turn. Any search is
    * cancelled; the engine otherwise stays as it is, as each search sends it the whole game. The
-   * verdicts go with their moves.
+   * verdicts go with their moves, and so do the hints, though not what they cost.
    */
   takeBack(): void {
     const game = this.game;
@@ -198,6 +212,10 @@ export class GameSession {
     game.positions.length -= plies;
     game.search = undefined;
     game.surrenderedTurns = 0;
+    // The turns after this one may be reached again by other moves.
+    game.hints.length = Math.min(game.hints.length, moves.length + 1);
+    game.searches.best.length = Math.min(game.searches.best.length, moves.length + 1);
+    game.searches.running = undefined;
     game.state = {
       ...game.state,
       phase: 'human',
@@ -205,15 +223,34 @@ export class GameSession {
       moves,
       lastMove: moves.at(-1),
       ...(game.state.verdicts && { verdicts: game.state.verdicts.slice(0, -plies) }),
+      hint: game.hints[moves.length],
     };
     void game.engine?.stop();
-    if (game.analysis) {
-      // The turns after this one may be reached again by other moves.
-      game.analysis.best.length = Math.min(game.analysis.best.length, moves.length + 1);
-      game.analysis.running = undefined;
-    }
     this.publish(game);
     this.analyseTurn(game);
+  }
+
+  /**
+   * Shows the next stage of a hint for the human's turn: the engine's best move, from the turn's
+   * position search. A held game's engine is restarted for it, as for a move.
+   */
+  hint(): void {
+    const game = this.game;
+    if (!game) return this.error('no game in progress');
+    if (game.state.phase === 'over') return this.error('the game is over');
+    if (game.state.phase !== 'human') return this.error('not your turn');
+    if (!canHint(game.state)) {
+      return this.error(game.state.hint ? 'the hint is already showing' : 'no hints left');
+    }
+    const { moves } = game.state;
+    // A second tap while the first is searched would otherwise show both stages at once.
+    if (game.hinting === moves) return;
+    const needsRestart = this.hintNeedsEngine(game, moves.length) && !game.engineStart;
+    if (needsRestart && !this.options.slots.take()) return this.refuseAtLimit();
+    game.hinting = moves;
+    void this.showHint(game, moves).finally(() => {
+      if (game.hinting === moves) game.hinting = undefined;
+    });
   }
 
   /** Only the human resigns. Ending the game quits the engine, which cancels any search. */
@@ -264,6 +301,7 @@ export class GameSession {
       moves: [...moves, uci],
       lastMove: uci,
       ...(verdicts && { verdicts: [...verdicts, null] }),
+      hint: undefined,
     };
     this.nextTurn(game);
   }
@@ -329,7 +367,7 @@ export class GameSession {
     void game.engine?.quit();
     game.engine = undefined;
     // Its position search is cancelled, and may settle only after a restarted engine's move asks.
-    if (game.analysis) game.analysis.running = undefined;
+    game.searches.running = undefined;
   }
 
   /**
@@ -341,12 +379,39 @@ export class GameSession {
   }
 
   /**
-   * Starts the position search of the human's turn while they think. Analysis never starts an
-   * engine: a held game's turn is searched once its move has restarted one.
+   * Starts the position search of the human's turn while they think, in a game asked for verdicts;
+   * any other game searches a turn only for a hint. Analysis never starts an engine: a held game's
+   * turn is searched once its move, or a hint, has restarted one.
    */
   private analyseTurn(game: Game): void {
-    if (game.analysis && game.engine)
-      void this.positionSearch(game, game.analysis, game.state.moves.length);
+    if (game.state.analysis && game.engine)
+      void this.positionSearch(game, game.searches, game.state.moves.length);
+  }
+
+  /** A turn searched before, as one returned to by a takeback, hints with no engine running. */
+  private hintNeedsEngine(game: Game, ply: number): boolean {
+    return game.searches.best[ply] === undefined && !game.engine;
+  }
+
+  /** Finds the hint for the turn that began with `moves` and shows its next stage. */
+  private async showHint(game: Game, moves: readonly string[]): Promise<void> {
+    const ply = moves.length;
+    if (this.hintNeedsEngine(game, ply) && !(await this.restartForTurn(game))) return;
+    const best = await this.positionSearch(game, game.searches, ply);
+    // Moved, taken back or ended meanwhile: the game state that said so has answered the request.
+    if (this.game !== game || game.state.moves !== moves || game.state.phase !== 'human') return;
+    // A restart defers `stopEngineWhenIdle`, and no move follows here to honour it.
+    if (game.engineUnwanted) this.stopEngine(game);
+    // The engine is not trusted with the board's squares either.
+    const move = best && applyUciMove(game.state.fen, best.bestMove);
+    if (!move || !move.ok) return this.error('no hint for this position');
+    const from = move.uci.slice(0, 2);
+    const shown = game.hints[ply];
+    const hint = shown ? { from, to: move.uci.slice(2, 4) } : { from };
+    game.hints[ply] = hint;
+    const hintsLeft = game.state.hintsLeft - (shown ? 0 : 1);
+    game.state = { ...game.state, hint, hintsLeft };
+    this.publish(game);
   }
 
   /** The position search of the human's turn after `ply` moves: kept, under way, or started now. */
@@ -433,7 +498,7 @@ export class GameSession {
     const { moves, humanColor } = game.state;
     const ply = moves.length - 1;
     // Only a human turn has a position search, so an engine's move finds none.
-    const best = game.analysis?.best[ply];
+    const best = game.state.analysis && game.searches.best[ply];
     if (!best) return;
     const verdict =
       moves[ply] === best.bestMove
@@ -442,9 +507,13 @@ export class GameSession {
     this.setVerdict(game, ply, verdict);
   }
 
-  /** Records the verdict the move at `ply` is to show, if any; false if it shows none. */
+  /**
+   * Records the verdict the move at `ply` is to show, if any; false if it shows none. A move made
+   * on a hinted turn earns no praise: at best it is the engine's own.
+   */
   private setVerdict(game: Game, ply: number, judged: Verdict | undefined): boolean {
-    const verdict = withoutOpeningPraise(judged, game.state.startFen, ply);
+    const earned = game.hints[ply] ? withoutPraise(judged) : judged;
+    const verdict = withoutOpeningPraise(earned, game.state.startFen, ply);
     if (!verdict) return false;
     game.state = { ...game.state, verdicts: game.state.verdicts!.with(ply, verdict) };
     return true;
@@ -452,7 +521,7 @@ export class GameSession {
 
   private async engineMove(game: Game): Promise<void> {
     if (!game.engine && !(await this.restartForTurn(game))) return;
-    if (game.analysis && !(await this.judgeLastMove(game, game.analysis))) return;
+    if (game.state.analysis && !(await this.judgeLastMove(game, game.searches))) return;
     const { state } = game;
     if ('level' in state) return this.levelMove(game, levelOf(state.level));
     const fen = state.fen;
@@ -490,7 +559,7 @@ export class GameSession {
     const { startFen, moves } = game.state;
     const turnIsGone = () => this.turnIsGone(game, moves);
     // The levels are calibrated on depth-1 scores, which a deeper search left in the hash changes.
-    if (game.analysis?.inHash && !(await this.clearHash(game, game.analysis))) return;
+    if (game.searches.inHash && !(await this.clearHash(game, game.searches))) return;
     if (turnIsGone()) return;
     const search = async (uci: string) => {
       const { info } = await engine.search({

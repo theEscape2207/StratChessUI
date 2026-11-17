@@ -111,6 +111,7 @@ const GAME: GameState = {
   engineName: 'Fake',
   limit: { movetimeMs: 1000 },
   phase: 'starting',
+  hintsLeft: 3,
 };
 
 test('each phase has its chips, and the limit shows as move time', async ({ page }) => {

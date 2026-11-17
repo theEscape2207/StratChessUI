@@ -30,6 +30,23 @@ export async function expectFenNotShown(page: Page, fen: string) {
 
 /** Clicks (or taps, on touch devices) a square on the board, seen from `bottom`'s side. */
 export async function tapSquare(page: Page, sq: string, touch: boolean, bottom = 'white') {
+  const { x, y } = await squareCenter(page, sq, bottom);
+  if (touch) await page.touchscreen.tap(x, y);
+  else await page.mouse.click(x, y);
+}
+
+/** Drags a piece with the mouse, which Chessground takes on a touch device too. */
+export async function dragMove(page: Page, uci: string, bottom = 'white') {
+  const from = await squareCenter(page, uci.slice(0, 2), bottom);
+  const to = await squareCenter(page, uci.slice(2, 4), bottom);
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(to.x, to.y, { steps: 5 });
+  await page.mouse.up();
+}
+
+/** A square's centre on screen, once the board is scrolled into view. */
+async function squareCenter(page: Page, sq: string, bottom: string) {
   const board = page.getByTestId('board');
   // Pressing New game scrolls the form into view, which can push the top ranks off screen.
   // Chessground caches the board's position until it sees the scroll event, so wait for it.
@@ -47,10 +64,7 @@ export async function tapSquare(page: Page, sq: string, touch: boolean, bottom =
   let file = sq.charCodeAt(0) - 'a'.charCodeAt(0);
   let rank = Number(sq[1]) - 1;
   if (bottom === 'black') [file, rank] = [7 - file, 7 - rank];
-  const x = box.x + (file + 0.5) * square;
-  const y = box.y + (7 - rank + 0.5) * square;
-  if (touch) await page.touchscreen.tap(x, y);
-  else await page.mouse.click(x, y);
+  return { x: box.x + (file + 0.5) * square, y: box.y + (7 - rank + 0.5) * square };
 }
 
 export async function playMove(page: Page, uci: string, touch: boolean, bottom = 'white') {
@@ -141,6 +155,7 @@ const SCRIPTED_GAME: GameState = {
   engineName: 'Fake',
   limit: { depth: 3 },
   phase: 'thinking',
+  hintsLeft: 3,
 };
 
 /** Stands in for the server, so a test can send exactly the messages it needs. */
@@ -149,6 +164,7 @@ export async function scriptedServer(page: Page) {
   const newGames: unknown[] = [];
   const takebacks: unknown[] = [];
   const resigns: unknown[] = [];
+  const hints: unknown[] = [];
   await page.routeWebSocket(/\/ws/, (ws) => {
     send = (msg) => ws.send(JSON.stringify(msg));
     ws.onMessage((data) => {
@@ -156,6 +172,7 @@ export async function scriptedServer(page: Page) {
       if (msg.type === 'new-game') newGames.push(msg);
       if (msg.type === 'takeback') takebacks.push(msg);
       if (msg.type === 'resign') resigns.push(msg);
+      if (msg.type === 'hint') hints.push(msg);
     });
     send({ type: 'hello', engines: [{ id: 'fake', name: 'Fake' }], hasGame: true });
     send({ type: 'game', game: SCRIPTED_GAME });
@@ -169,5 +186,6 @@ export async function scriptedServer(page: Page) {
     newGames,
     takebacks,
     resigns,
+    hints,
   };
 }

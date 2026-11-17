@@ -2,7 +2,7 @@ import { Chessground } from '@lichess-org/chessground';
 import type { Api } from '@lichess-org/chessground/api';
 import type { Key } from '@lichess-org/chessground/types';
 import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react';
-import { legalDests, turn, type Color } from '@stratchess-ui/shared';
+import { legalDests, turn, type Color, type Hint } from '@stratchess-ui/shared';
 
 type BoardProps = {
   fen: string;
@@ -12,6 +12,8 @@ type BoardProps = {
   orientation: Color;
   /** The side the user may move now; undefined locks the board. */
   movable?: Color;
+  /** Drawn as a circle on the piece to move, or an arrow once it says where to. */
+  hint?: Hint;
   onMove: (uci: string) => void;
   /** Drawn over the board, such as a dialog. */
   children?: ReactNode;
@@ -37,6 +39,7 @@ export function Board({
   revision,
   orientation,
   movable,
+  hint,
   onMove,
   children,
 }: BoardProps) {
@@ -76,6 +79,12 @@ export function Board({
     });
   }, [fen, lastMove, revision, redraw, orientation, movable]);
 
+  const hintFrom = hint?.from as Key | undefined;
+  const hintTo = hint?.to as Key | undefined;
+  useEffect(() => {
+    api.current?.setAutoShapes(hintFrom ? [{ orig: hintFrom, dest: hintTo, brush: 'green' }] : []);
+  }, [hintFrom, hintTo]);
+
   const cancel = () => {
     setPromotion(undefined);
     setRedraw((r) => r + 1);
@@ -83,7 +92,13 @@ export function Board({
 
   return (
     <div className="board-frame">
-      <div ref={element} className="board" data-testid="board" data-fen={fen} />
+      <div
+        ref={element}
+        className="board"
+        data-testid="board"
+        data-fen={fen}
+        data-hint={hint && `${hint.from}${hint.to ?? ''}`}
+      />
       {choosing && (
         // Pieces are drawn by Chessground's stylesheet, which applies inside a cg-wrap.
         <div className="promotion cg-wrap" onClick={cancel}>

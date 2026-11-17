@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import {
   appendTranscript,
+  canHint,
   canResign,
   canTakeBack,
   capturedPieces,
@@ -16,6 +17,7 @@ import { Board } from './Board.tsx';
 import { CopyFen } from './CopyFen.tsx';
 import { EvalBar } from './EvalBar.tsx';
 import { GameOverDialog } from './GameOverDialog.tsx';
+import { HintButton } from './HintButton.tsx';
 import { gameOverText } from './gameover.ts';
 import { nextEval } from './eval.ts';
 import { MoveList } from './MoveList.tsx';
@@ -165,6 +167,8 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
   // From the tap until the server answers, so a double tap cannot take back two turns, nor a move
   // made meanwhile land on the rewound position.
   const [undoSent, setUndoSent] = useState(false);
+  // From the tap until the server answers, as a hint can take a search to find.
+  const [hintSent, setHintSent] = useState(false);
   const [resignAsked, setResignAsked] = useState(false);
   const [moreOpen, setMoreOpen] = useStoredFlag(MORE_OPEN_KEY);
   const [searchLine, setSearchLine] = useStoredFlag(SEARCH_LINE_KEY);
@@ -176,6 +180,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
     setFormOpen(false);
     setGameOverOpen(false);
     setUndoSent(false);
+    setHintSent(false);
     setResignAsked(false);
   };
   const { link, stalled, send, retry } = useGameSocket(
@@ -201,12 +206,14 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
       if (msg.type === 'error') {
         setNotice(msg.reason);
         setUndoSent(false);
+        setHintSent(false);
         // Redraw the last server position to undo the board's optimistic move.
         setRevision((r) => r + 1);
         return;
       }
       setNotice('');
       setUndoSent(false);
+      setHintSent(false);
       // What the engine said was about moves that are gone. The server has forgotten it too.
       if (game && msg.game.moves.length < game.moves.length) {
         setSearch(undefined);
@@ -259,6 +266,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
           movable={
             link === 'connected' && game?.phase === 'human' && !undoSent ? humanColor : undefined
           }
+          hint={game?.hint}
           onMove={(uci) => send({ type: 'move', uci })}
         >
           {verdict && <BoardBadge {...verdict} orientation={humanColor} />}
@@ -327,6 +335,14 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
               onClick={() => {
                 setUndoSent(true);
                 send({ type: 'takeback' });
+              }}
+            />
+            <HintButton
+              left={game.hintsLeft}
+              disabled={link !== 'connected' || hintSent || undoSent || !canHint(game)}
+              onClick={() => {
+                setHintSent(true);
+                send({ type: 'hint' });
               }}
             />
             {ready && formHidden && (

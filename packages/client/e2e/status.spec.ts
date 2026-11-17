@@ -20,6 +20,7 @@ const GAME: GameState = {
   engineName: 'Fake',
   limit: { depth: 3 },
   phase: 'human',
+  hintsLeft: 3,
 };
 
 const HELLO: ServerMessage = {

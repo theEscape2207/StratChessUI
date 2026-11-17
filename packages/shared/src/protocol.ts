@@ -36,6 +36,8 @@ export type ClientMessage =
   /** No arguments: the server works out the target from its own state. */
   | { type: 'takeback' }
   | { type: 'resign' }
+  /** For the turn the server is at: its first stage, or the second of one already shown. */
+  | { type: 'hint' }
   | ({ type: 'new-game' } & NewGameRequest);
 
 /** `levels`: the profile plays the beginner opponent's levels as well as limits. */
@@ -55,6 +57,12 @@ export type Outcome = { result: Color | 'draw'; termination: Termination };
 
 /** How a move of the human's compares with the engine's best, by the win chance it gave up. */
 export type Verdict = 'best' | 'excellent' | 'inaccuracy' | 'mistake' | 'blunder';
+
+/**
+ * A hint for the human's turn, in two stages: the square of the piece to move, then the square it
+ * goes to as well.
+ */
+export type Hint = { from: string; to?: string };
 
 export type GameState = {
   /** The position the game started from, normalised. */
@@ -81,7 +89,17 @@ export type GameState = {
    * human's that has no verdict, or none yet.
    */
   verdicts?: (Verdict | null)[];
+  /** Turns the human can still ask a hint for. A turn costs one, whatever its stages. */
+  hintsLeft: number;
+  /** The hint shown for the turn the game is at, which a takeback to the turn brings back. */
+  hint?: Hint;
 } & Strength;
+
+/** Whether a hint request shows anything: a turn's second stage is free, its first is not. */
+export function canHint(game: Pick<GameState, 'phase' | 'hintsLeft' | 'hint'>): boolean {
+  if (game.phase !== 'human') return false;
+  return game.hint ? !game.hint.to : game.hintsLeft > 0;
+}
 
 /**
  * Whether a takeback has a turn of the human's to return to. While the engine thinks, the last move
@@ -165,6 +183,7 @@ export function parseClientMessage(raw: string): ClientMessage | undefined {
   if (msg.type === 'move' && typeof msg.uci === 'string') return { type: 'move', uci: msg.uci };
   if (msg.type === 'takeback') return { type: 'takeback' };
   if (msg.type === 'resign') return { type: 'resign' };
+  if (msg.type === 'hint') return { type: 'hint' };
   if (msg.type !== 'new-game') return undefined;
   const strength = parseStrength(msg);
   if (msg.humanColor !== 'white' && msg.humanColor !== 'black') return undefined;
