@@ -15,6 +15,15 @@ test.beforeEach(async ({ page }) => openSettled(page));
 const searchLine = (page: Page) => page.getByLabel('Show engine search line');
 const startPosition = (page: Page) => page.getByLabel('Start position');
 
+/**
+ * Closes More and waits until the browser remembers it. The `toggle` event that stores the choice
+ * is queued after the click returns, so a reload straight away can beat it and reopen More.
+ */
+async function closeMore(page: Page) {
+  await summary(page).click();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('more-open'))).toBeNull();
+}
+
 function technical(page: Page) {
   return [
     page.getByLabel('Move Feedback'),
@@ -60,7 +69,7 @@ test('the search line shows once asked for, and More stays as it was left', asyn
 
   await searchLine(page).uncheck();
   await expect(page.getByTestId('search')).toBeHidden();
-  await summary(page).click();
+  await closeMore(page);
   await page.reload();
   await expectYourMove(page);
   await expect(searchLine(page)).toBeHidden();
