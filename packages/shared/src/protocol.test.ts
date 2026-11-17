@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   appendTranscript,
+  canHint,
   MAX_FEN_LENGTH,
   parseClientMessage,
   TRANSCRIPT_LINES,
@@ -78,6 +79,21 @@ describe('protocol', () => {
   it('accepts a takeback, dropping anything sent with it', () => {
     const raw = JSON.stringify({ type: 'takeback', plies: 7 });
     expect(parseClientMessage(raw)).toEqual({ type: 'takeback' });
+  });
+
+  it('accepts a hint request, dropping anything sent with it', () => {
+    const raw = JSON.stringify({ type: 'hint', stage: 2 });
+    expect(parseClientMessage(raw)).toEqual({ type: 'hint' });
+  });
+
+  it('allows a hint on the human turn: a first stage while any are left, a second for free', () => {
+    const human = { phase: 'human', hintsLeft: 1 } as const;
+    expect(canHint(human)).toBe(true);
+    expect(canHint({ ...human, hintsLeft: 0 })).toBe(false);
+    expect(canHint({ ...human, hintsLeft: 0, hint: { from: 'e2' } })).toBe(true);
+    expect(canHint({ ...human, hint: { from: 'e2', to: 'e4' } })).toBe(false);
+    for (const phase of ['starting', 'thinking', 'over'] as const)
+      expect(canHint({ ...human, phase })).toBe(false);
   });
 
   it('keeps the newest lines of a transcript', () => {

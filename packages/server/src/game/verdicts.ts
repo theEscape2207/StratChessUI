@@ -54,6 +54,11 @@ export function verdictOf(bestCp: number, playedCp: number): Verdict | undefined
   return ANALYSIS.drops.find(({ from }) => drop >= from)?.verdict;
 }
 
+/** The verdict if it is a fault, for a move that earned no praise: the engine's own, played back. */
+export function withoutPraise(verdict: Verdict | undefined): Verdict | undefined {
+  return verdict === 'best' || verdict === 'excellent' ? undefined : verdict;
+}
+
 /**
  * The verdict to show for the move at `ply`: none for praise in the opening, where every sensible
  * move is close to the engine's best. A game from another position has no opening.
@@ -63,8 +68,7 @@ export function withoutOpeningPraise(
   startFen: string,
   ply: number,
 ): Verdict | undefined {
-  const praise = verdict === 'best' || verdict === 'excellent';
   // Either colour's own moves so far: white moves first from the standard start.
   const opening = startFen === START_FEN && Math.floor(ply / 2) < ANALYSIS.openingMoves;
-  return praise && opening ? undefined : verdict;
+  return opening ? withoutPraise(verdict) : verdict;
 }

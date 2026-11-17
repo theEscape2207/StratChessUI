@@ -65,6 +65,7 @@ M2 and M3 are two views of one app, sharing game and engine handling. No configu
 | Beginner opponent   | The server scores every legal move with `go depth 1`, then chooses one by level                                         | Stock limits punish every blunder, even at `depth 1`. Plain UCI needs no engine change, and a level is a data change. Calibrated for StratChess only (#94, 2026-11-04)           |
 | Move verdicts       | The game's own engine searches before and after each human move; off unless asked, and the form asks unless told not to | The opponent's search is too weak to judge; a second process takes a slot and a Hash. Win chance given up decides: raw pawns fault a pawn lost in a won game (#91, 2026-11-16)   |
 | Opening praise      | No best or excellent for the human's first moves from the standard start; faults still show; a FEN game has no opening  | Every sensible opening move is close to the engine's best, so praise there is noise; an opening book waits (#111, 2026-11-16)                                                    |
+| Hints               | The verdicts' position search gives the move: the piece first, then the arrow; three hinted turns a game, none refunded | A plain search, so a level's mistakes stay out; staged, so a beginner can still find the move. A hinted move earns no praise (#68, 2026-11-17)                                   |
 
 ## Architecture constraints (independent of stack)
 
@@ -170,9 +171,8 @@ in build tooling (Vite, ESLint, TypeScript) rather than in the chess or server c
 
 ## Open questions (later milestones)
 
-- **M3:** hint form (piece, move or line) and its engine/limit (#68); how difficulty is named
-  (#71); whether Play needs its own view (#76). A real game with the target player closes the
-  milestone (#74).
+- **M3:** how difficulty is named (#71); whether Play needs its own view (#76). A real game with
+  the target player closes the milestone (#74), and tunes the hints per game.
 - **After M3:** PGN export, #65 (recommended: retains games without a database). M3 holds only what
   serves beginners.
 - **Several users:** one game per paired browser serves a household. Accounts, or a game that moves

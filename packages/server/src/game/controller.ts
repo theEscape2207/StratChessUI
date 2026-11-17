@@ -74,6 +74,7 @@ export class Controller {
     if (msg.type === 'new-game') return void browser.session.newGame(msg);
     if (msg.type === 'takeback') return browser.session.takeBack();
     if (msg.type === 'resign') return browser.session.resign();
+    if (msg.type === 'hint') return browser.session.hint();
     browser.session.move(msg.uci);
   }
 

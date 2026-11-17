@@ -11,6 +11,7 @@ const GAME_SPECS = [
   'board.spec.ts',
   'eval.spec.ts',
   'gameover.spec.ts',
+  'hints.spec.ts',
   'layout.spec.ts',
   'level.spec.ts',
   'status.spec.ts',

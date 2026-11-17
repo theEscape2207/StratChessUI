@@ -17,7 +17,7 @@ import {
 import type { Timeouts } from '../uci/engine.ts';
 import { fakeProfile } from '../uci/fake-profile.ts';
 import { EngineSlots } from './engine-slots.ts';
-import { GameSession } from './session.ts';
+import { GameSession, HINTS_PER_GAME } from './session.ts';
 import { ANALYSIS } from './verdicts.ts';
 
 const PROFILES = [
@@ -1425,6 +1425,193 @@ describe('GameSession', () => {
       expect((await settled()).verdicts).toEqual(['excellent', null, null, null]);
       // With no best move to compare with, the reply is not searched either.
       expect(sent(session, 'go depth 9')).toBe(1);
+    });
+  });
+
+  describe('hints', () => {
+    // The start position's best move for the scored fake, which the verdict profiles run.
+    const BEST = legalMoves(START_FEN)[0]!.uci;
+    const FROM = { from: BEST.slice(0, 2) };
+    const FULL = { ...FROM, to: BEST.slice(2, 4) };
+    const NO_OPENING = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1';
+    const sent = (session: GameSession, command: string) =>
+      session.takeTranscript()!.filter((l) => l.dir === 'sent' && l.text === command).length;
+    const error = async (next: () => Promise<ServerMessage>) => {
+      const msg = await next();
+      return msg.type === 'error' ? msg.reason : msg;
+    };
+
+    it('shows the piece, then where it goes, for one charge and one search', async () => {
+      const { session, settled, next } = open();
+      void session.newGame(game('judged', 'white'));
+      const start = await settled();
+      expect(start.hintsLeft).toBe(HINTS_PER_GAME);
+      expect(start.hint).toBeUndefined();
+      expect(sent(session, `go depth ${ANALYSIS.depth}`)).toBe(0);
+
+      session.hint();
+      expect(await settled()).toMatchObject({ hint: FROM, hintsLeft: HINTS_PER_GAME - 1 });
+      session.hint();
+      expect(await settled()).toMatchObject({ hint: FULL, hintsLeft: HINTS_PER_GAME - 1 });
+      session.hint();
+      expect(await error(next)).toBe('the hint is already showing');
+      expect(sent(session, `go depth ${ANALYSIS.depth}`)).toBe(1);
+    });
+
+    it('shows one stage for two requests made before the first is answered', async () => {
+      const { session, settled } = open();
+      void session.newGame(game('judged', 'white'));
+      await settled();
+      session.hint();
+      session.hint();
+      const hinted = await settled();
+      expect(hinted.hint).toEqual(FROM);
+      await sleep(100);
+      expect(session.state).toEqual(hinted);
+    });
+
+    it('goes with the move made, and runs out', async () => {
+      const { session, settled, next } = open();
+      void session.newGame(game('judged', 'white'));
+      let state = await settled();
+      for (let left = HINTS_PER_GAME - 1; left >= 0; left--) {
+        session.hint();
+        expect((await settled()).hintsLeft).toBe(left);
+        session.move(legalMoves(state.fen)[0]!.uci);
+        state = await settled();
+        expect(state.hint).toBeUndefined();
+        expect(state.hintsLeft).toBe(left);
+      }
+      session.hint();
+      expect(await error(next)).toBe('no hints left');
+      expect(session.state).toEqual(state);
+    });
+
+    it('is refused when it is not the human turn', async () => {
+      const { session, settled, next } = open();
+      session.hint();
+      expect(await error(next)).toBe('no game in progress');
+      void session.newGame(game('held', 'white'));
+      await settled();
+      session.move('e2e4');
+      expect(await next()).toMatchObject({ game: { phase: 'thinking' } });
+      session.hint();
+      expect(await error(next)).toBe('not your turn');
+    });
+
+    describe('takeback', () => {
+      it('brings back the hint of the turn it returns to, with no refund and no search', async () => {
+        const { session, settled } = open();
+        void session.newGame(game('judged', 'white'));
+        await settled();
+        session.hint();
+        await settled();
+        session.move('h2h4');
+        await settled();
+        session.takeBack();
+        expect(await settled()).toMatchObject({
+          moves: [],
+          hint: FROM,
+          hintsLeft: HINTS_PER_GAME - 1,
+        });
+        session.hint();
+        expect(await settled()).toMatchObject({ hint: FULL, hintsLeft: HINTS_PER_GAME - 1 });
+        expect(sent(session, `go depth ${ANALYSIS.depth}`)).toBe(1);
+      });
+
+      it('drops the hints of the turns it removes, but not what they cost', async () => {
+        const { session, settled } = open();
+        void session.newGame(game('judged', 'white'));
+        await settled();
+        session.move('e2e4');
+        await settled();
+        session.hint();
+        expect((await settled()).hintsLeft).toBe(HINTS_PER_GAME - 1);
+        session.takeBack();
+        const back = await settled();
+        expect(back.hint).toBeUndefined();
+        expect(back.hintsLeft).toBe(HINTS_PER_GAME - 1);
+        session.move('d2d4');
+        const again = await settled();
+        expect(again.moves).toHaveLength(2);
+        expect(again.hint).toBeUndefined();
+        session.hint();
+        expect((await settled()).hintsLeft).toBe(HINTS_PER_GAME - 2);
+      });
+    });
+
+    it('costs nothing when the search is capped', async () => {
+      const { session, settled, next } = open({ ...TIMEOUTS, maxSearchMs: 300 });
+      void session.newGame(game('held-position', 'white'));
+      await settled();
+      session.move('e2e4');
+      const state = await settled();
+      session.hint();
+      expect(await error(next)).toBe('no hint for this position');
+      expect(session.state).toEqual(state);
+    });
+
+    it.each([
+      [BEST, null],
+      ['h2h4', 'blunder'],
+    ])('leaves %s on a hinted turn with the verdict %s: faults only', async (move, verdict) => {
+      const { session, settled } = open();
+      void session.newGame({ ...game('judged', 'white'), analysis: true, fen: NO_OPENING });
+      await settled();
+      session.hint();
+      await settled();
+      session.move(move);
+      expect((await settled()).verdicts).toEqual([verdict, null]);
+    });
+
+    it('judges nothing in a game that asked for no verdicts', async () => {
+      // White mates on f8, or stalemates on f7: a move that ends the game is judged without a search.
+      const { session, settled } = open();
+      void session.newGame({ ...game('judged', 'white'), fen: '7k/8/6K1/8/8/8/8/5Q2 w - - 0 1' });
+      await settled();
+      session.hint();
+      await settled();
+      session.move('f1f7');
+      const over = await settled();
+      expect(over).toMatchObject({ phase: 'over', termination: 'stalemate' });
+      expect('verdicts' in over).toBe(false);
+    });
+
+    it("clears the hash a hint's search wrote to before a level's turn", async () => {
+      const { session, settled } = open(TIMEOUTS, undefined, () => 0.99);
+      void session.newGame({ engineId: 'judged', humanColor: 'white', level: 5 });
+      await settled();
+      session.hint();
+      await settled();
+      session.move('e2e4');
+      expect((await settled()).moves).toHaveLength(2);
+      expect(sent(session, 'ucinewgame')).toBe(1);
+    });
+
+    describe('in a held game', () => {
+      it('restarts the engine', async () => {
+        const { session, settled, logged } = open();
+        void session.newGame(game('judged', 'white'));
+        await settled();
+        expect(session.stopEngineWhenIdle()).toBe(true);
+        session.keepEngine();
+        session.hint();
+        expect((await settled()).hint).toEqual(FROM);
+        expect(logged.filter((line) => line.includes('running'))).toHaveLength(2);
+      });
+
+      it('is refused, keeping the game, when the engines are all taken', async () => {
+        const slots = new EngineSlots(1);
+        const { session, settled, take } = open(TIMEOUTS, slots);
+        void session.newGame(game('judged', 'white'));
+        const state = await settled();
+        expect(session.stopEngineWhenIdle()).toBe(true);
+        await vi.waitFor(() => expect(slots.take()).toBe(true));
+        session.hint();
+        const refused = await take((msg) => msg.type === 'error');
+        expect(refused).toMatchObject({ reason: 'limit of 1 engines reached, try again later' });
+        expect(session.state).toEqual(state);
+      });
     });
   });
 });

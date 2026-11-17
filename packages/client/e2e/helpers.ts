@@ -129,6 +129,7 @@ const SCRIPTED_GAME: GameState = {
   engineName: 'Fake',
   limit: { depth: 3 },
   phase: 'thinking',
+  hintsLeft: 3,
 };
 
 /** Stands in for the server, so a test can send exactly the messages it needs. */
@@ -137,6 +138,7 @@ export async function scriptedServer(page: Page) {
   const newGames: unknown[] = [];
   const takebacks: unknown[] = [];
   const resigns: unknown[] = [];
+  const hints: unknown[] = [];
   await page.routeWebSocket(/\/ws/, (ws) => {
     send = (msg) => ws.send(JSON.stringify(msg));
     ws.onMessage((data) => {
@@ -144,6 +146,7 @@ export async function scriptedServer(page: Page) {
       if (msg.type === 'new-game') newGames.push(msg);
       if (msg.type === 'takeback') takebacks.push(msg);
       if (msg.type === 'resign') resigns.push(msg);
+      if (msg.type === 'hint') hints.push(msg);
     });
     send({ type: 'hello', engines: [{ id: 'fake', name: 'Fake' }], hasGame: true });
     send({ type: 'game', game: SCRIPTED_GAME });
@@ -157,5 +160,6 @@ export async function scriptedServer(page: Page) {
     newGames,
     takebacks,
     resigns,
+    hints,
   };
 }

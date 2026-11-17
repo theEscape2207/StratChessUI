@@ -562,6 +562,11 @@ button.stack {
   line-height: 16px;
 }
 
+.hints-left {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .toolbar {
   display: flex;
   align-items: center;
