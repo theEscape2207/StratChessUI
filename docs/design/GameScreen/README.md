@@ -10,8 +10,9 @@ one `panel` (`radius-md`) with a `panel-raised` title bar; sections are split by
 and the move list takes whatever height is left.
 
 **Sidebar order, top to bottom** title bar · SearchInfo · MoveFeedback · MoveList · actions ·
-Transcript (closed) · toolbar. SearchInfo and Transcript belong to the technical view (milestone 2)
-and are hidden in the Play view (milestone 3).
+new-game form · More (closed). More holds Move Feedback, the SearchInfo switch (off until asked
+for), the limit kind, the start position, the Transcript and the toolbar, so a beginner sees none
+of them.
 
 **Under the board** nothing during play: the strips' chips carry the turn, and the FEN is only ever
 copied, never shown. A StatusLine appears here for a connection problem or an ended game with its

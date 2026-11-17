@@ -19,7 +19,12 @@ import { GameOverDialog } from './GameOverDialog.tsx';
 import { gameOverText } from './gameover.ts';
 import { nextEval } from './eval.ts';
 import { MoveList } from './MoveList.tsx';
-import { NewGameForm } from './NewGameForm.tsx';
+import {
+  FeedbackField,
+  NewGameForm,
+  LimitAndStartFields,
+  useNewGameSettings,
+} from './NewGameForm.tsx';
 import { PairForm } from './PairForm.tsx';
 import { PlayerStrip } from './PlayerStrip.tsx';
 import { BoardBadge } from './QualityBadge.tsx';
@@ -29,9 +34,12 @@ import { materialLead, strengthLabel, stripChip } from './strip.ts';
 import { Transcript } from './Transcript.tsx';
 import { UndoButton } from './UndoButton.tsx';
 import { useGameSocket, type Link } from './useGameSocket.ts';
+import { useStoredFlag } from './useStoredFlag.ts';
 import { boardVerdict } from './verdicts.ts';
 
 const TOKEN_KEY = 'pairing-token';
+const MORE_OPEN_KEY = 'more-open';
+const SEARCH_LINE_KEY = 'search-line';
 
 const LINK_STATUS: Record<Exclude<Link, 'connected'>, string> = {
   connecting: 'connecting',
@@ -158,6 +166,8 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
   // made meanwhile land on the rewound position.
   const [undoSent, setUndoSent] = useState(false);
   const [resignAsked, setResignAsked] = useState(false);
+  const [moreOpen, setMoreOpen] = useStoredFlag(MORE_OPEN_KEY);
+  const [searchLine, setSearchLine] = useStoredFlag(SEARCH_LINE_KEY);
   const newGameButton = useRef<HTMLButtonElement>(null);
   const clearGame = () => {
     setGame(undefined);
@@ -212,12 +222,25 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
     },
     onUnpaired,
   );
+  const settings = useNewGameSettings(
+    engines ?? [],
+    (request) => {
+      // Until the new game arrives, the old one's status must not pass for it.
+      clearGame();
+      // A start position that is already over ends the game in its first state.
+      inPlay.current = true;
+      send({ type: 'new-game', ...request });
+    },
+    // The reason shows beside the field, which a closed More would hide.
+    () => setMoreOpen(true),
+  );
   const humanColor = game?.humanColor ?? 'white';
   const fen = game?.fen ?? START_FEN;
 
   const ready = engines !== undefined && link === 'connected';
   const playing = game !== undefined && game.phase !== 'over';
   const formHidden = playing && !formOpen;
+  const settingsShown = ready && !formHidden && engines.length > 0;
   // Replays the game, so once per game state rather than on each search line.
   const strips = useMemo(() => playerStrips(game), [game]);
   const verdict = game && boardVerdict(game);
@@ -277,7 +300,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
       </div>
       <aside className="sidebar" aria-label="Game">
         <h2 className="sidebar-title">{game ? `Play ${game.engineName}` : 'New game'}</h2>
-        {game && search && <SearchInfo fen={search.fen} info={search.info} />}
+        {game && search && searchLine && <SearchInfo fen={search.fen} info={search.info} />}
         <MoveList
           startFen={game?.startFen ?? START_FEN}
           moves={game?.moves ?? []}
@@ -315,24 +338,37 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
         )}
         {ready && (
           <NewGameForm
-            engines={engines}
+            settings={settings}
             hidden={formHidden}
-            onStart={(request) => {
-              // Until the new game arrives, the old one's status must not pass for it.
-              clearGame();
-              // A start position that is already over ends the game in its first state.
-              inPlay.current = true;
-              send({ type: 'new-game', ...request });
-            }}
             onCancel={playing ? () => setFormOpen(false) : undefined}
             submitRef={newGameButton}
           />
         )}
-        {/* Kept through a new game, so an open panel stays open; the server resets its lines. */}
-        {(game || transcript.length > 0) && <Transcript lines={transcript} />}
-        <div className="toolbar">
-          <CopyFen fen={fen} />
-        </div>
+        <details
+          className="more"
+          data-testid="more"
+          open={moreOpen}
+          onToggle={(event) => setMoreOpen(event.currentTarget.open)}
+        >
+          <summary>More</summary>
+          <div className="more-fields">
+            {settingsShown && <FeedbackField settings={settings} />}
+            <label className="check-field">
+              <input
+                type="checkbox"
+                checked={searchLine}
+                onChange={(event) => setSearchLine(event.target.checked)}
+              />
+              Show engine search line
+            </label>
+            {settingsShown && <LimitAndStartFields settings={settings} />}
+          </div>
+          {/* Kept through a new game, so an open panel stays open; the server resets its lines. */}
+          {(game || transcript.length > 0) && <Transcript lines={transcript} />}
+          <div className="toolbar">
+            <CopyFen fen={fen} />
+          </div>
+        </details>
       </aside>
     </main>
   );

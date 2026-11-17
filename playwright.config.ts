@@ -13,6 +13,7 @@ const GAME_SPECS = [
   'gameover.spec.ts',
   'layout.spec.ts',
   'level.spec.ts',
+  'more.spec.ts',
   'status.spec.ts',
   'strips.spec.ts',
   'takeback.spec.ts',
