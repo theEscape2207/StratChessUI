@@ -47,7 +47,8 @@ separate open-source repository, and has no commercial goal.
 | 2. Technical        | Owner               | Board, move list, side selection, FEN load/copy, engine profile and limits, live search info, UCI transcript, legal-move highlighting | Any valid FEN can be loaded and played from; an invalid FEN is rejected with a reason; live depth/score/nodes/PV shown; promotion, stalemate and automatic draws confirmed from a phone (deferred from M1) |
 | 3. Play             | Daughter, beginners | Simple controls, understandable difficulty choice, technical detail hidden, takebacks, hints                                          | A beginner can win against the easiest setting, and use hints and takebacks without help                                                                                                                   |
 
-M2 and M3 are two views of one app, sharing game and engine handling. No configurable dashboard.
+M2 and M3 share one screen: the technical detail waits behind a collapsed More in the sidebar,
+which each browser remembers open or closed (#76). No separate view, no configurable dashboard.
 
 ## Decisions (agreed 2026-10-25)
 

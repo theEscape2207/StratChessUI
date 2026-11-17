@@ -299,6 +299,7 @@ main {
   color: var(--muted);
 }
 
+.more > summary,
 .transcript summary {
   padding: var(--space-3) var(--space-5);
   font: var(--text-caption);
@@ -804,7 +805,8 @@ button:disabled {
 }
 
 .new-game label,
-.new-game legend {
+.new-game legend,
+.more-fields label {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -824,13 +826,31 @@ button:disabled {
   border-radius: 0;
 }
 
-.new-game .fen-error {
+/* The fields the form keeps out of sight, laid out as its own are. */
+.more-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5) var(--space-5);
+}
+
+.more > * + * {
+  border-top: 1px solid var(--hairline);
+}
+
+.more > .more-fields {
+  border-top: none;
+}
+
+.more-fields .fen-error {
   margin: 0;
   font: var(--text-status);
 }
 
 .new-game input,
-.new-game select {
+.new-game select,
+.more-fields input,
+.more-fields select {
   min-height: var(--control-min-height);
   box-sizing: border-box;
   padding: 0 var(--space-3);
@@ -841,14 +861,14 @@ button:disabled {
   background: var(--bg);
 }
 
-.new-game .check-field {
+.more-fields .check-field {
   flex-direction: row;
   align-items: center;
   gap: var(--space-3);
   min-height: var(--control-min-height);
 }
 
-.new-game .check-field input {
+.more-fields .check-field input {
   width: 18px;
   height: 18px;
   min-height: 0;

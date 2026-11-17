@@ -90,7 +90,7 @@ test('New game goes to the form, keeping the settings just played', async ({ pag
   const form = page.locator('form.new-game');
   await expect(form.getByRole('button', { name: 'New game' })).toBeFocused();
   await expect(form.getByLabel('black', { exact: true })).toBeChecked();
-  await expect(form.getByRole('combobox', { name: 'Limit' })).toHaveValue('depth');
+  await expect(page.getByRole('combobox', { name: 'Limit' })).toHaveValue('depth');
   await expect(form.getByRole('spinbutton', { name: 'Depth (plies)' })).toHaveValue('5');
-  await expect(form.getByLabel('Start position')).toHaveValue(MATED);
+  await expect(page.getByLabel('Start position')).toHaveValue(MATED);
 });

@@ -73,6 +73,14 @@ export async function turnOffFeedback(page: Page) {
   await page.getByLabel('Move Feedback').uncheck();
 }
 
+/** For a browser that started without the fixture's stored choice, such as a fresh pairing. */
+export async function openMore(page: Page) {
+  const more = page.getByTestId('more');
+  if (!(await more.evaluate((el: HTMLDetailsElement) => el.open))) {
+    await more.getByText('More', { exact: true }).click();
+  }
+}
+
 /** The form's submit, not the game-over dialog's New game, which only opens the form. */
 export async function submitNewGame(page: Page) {
   await page.locator('form.new-game').getByRole('button', { name: 'New game' }).click();
@@ -94,6 +102,7 @@ export async function openSettled(page: Page) {
 export async function newGame(page: Page, side: 'white' | 'black' = 'white') {
   await showNewGameForm(page);
   await page.getByLabel(side, { exact: true }).check();
+  await openMore(page);
   await page.getByRole('combobox', { name: 'Limit' }).selectOption('depth');
   await submitNewGame(page);
   await expectYourMove(page);
