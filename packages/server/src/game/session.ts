@@ -95,7 +95,8 @@ type Game = {
   rankingTurn?: readonly string[];
   /** A level game's turns in a row spent surrendering, towards resigning. */
   surrenderedTurns: number;
-  analysis: Analysis;
+  /** Behind verdicts when `state.analysis` asks for them, and behind hints in any game. */
+  searches: Analysis;
   /** The hint shown at each human turn, by the number of moves before the turn. */
   hints: (Hint | undefined)[];
   /** The moves of the turn a hint is being found for, which a second request must not overtake. */
@@ -106,7 +107,7 @@ const TRANSCRIPT_TAIL = 20;
 const REPORT_INTERVAL_MS = 100;
 /** Deep enough to see a hanging piece or a mate in one, through quiescence at the horizon. */
 const RANKING_LIMIT = { depth: 1 };
-/** Tuned on the owner's games, as the verdicts are. */
+/** Per game rather than per turn: a beginner who needs one every turn wants an easier level. */
 export const HINTS_PER_GAME = 3;
 
 export class GameSession {
@@ -165,7 +166,7 @@ export class GameSession {
         ...(request.analysis && { analysis: true, verdicts: [] }),
         hintsLeft: HINTS_PER_GAME,
       },
-      analysis: { best: [], inHash: false },
+      searches: { best: [], inHash: false },
       hints: [],
       positions: [start.fen],
       // A replaced game's engine still logs its `quit`, which must not reach the browser.
@@ -213,8 +214,8 @@ export class GameSession {
     game.surrenderedTurns = 0;
     // The turns after this one may be reached again by other moves.
     game.hints.length = Math.min(game.hints.length, moves.length + 1);
-    game.analysis.best.length = Math.min(game.analysis.best.length, moves.length + 1);
-    game.analysis.running = undefined;
+    game.searches.best.length = Math.min(game.searches.best.length, moves.length + 1);
+    game.searches.running = undefined;
     game.state = {
       ...game.state,
       phase: 'human',
@@ -244,8 +245,7 @@ export class GameSession {
     const { moves } = game.state;
     // A second tap while the first is searched would otherwise show both stages at once.
     if (game.hinting === moves) return;
-    const searched = game.analysis.best[moves.length] !== undefined;
-    const needsRestart = !searched && !game.engine && !game.engineStart;
+    const needsRestart = this.hintNeedsEngine(game, moves.length) && !game.engineStart;
     if (needsRestart && !this.options.slots.take()) return this.refuseAtLimit();
     game.hinting = moves;
     void this.showHint(game, moves).finally(() => {
@@ -367,7 +367,7 @@ export class GameSession {
     void game.engine?.quit();
     game.engine = undefined;
     // Its position search is cancelled, and may settle only after a restarted engine's move asks.
-    game.analysis.running = undefined;
+    game.searches.running = undefined;
   }
 
   /**
@@ -385,17 +385,23 @@ export class GameSession {
    */
   private analyseTurn(game: Game): void {
     if (game.state.analysis && game.engine)
-      void this.positionSearch(game, game.analysis, game.state.moves.length);
+      void this.positionSearch(game, game.searches, game.state.moves.length);
+  }
+
+  /** A turn searched before, as one returned to by a takeback, hints with no engine running. */
+  private hintNeedsEngine(game: Game, ply: number): boolean {
+    return game.searches.best[ply] === undefined && !game.engine;
   }
 
   /** Finds the hint for the turn that began with `moves` and shows its next stage. */
   private async showHint(game: Game, moves: readonly string[]): Promise<void> {
     const ply = moves.length;
-    const searched = game.analysis.best[ply] !== undefined;
-    if (!searched && !game.engine && !(await this.restartForTurn(game))) return;
-    const best = await this.positionSearch(game, game.analysis, ply);
+    if (this.hintNeedsEngine(game, ply) && !(await this.restartForTurn(game))) return;
+    const best = await this.positionSearch(game, game.searches, ply);
     // Moved, taken back or ended meanwhile: the game state that said so has answered the request.
     if (this.game !== game || game.state.moves !== moves || game.state.phase !== 'human') return;
+    // A restart defers `stopEngineWhenIdle`, and no move follows here to honour it.
+    if (game.engineUnwanted) this.stopEngine(game);
     // The engine is not trusted with the board's squares either.
     const move = best && applyUciMove(game.state.fen, best.bestMove);
     if (!move || !move.ok) return this.error('no hint for this position');
@@ -492,7 +498,7 @@ export class GameSession {
     const { moves, humanColor } = game.state;
     const ply = moves.length - 1;
     // Only a human turn has a position search, so an engine's move finds none.
-    const best = game.state.analysis && game.analysis.best[ply];
+    const best = game.state.analysis && game.searches.best[ply];
     if (!best) return;
     const verdict =
       moves[ply] === best.bestMove
@@ -515,7 +521,7 @@ export class GameSession {
 
   private async engineMove(game: Game): Promise<void> {
     if (!game.engine && !(await this.restartForTurn(game))) return;
-    if (game.state.analysis && !(await this.judgeLastMove(game, game.analysis))) return;
+    if (game.state.analysis && !(await this.judgeLastMove(game, game.searches))) return;
     const { state } = game;
     if ('level' in state) return this.levelMove(game, levelOf(state.level));
     const fen = state.fen;
@@ -553,7 +559,7 @@ export class GameSession {
     const { startFen, moves } = game.state;
     const turnIsGone = () => this.turnIsGone(game, moves);
     // The levels are calibrated on depth-1 scores, which a deeper search left in the hash changes.
-    if (game.analysis.inHash && !(await this.clearHash(game, game.analysis))) return;
+    if (game.searches.inHash && !(await this.clearHash(game, game.searches))) return;
     if (turnIsGone()) return;
     const search = async (uci: string) => {
       const { info } = await engine.search({

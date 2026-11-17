@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import type { GameState } from '@stratchess-ui/shared';
 import { expect, test } from './fixtures.ts';
 import {
+  dragMove,
   expectFen,
   expectYourMove,
   openSettled,
@@ -11,8 +12,9 @@ import {
   submitNewGame,
 } from './helpers.ts';
 
-// The fake-play engine counts material, so a hint takes the rook on a1.
-const MATE_IN_ONE = '6k1/5ppp/8/8/8/8/r4PPP/1R4K1 w - - 0 1';
+// The fake-play engine's best move is the first legal one, here Ra1: a rook move, so the arrow is
+// straight.
+const ROOK_ENDGAME = '6k1/5ppp/8/8/8/8/r4PPP/1R4K1 w - - 0 1';
 const YOUR_MOVE: Partial<GameState> = { humanColor: 'white', phase: 'human', fen: START };
 
 const hint = (page: Page) => page.getByRole('button', { name: /^Hint/ });
@@ -28,11 +30,11 @@ test('shows the piece, then the move, for one hint, and keeps it through a reloa
   await showNewGameForm(page);
   await page.getByRole('combobox', { name: 'Engine' }).selectOption('fake-play');
   await page.getByRole('combobox', { name: 'Limit' }).selectOption('depth');
-  await page.getByLabel('Start position').fill(MATE_IN_ONE);
+  await page.getByLabel('Start position').fill(ROOK_ENDGAME);
   // Without verdicts, the hint runs the position search on demand.
   await page.getByLabel('Move Feedback').uncheck();
   await submitNewGame(page);
-  await expectFen(page, MATE_IN_ONE);
+  await expectFen(page, ROOK_ENDGAME);
   await expectYourMove(page);
   await expect(left(page)).toHaveText('3');
 
@@ -52,6 +54,12 @@ test('shows the piece, then the move, for one hint, and keeps it through a reloa
   await expect(board(page)).toHaveAttribute('data-hint', 'b1a1');
   await expect(shapes(page, 'line')).toHaveCount(1);
   await expect(left(page)).toHaveText('2');
+
+  // The arrow is drawn over the board; a piece dragged elsewhere must still move.
+  await dragMove(page, 'h2h3');
+  await expect(page.getByTestId('moves').locator('.san').first()).toHaveText('h3');
+  await expect(board(page)).not.toHaveAttribute('data-hint');
+  await expect(shapes(page, 'line')).toHaveCount(0);
 });
 
 test('sends one request until the server answers, with a game state or an error', async ({

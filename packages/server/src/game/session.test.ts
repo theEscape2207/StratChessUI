@@ -127,6 +127,12 @@ function open(
   return { session, next, nextAny, take, settled, untilSettled, logged };
 }
 
+// The standard start but for its castling rights: the same moves, in a game with no opening.
+const NO_OPENING = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1';
+// The start position's best move for the scored fake, which the verdict profiles run.
+const BEST = legalMoves(START_FEN)[0]!.uci;
+const sent = (session: GameSession, command: string) =>
+  session.takeTranscript()!.filter((l) => l.dir === 'sent' && l.text === command).length;
 const searches = (messages: ServerMessage[]) => messages.filter((m) => m.type === 'search');
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -1114,12 +1120,7 @@ describe('GameSession', () => {
       analysis: true,
       fen,
     });
-    // The standard start but for its castling rights: the same moves, in a game with no opening.
-    const NO_OPENING = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1';
-    const BEST = legalMoves(START_FEN)[0]!.uci;
     const lines = (session: GameSession) => session.takeTranscript()!.map((line) => line.text);
-    const sent = (session: GameSession, command: string) =>
-      session.takeTranscript()!.filter((l) => l.dir === 'sent' && l.text === command).length;
     /** Waits until the engine has answered this many searches, the last of which is then in. */
     const answered = (session: GameSession, searches: number) =>
       vi.waitFor(() =>
@@ -1429,13 +1430,8 @@ describe('GameSession', () => {
   });
 
   describe('hints', () => {
-    // The start position's best move for the scored fake, which the verdict profiles run.
-    const BEST = legalMoves(START_FEN)[0]!.uci;
     const FROM = { from: BEST.slice(0, 2) };
     const FULL = { ...FROM, to: BEST.slice(2, 4) };
-    const NO_OPENING = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1';
-    const sent = (session: GameSession, command: string) =>
-      session.takeTranscript()!.filter((l) => l.dir === 'sent' && l.text === command).length;
     const error = async (next: () => Promise<ServerMessage>) => {
       const msg = await next();
       return msg.type === 'error' ? msg.reason : msg;
@@ -1541,7 +1537,7 @@ describe('GameSession', () => {
     });
 
     it('costs nothing when the search is capped', async () => {
-      const { session, settled, next } = open({ ...TIMEOUTS, maxSearchMs: 300 });
+      const { session, settled, next, logged } = open({ ...TIMEOUTS, maxSearchMs: 300 });
       void session.newGame(game('held-position', 'white'));
       await settled();
       session.move('e2e4');
@@ -1549,7 +1545,10 @@ describe('GameSession', () => {
       session.hint();
       expect(await error(next)).toBe('no hint for this position');
       expect(session.state).toEqual(state);
-    });
+      expect(logged).toContain(
+        `StratChess (fake): analysis to depth ${ANALYSIS.depth} capped at ${ANALYSIS.capMs} ms`,
+      );
+    }, 15_000);
 
     it.each([
       [BEST, null],
@@ -1598,6 +1597,22 @@ describe('GameSession', () => {
         session.hint();
         expect((await settled()).hint).toEqual(FROM);
         expect(logged.filter((line) => line.includes('running'))).toHaveLength(2);
+      });
+
+      it('stops the engine it restarted once the hint is shown, if nobody is connected', async () => {
+        const { session, settled, logged } = open();
+        void session.newGame(game('judged', 'white'));
+        await settled();
+        expect(session.stopEngineWhenIdle()).toBe(true);
+        session.keepEngine();
+        session.hint();
+        // The grace period runs out again during the restart.
+        expect(session.stopEngineWhenIdle()).toBe(false);
+        expect((await settled()).hint).toEqual(FROM);
+        // A move then needs a third engine: the hint's was stopped.
+        session.move(BEST);
+        await settled();
+        expect(logged.filter((line) => line.includes('running'))).toHaveLength(3);
       });
 
       it('is refused, keeping the game, when the engines are all taken', async () => {
