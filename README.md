@@ -40,6 +40,32 @@ machine's name and its IPv4 addresses. `FAKE_ENGINE=legal` replaces the configur
 the test engine (`packages/server/src/uci/fake-engine.ts`), as Playwright does; with it,
 pairings are not saved and `PAIRING_CODE` fixes the code.
 
+### Test a worktree from a phone
+
+A test server runs a worktree's build beside the live one, so nobody's game stops. It listens on
+port 8081 with a host directory of its own, `%APPDATA%\StratChessUI-Test`, sharing no pairings,
+settings or log with the live server. It is reachable from the home network only, never through
+the tunnel.
+
+Once, from an elevated PowerShell, open its port under a rule of its own (`-Test -Remove` deletes
+that rule and leaves the main one):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\firewall.ps1 -Test
+```
+
+Then, in the worktree, after `npm ci`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\test-server.ps1
+```
+
+It builds, starts the server in the console and prints the pairing code; Ctrl+C stops it. The
+first run copies the live `engines.json` and links the live `engines` folder; after that the test
+server's `engines.json` is its own. The phone pairs once on the test address
+(`http://<this-machine>:8081`): a pairing belongs to the address it was made on, and the directory
+is the same from every worktree.
+
 ## Host directory
 
 `engines.json` and `pairings.json` live outside the checkout, so every worktree shares one set of

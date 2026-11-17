@@ -1,13 +1,16 @@
 # Opens the server port to the home LAN: inbound TCP, Private profile, local subnet only.
-# Run from an elevated PowerShell. -Remove deletes the rule again.
+# -Test opens the test server's port instead, under a rule of its own, so either can be opened or
+# removed without touching the other. Run from an elevated PowerShell. -Remove deletes the rule again.
 #Requires -RunAsAdministrator
 param(
-    [int]$Port = 8080,
+    [int]$Port,
+    [switch]$Test,
     [switch]$Remove
 )
 
 $ErrorActionPreference = 'Stop'
-$ruleName = 'StratChessUI'
+$ruleName = if ($Test) { 'StratChessUI-Test' } else { 'StratChessUI' }
+if (-not $PSBoundParameters.ContainsKey('Port')) { $Port = if ($Test) { 8081 } else { 8080 } }
 
 Get-NetFirewallRule -Name $ruleName -ErrorAction SilentlyContinue | Remove-NetFirewallRule
 if ($Remove) {
@@ -15,10 +18,10 @@ if ($Remove) {
     return
 }
 
-New-NetFirewallRule -Name $ruleName -DisplayName "StratChessUI (TCP $Port, LAN)" `
+New-NetFirewallRule -Name $ruleName -DisplayName "$ruleName (TCP $Port, LAN)" `
     -Direction Inbound -Action Allow -Protocol TCP -LocalPort $Port `
     -Profile Private -RemoteAddress LocalSubnet | Out-Null
-Write-Host "Allowed inbound TCP $Port from the local subnet on Private networks."
+Write-Host "Allowed inbound TCP $Port from the local subnet on Private networks (rule $ruleName)."
 
 # The rule applies only while the network is Private; Windows often files a new network as Public.
 Get-NetConnectionProfile | Where-Object { $_.NetworkCategory -ne 'Private' } | ForEach-Object {
