@@ -8,6 +8,7 @@ function scoreText({ score, bound }: SearchReport): string | undefined {
   const value = formatScore(score);
   return bound ? `${bound === 'lower' ? '≥' : '≤'} ${value}` : value;
 }
+
 /** The engine's latest search line; whatever the engine did not report is left out. */
 export function SearchInfo({ fen, info }: { fen: string; info: SearchReport }) {
   const stats = [

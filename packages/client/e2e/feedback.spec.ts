@@ -56,6 +56,10 @@ test('a blunder shows against the best move: two rows on a desktop, one on a pho
     await expect(bestWas(page)).toHaveText(/^Best was \S+ \(#1\)$/);
     // One row: the badge's height, the headline and "Best was" beside it, and the padding.
     expect((await feedback(page).boundingBox())!.height).toBeLessThanOrEqual(64);
+    // The buttons under it are still on the first screen.
+    const undo = page.getByRole('button', { name: 'Undo' });
+    const bottom = await undo.evaluate((el) => el.getBoundingClientRect().bottom + scrollY);
+    expect(bottom).toBeLessThanOrEqual(page.viewportSize()!.height);
   }
   const sideways = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,

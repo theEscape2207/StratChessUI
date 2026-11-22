@@ -1,11 +1,11 @@
 # MoveFeedback
 
-Two rows at the top of the sidebar: the move just played with its verdict and eval, and the engine's
-best move with its line.
+Two rows in the sidebar, under SearchInfo: the move just played with its verdict and eval, and the
+engine's best move with its line.
 
-**Use** under SearchInfo when Move Feedback is on, for the human's latest move: from its verdict
-until the human's next move, including while the engine thinks. A move with no feedback yet shows
-nothing, so the previous feedback goes as soon as the human moves.
+**Use** when Move Feedback is on, for the human's latest move: from its verdict until the human's
+next move, including while the engine thinks. A move with no feedback yet shows nothing, so the
+previous feedback goes as soon as the human moves.
 
 **Rows**
 - **Played move:** QualityBadge when it has a verdict, the headline, the eval chip when it has a
@@ -26,5 +26,3 @@ under the best move is `pv` style in `muted`, one line, ellipsised.
 
 **Below 960px** one row, per GameScreenPhone: badge, headline and chip, with "Best was O-O (0.00)"
 under the headline in place of the best row. No PV.
-
-New in this system.

@@ -37,8 +37,9 @@ export function shownFeedback(
   game: Pick<GameState, 'startFen' | 'moves' | 'humanColor' | 'verdicts' | 'feedback'>,
 ): ShownFeedback | undefined {
   const ply = latestHumanPly(game);
-  const feedback = ply === undefined ? undefined : game.feedback?.[ply];
-  if (ply === undefined || !feedback) return undefined;
+  if (ply === undefined) return undefined;
+  const feedback = game.feedback?.[ply];
+  if (!feedback) return undefined;
   const before = game.moves.slice(0, ply);
   let fen = game.startFen;
   for (const uci of before) {
@@ -49,7 +50,7 @@ export function shownFeedback(
   const san = sanMoves(fen, [game.moves[ply]!])[0];
   if (!san) return undefined;
   const verdict = game.verdicts?.[ply] ?? undefined;
-  // The best row names its move by the PV's first.
+  // The best row names its move by the PV's first; an empty PV leaves it nothing to name.
   const best = feedback.best?.pv.length ? feedback.best : undefined;
   return {
     san,
