@@ -9,11 +9,13 @@ import {
   parseStartFen,
   START_FEN,
   turn,
+  type Feedback,
   type GameState,
   type Hint,
   type NewGameRequest,
   type Outcome,
   type SearchUpdate,
+  type Score,
   type ServerMessage,
   type Strength,
   type TranscriptLine,
@@ -52,8 +54,11 @@ export type SessionOptions = {
   rng?: () => number;
 };
 
-/** An analysis search's best move and its score for the side to move, on `scoreCp`'s scale. */
-type Scored = { bestMove: string; cp: number };
+/**
+ * An analysis search's best move, its score for the side to move on `scoreCp`'s scale, and the
+ * score and PV as the browser sees them: from white's perspective, in SAN.
+ */
+type Scored = { bestMove: string; cp: number; score: Score; pv: string[] };
 
 /** `null`: the search ran and gave nothing to judge a move by. Undefined: it was cancelled. */
 type Analysed = Scored | null | undefined;
@@ -99,6 +104,11 @@ type Game = {
   searches: Analysis;
   /** The hint shown at each human turn, by the number of moves before the turn. */
   hints: (Hint | undefined)[];
+  /**
+   * The human turns whose best move MoveFeedback has shown, by the number of moves before the
+   * turn. A takeback keeps them, so replaying that move earns no praise, as on a hinted turn.
+   */
+  revealed: boolean[];
   /** The moves of the turn a hint is being found for, which a second request must not overtake. */
   hinting?: readonly string[];
 };
@@ -107,8 +117,15 @@ const TRANSCRIPT_TAIL = 20;
 const REPORT_INTERVAL_MS = 100;
 /** Deep enough to see a hanging piece or a mate in one, through quiescence at the horizon. */
 const RANKING_LIMIT = { depth: 1 };
+/** The PV a best move shows with: one line in the sidebar. */
+const FEEDBACK_PV_PLIES = 8;
 /** Per game rather than per turn: a beginner who needs one every turn wants an easier level. */
 export const HINTS_PER_GAME = 3;
+
+/** The best move's row of MoveFeedback, from the position search of the move's turn. */
+function bestLine(best: Scored): NonNullable<Feedback['best']> {
+  return { score: best.score, pv: best.pv.slice(0, FEEDBACK_PV_PLIES) };
+}
 
 export class GameSession {
   private readonly options: SessionOptions;
@@ -163,11 +180,12 @@ export class GameSession {
         ...strength,
         phase: 'starting',
         moves: [],
-        ...(request.analysis && { analysis: true, verdicts: [] }),
+        ...(request.analysis && { analysis: true, verdicts: [], feedback: [] }),
         hintsLeft: HINTS_PER_GAME,
       },
       searches: { best: [], inHash: false },
       hints: [],
+      revealed: [],
       positions: [start.fen],
       // A replaced game's engine still logs its `quit`, which must not reach the browser.
       transcript: new TranscriptFeed((lines) => {
@@ -214,6 +232,7 @@ export class GameSession {
     game.surrenderedTurns = 0;
     // The turns after this one may be reached again by other moves.
     game.hints.length = Math.min(game.hints.length, moves.length + 1);
+    game.revealed.length = Math.min(game.revealed.length, moves.length + 1);
     game.searches.best.length = Math.min(game.searches.best.length, moves.length + 1);
     game.searches.running = undefined;
     game.state = {
@@ -223,6 +242,7 @@ export class GameSession {
       moves,
       lastMove: moves.at(-1),
       ...(game.state.verdicts && { verdicts: game.state.verdicts.slice(0, -plies) }),
+      ...(game.state.feedback && { feedback: game.state.feedback.slice(0, -plies) }),
       hint: game.hints[moves.length],
     };
     void game.engine?.stop();
@@ -294,13 +314,14 @@ export class GameSession {
 
   private play(game: Game, uci: string, fen: string): void {
     game.positions.push(fen);
-    const { moves, verdicts } = game.state;
+    const { moves, verdicts, feedback } = game.state;
     game.state = {
       ...game.state,
       fen,
       moves: [...moves, uci],
       lastMove: uci,
       ...(verdicts && { verdicts: [...verdicts, null] }),
+      ...(feedback && { feedback: [...feedback, null] }),
       hint: undefined,
     };
     this.nextTurn(game);
@@ -445,6 +466,7 @@ export class GameSession {
     depth: number,
   ): Promise<Analysed> {
     const { startFen, engineName } = game.state;
+    const fen = game.positions[moves.length]!;
     // Before the search, as one cancelled part-way has written to the hash too.
     analysis.inHash = true;
     let result;
@@ -463,8 +485,13 @@ export class GameSession {
       this.options.log(`${engineName}: analysis to depth ${depth} capped at ${ANALYSIS.capMs} ms`);
       return null;
     }
-    const score = result.info?.score;
-    return score ? { bestMove: result.bestMove, cp: scoreCp(score) } : null;
+    const { info, bestMove } = result;
+    if (!info?.score) return null;
+    // The feedback names the best move by the PV's first, and an engine's PV need not lead with it.
+    const pv = info.pv?.[0] === bestMove ? info.pv : [bestMove];
+    const report = searchReport(fen, { ...info, pv });
+    if (!report.score) return null;
+    return { bestMove, cp: scoreCp(info.score), score: report.score, pv: report.pv ?? [] };
   }
 
   /**
@@ -481,12 +508,15 @@ export class GameSession {
     if (this.turnIsGone(game, moves)) return false;
     if (!best) return true;
     let verdict: Verdict | undefined = 'best';
+    let feedback: Feedback = { score: best.score };
     if (moves[ply] !== best.bestMove) {
       const reply = await this.analysisSearch(game, analysis, moves, ANALYSIS.depth - 1);
       if (this.turnIsGone(game, moves)) return false;
       verdict = reply ? verdictOf(best.cp, -reply.cp) : undefined;
+      feedback = { ...(reply && { score: reply.score }), best: bestLine(best) };
     }
-    if (this.setVerdict(game, ply, verdict)) this.publish(game);
+    this.judge(game, ply, verdict, feedback);
+    this.publish(game);
     return true;
   }
 
@@ -500,23 +530,25 @@ export class GameSession {
     // Only a human turn has a position search, so an engine's move finds none.
     const best = game.state.analysis && game.searches.best[ply];
     if (!best) return;
-    const verdict =
-      moves[ply] === best.bestMove
-        ? 'best'
-        : verdictOf(best.cp, decidedCp(ended.result, humanColor));
-    this.setVerdict(game, ply, verdict);
+    if (moves[ply] === best.bestMove) return this.judge(game, ply, 'best', { score: best.score });
+    const verdict = verdictOf(best.cp, decidedCp(ended.result, humanColor));
+    this.judge(game, ply, verdict, { best: bestLine(best) });
   }
 
   /**
-   * Records the verdict the move at `ply` is to show, if any; false if it shows none. A move made
-   * on a hinted turn earns no praise: at best it is the engine's own.
+   * Records the verdict the move at `ply` is to show, if any, and its feedback. A move made on a
+   * turn whose best move was hinted or shown earns no praise: at best it is the engine's own.
    */
-  private setVerdict(game: Game, ply: number, judged: Verdict | undefined): boolean {
-    const earned = game.hints[ply] ? withoutPraise(judged) : judged;
+  private judge(game: Game, ply: number, judged: Verdict | undefined, feedback: Feedback): void {
+    const earned = game.hints[ply] || game.revealed[ply] ? withoutPraise(judged) : judged;
     const verdict = withoutOpeningPraise(earned, game.state.startFen, ply);
-    if (!verdict) return false;
-    game.state = { ...game.state, verdicts: game.state.verdicts!.with(ply, verdict) };
-    return true;
+    if (feedback.best) game.revealed[ply] = true;
+    const { verdicts, feedback: all } = game.state;
+    game.state = {
+      ...game.state,
+      ...(verdict && { verdicts: verdicts!.with(ply, verdict) }),
+      feedback: all!.with(ply, feedback),
+    };
   }
 
   private async engineMove(game: Game): Promise<void> {

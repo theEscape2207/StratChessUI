@@ -68,6 +68,7 @@ which each browser remembers open or closed (#76). No separate view, no configur
 | Move verdicts       | The game's own engine searches before and after each human move; off unless asked, and the form asks unless told not to | The opponent's search is too weak to judge; a second process takes a slot and a Hash. Win chance given up decides: raw pawns fault a pawn lost in a won game (#91, 2026-11-16)   |
 | Opening praise      | No best or excellent for the human's first moves from the standard start; faults still show; a FEN game has no opening  | Every sensible opening move is close to the engine's best, so praise there is noise; an opening book waits (#111, 2026-11-16)                                                    |
 | Hints               | The verdicts' position search gives the move: the piece first, then the arrow; three hinted turns a game, none refunded | A plain search, so a level's mistakes stay out; staged, so a beginner can still find the move. A hinted move earns no praise (#68, 2026-11-17)                                   |
+| Move feedback       | The verdicts' scores, and the best move's line only when another move was played; a best move shown counts as hinted    | A line after the move played would hand out the next turn's hint; without the rule, Undo turns any fault into a free best (#92, 2026-11-22)                                      |
 
 ## Architecture constraints (independent of stack)
 

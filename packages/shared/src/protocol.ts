@@ -64,6 +64,20 @@ export type Verdict = 'best' | 'excellent' | 'inaccuracy' | 'mistake' | 'blunder
  */
 export type Hint = { from: string; to?: string };
 
+/** The scores behind a verdict, and the engine's line, for MoveFeedback. */
+export type Feedback = {
+  /**
+   * The move played, from white's perspective; absent when its search was capped or the rules
+   * decided the game.
+   */
+  score?: Score;
+  /**
+   * The engine's best move instead, absent when it was the move played. The PV, in SAN from the
+   * position before the move, starts with the best move.
+   */
+  best?: { score: Score; pv: string[] };
+};
+
 export type GameState = {
   /** The position the game started from, normalised. */
   startFen: string;
@@ -89,6 +103,11 @@ export type GameState = {
    * human's that has no verdict, or none yet.
    */
   verdicts?: (Verdict | null)[];
+  /**
+   * With `analysis`, one entry per move: `null` for the engine's moves, and for a move of the
+   * human's whose position search gave nothing, or none yet.
+   */
+  feedback?: (Feedback | null)[];
   /** Turns the human can still ask a hint for. A turn costs one, whatever its stages. */
   hintsLeft: number;
   /** The hint shown for the turn the game is at, which a takeback to the turn brings back. */

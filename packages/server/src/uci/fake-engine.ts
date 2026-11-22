@@ -9,7 +9,8 @@
 //   no-id-name      like normal, but the handshake has no `id name`
 //   ignore-quit     like legal, but stays up after `quit` until it is killed
 //   scored          scores a position by material for the side to move, plus `--bias=<cp>`, or as
-//                   `mate 1` when it has one; a mated or stalemated root answers `bestmove 0000`
+//                   `mate 1` when it has one; a mated or stalemated root answers `bestmove 0000`.
+//                   Its PV is the best move, then first legal moves, 12 plies in all
 //   scoreless       like scored, but its info line has no score
 // With `--hold=<uci>`, a `go` for a position whose moves include that move runs until `stop`; with
 // `--hold-depth=<n>` as well, only a `go depth <n>` does.
@@ -60,6 +61,8 @@ const SEARCH_END = [
   'info string treenodes main 751 qs 47',
 ];
 
+const SCORED_PV_PLIES = 12;
+
 const STALEMATE = '7k/5Q2/6K1/8/8/8/8/8 b - - 0 1';
 // In any mode, a game from here crashes the engine on its first search.
 const CRASH = '4k3/8/8/8/8/8/4P3/4K3 w - - 0 1';
@@ -96,8 +99,21 @@ function finishScored() {
   const lost = losses.get(movesOf(position).at(-1) ?? '') ?? 0;
   const score =
     mode === 'scoreless' ? '' : mates ? ' score mate 1' : ` score cp ${material + lost}`;
-  out(`info depth 1 seldepth 1${score} nodes 1 pv ${moves[0]!.uci}`);
+  out(`info depth 1 seldepth 1${score} nodes 1 pv ${scoredPv(moves[0]!).join(' ')}`);
   out(`bestmove ${moves[0]!.uci}`);
+}
+
+/** The best move, then first legal moves in a row: a PV longer than MoveFeedback shows. */
+function scoredPv(best: { uci: string; fen: string }): string[] {
+  const pv = [best.uci];
+  let fen = best.fen;
+  while (pv.length < SCORED_PV_PLIES) {
+    const move = firstLegalMoveFrom(fen);
+    if (!move) break;
+    pv.push(move);
+    fen = (applyUciMove(fen, move) as { fen: string }).fen;
+  }
+  return pv;
 }
 
 function movesOf(command: string): string[] {
