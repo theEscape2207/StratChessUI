@@ -1,10 +1,11 @@
 # Web chess UI: requirements
 
-Status: requirements agreed 2026-10-25; Milestones 1 and 2 done. Moved here from the engine
+Status: requirements agreed 2026-10-25; Milestones 1, 2 and 3 done. Moved here from the engine
 repository (`theEscape2207/StratChess`, PR 915).
 
-**Next task:** Milestone 3, starting with its open questions below. Engine issues below follow when
-their milestone needs them; they live in the engine repository.
+**Next task:** not set. M3's real game (#74) asked mostly for feedback during and after a game,
+learning from move analysis: MoveFeedback (#92) and GameReview (#93). Engine issues below follow
+when a change needs them; they live in the engine repository.
 
 ## Intent
 
@@ -126,13 +127,13 @@ progress`). The controller must send `stop` and wait for `bestmove` before the n
 
 Fixed in the engine rather than worked around in the UI:
 
-| Issue                                  | Change                                                                                                | Needed by                          |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| theEscape2207/StratChess#911           | Report `nps` and `seldepth`                                                                           | M2                                 |
-| theEscape2207/StratChess#912           | Full PV on the final info line                                                                        | M2                                 |
-| theEscape2207/StratChess#94 (reopened) | MultiPV                                                                                               | M3: hint alternatives              |
-| theEscape2207/StratChess#913 (closed)  | Beginner strength. Closed without an engine change: the beginner opponent runs on the UI server (#94) | M3                                 |
-| theEscape2207/StratChess#914           | `currmove`/`currmovenumber` (optional)                                                                | No milestone; M2 closed without it |
+| Issue                                 | Change                                                                                                | Needed by                          |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| theEscape2207/StratChess#911          | Report `nps` and `seldepth`                                                                           | M2                                 |
+| theEscape2207/StratChess#912          | Full PV on the final info line                                                                        | M2                                 |
+| theEscape2207/StratChess#94 (closed)  | MultiPV, merged 2026-11-21; not yet in a release                                                      | The `great` verdict (#120)         |
+| theEscape2207/StratChess#913 (closed) | Beginner strength. Closed without an engine change: the beginner opponent runs on the UI server (#94) | M3                                 |
+| theEscape2207/StratChess#914          | `currmove`/`currmovenumber` (optional)                                                                | No milestone; M2 closed without it |
 
 ## External dependencies
 
@@ -172,10 +173,10 @@ in build tooling (Vite, ESLint, TypeScript) rather than in the chess or server c
 
 ## Open questions (later milestones)
 
-- **M3:** how difficulty is named (#71); whether Play needs its own view (#76). A real game with
-  the target player closes the milestone (#74), and tunes the hints per game.
-- **After M3:** PGN export, #65 (recommended: retains games without a database). M3 holds only what
-  serves beginners.
+- **After M3:** how difficulty is named (#71), left open as a beginner won at the easiest setting
+  without it (#74); learning from move analysis (#92, #93); PGN export, #65 (recommended: retains
+  games without a database). Hints per game and the verdict thresholds (#114) are tuned from real
+  games.
 - **Several users:** one game per paired browser serves a household. Accounts, or a game that moves
   between a player's devices, have no milestone.
 - **Analysis:** linear move navigation or variation tree; continuous analysis; multiple engines;
