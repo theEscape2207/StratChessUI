@@ -4,7 +4,7 @@ import { sanMoves, START_FEN } from './rules.ts';
 
 /**
  * PGN's numeric annotation glyphs: $1 good (!), $2 poor (?), $4 very poor (??), $6 dubious (?!).
- * $3 (!!) is the brilliant move, kept for an only move rather than the engine's own choice.
+ * $3 (!!) is the brilliant move: not the engine's own choice, so kept for `great`, an only move (#120).
  */
 const VERDICT_NAGS: Record<Verdict, number> = {
   best: 1,

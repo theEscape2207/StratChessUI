@@ -47,11 +47,11 @@ const PGN_ICON = (
   </svg>
 );
 
-/** Copy FEN, and Copy PGN once there is a game, sharing one status after the icons. */
+/** One status after the icons: one beside each would push the next icon aside as it appears. */
 export function CopyTools({ fen, pgn }: { fen: string; pgn: string | undefined }) {
   const items: Copyable[] = [{ label: 'Copy FEN', text: fen, icon: FEN_ICON }];
   if (pgn !== undefined) items.push({ label: 'Copy PGN', text: pgn, icon: PGN_ICON });
-  const [copied, setCopied] = useState<{ label: string; text: string; ok: boolean }>();
+  const [copied, setCopied] = useState<Omit<Copyable, 'icon'> & { ok: boolean }>();
   // Feedback belongs to the text it was about; a move changes both, which clears it.
   const feedback = items.some((item) => item.label === copied?.label && item.text === copied.text)
     ? copied

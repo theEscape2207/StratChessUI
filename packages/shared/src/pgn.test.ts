@@ -15,7 +15,7 @@ function game(overrides: Partial<PgnGame> = {}): PgnGame {
     engineName: 'Advanced',
     limit: { depth: 8 },
     ...overrides,
-  } as PgnGame;
+  };
 }
 
 function finalFen(startFen: string, moves: string[]): string {
@@ -47,9 +47,8 @@ describe('gamePgn', () => {
       gamePgn(
         game({
           moves,
-          analysis: true,
           verdicts: ['best', null, 'excellent', null, null, null, 'inaccuracy'],
-        } as Partial<PgnGame>),
+        }),
         DATE,
       ),
     );
