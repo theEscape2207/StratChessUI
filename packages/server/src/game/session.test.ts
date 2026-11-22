@@ -55,6 +55,8 @@ const VERDICT_PROFILES = {
   judged: [LOSS_ARG],
   'held-position': [LOSS_ARG, '--hold=e2e4', '--hold-depth=10'],
   'held-reply': [LOSS_ARG, '--hold=e2e4', '--hold-depth=9'],
+  // Every position is so much better for the side to move, so a score's sign shows its perspective.
+  biased: ['--bias=40'],
 };
 PROFILES.push(
   ...Object.entries(VERDICT_PROFILES).map(([id, args]) => ({
@@ -1137,7 +1139,7 @@ describe('GameSession', () => {
       session.move('h2h4');
       const state = await settled();
       expect(state.moves).toHaveLength(2);
-      expect('analysis' in state || 'verdicts' in state).toBe(false);
+      expect('analysis' in state || 'verdicts' in state || 'feedback' in state).toBe(false);
       expect(lines(session).filter((text) => /^go depth (9|10)$/.test(text))).toEqual([]);
     });
 
@@ -1240,6 +1242,8 @@ describe('GameSession', () => {
         phase: 'over',
         termination: 'stalemate',
         verdicts: ['blunder'],
+        // The rules decide the move's score, which the feedback leaves out.
+        feedback: [{ best: { score: { mate: 1 }, pv: expect.any(Array) } }],
       });
       expect(sent(session, 'go depth 9')).toBe(0);
     });
@@ -1292,7 +1296,7 @@ describe('GameSession', () => {
         session.move('h2h4');
         expect((await settled()).verdicts).toEqual(['blunder', null]);
         session.takeBack();
-        expect(await settled()).toMatchObject({ moves: [], verdicts: [] });
+        expect(await settled()).toMatchObject({ moves: [], verdicts: [], feedback: [] });
         session.move('d2d3');
         expect((await settled()).verdicts).toEqual(['mistake', null]);
         expect(sent(session, `position fen ${START_FEN}`)).toBe(1);
@@ -1312,7 +1316,8 @@ describe('GameSession', () => {
         const fresh = legalMoves((await settled()).fen)[0]!.uci;
         expect(fresh).not.toBe(stale);
         session.move(fresh);
-        expect((await settled()).verdicts).toEqual(['best', null, 'best', null]);
+        // The first move is the best one the feedback on e2e4 showed, so it earns no praise.
+        expect((await settled()).verdicts).toEqual([null, null, 'best', null]);
       });
 
       it('judges a move replayed straight after one taken back during its position search', async () => {
@@ -1412,6 +1417,8 @@ describe('GameSession', () => {
       session.move('e2e4');
       const state = await settled();
       expect(state.verdicts).toEqual([null, null]);
+      // The best move's row still shows; the move played has no score.
+      expect(state.feedback).toEqual([{ best: expect.anything() }, null]);
       expect(state.moves).toHaveLength(2);
       expect(logged).toContain('StratChess (fake): analysis to depth 9 capped at 2000 ms');
     }, 15_000);
@@ -1423,9 +1430,110 @@ describe('GameSession', () => {
       session.move('e2e4');
       await settled();
       session.move('h2h4');
-      expect((await settled()).verdicts).toEqual(['excellent', null, null, null]);
+      const state = await settled();
+      expect(state.verdicts).toEqual(['excellent', null, null, null]);
+      expect(state.feedback!.slice(1)).toEqual([null, null, null]);
       // With no best move to compare with, the reply is not searched either.
       expect(sent(session, 'go depth 9')).toBe(1);
+    });
+  });
+
+  describe('feedback', () => {
+    const analysed = (engineId: string, humanColor: NewGameRequest['humanColor'] = 'white') =>
+      ({ ...game(engineId, humanColor), analysis: true, fen: NO_OPENING }) as NewGameRequest;
+    const BEST_SAN = sanMoves(NO_OPENING, [BEST])[0];
+
+    it('gives the best move its score alone', async () => {
+      const { session, settled } = open();
+      void session.newGame(analysed('judged'));
+      await settled();
+      session.move(BEST);
+      expect((await settled()).feedback).toEqual([{ score: { cp: 0 } }, null]);
+    });
+
+    it("gives another move its score, and the best move's with its line, capped", async () => {
+      const { session, settled } = open();
+      void session.newGame(analysed('judged'));
+      await settled();
+      session.move('h2h4');
+      const state = await settled();
+      const [played, reply] = state.feedback!;
+      expect(reply).toBeNull();
+      expect(played).toEqual({
+        score: { cp: -200 },
+        best: { score: { cp: 0 }, pv: expect.any(Array) },
+      });
+      expect(played!.best!.pv).toHaveLength(8);
+      expect(played!.best!.pv[0]).toBe(BEST_SAN);
+      // A browser that reattaches gets it with the game.
+      expect(session.state).toEqual(state);
+    });
+
+    it('names the best move even when the PV the engine sent leads with another', async () => {
+      // The fake's normal mode answers b1c3 from the start, with a recorded PV of d2d4.
+      const { session, settled } = open();
+      void session.newGame({ ...game('normal', 'white'), analysis: true });
+      await settled();
+      session.move('e2e4');
+      expect((await settled()).feedback![0]).toMatchObject({ best: { pv: ['Nc3'] } });
+    });
+
+    it.each([
+      ['white', { cp: 40 }, { cp: -40 }],
+      ['black', { cp: -40 }, { cp: 40 }],
+    ] as const)(
+      "scores from white's perspective for a human playing %s",
+      async (color, best, score) => {
+        const { session, settled } = open();
+        void session.newGame(analysed('biased', color));
+        const turn = await settled();
+        const moves = legalMoves(turn.fen);
+        // Not the best move, so both searches run.
+        session.move(moves[1]!.uci);
+        const state = await settled();
+        const ply = state.moves.length - 2;
+        expect(state.feedback![ply]).toMatchObject({ score, best: { score: best } });
+      },
+    );
+
+    it('withholds praise from a best move that the feedback showed, after a takeback', async () => {
+      const { session, settled } = open();
+      void session.newGame(analysed('judged'));
+      await settled();
+      session.move(BEST);
+      expect((await settled()).verdicts).toEqual(['best', null]);
+      // Played, the best move showed no line, so it is praised again.
+      session.takeBack();
+      await settled();
+      session.move(BEST);
+      expect((await settled()).verdicts).toEqual(['best', null]);
+      session.takeBack();
+      await settled();
+      session.move('h2h4');
+      expect((await settled()).verdicts).toEqual(['blunder', null]);
+      session.takeBack();
+      await settled();
+      session.move(BEST);
+      const state = await settled();
+      expect(state.verdicts).toEqual([null, null]);
+      expect(state.feedback).toEqual([{ score: { cp: 0 } }, null]);
+    });
+
+    it('forgets what it showed on the turns a takeback removes, which other moves may reach', async () => {
+      const { session, settled } = open();
+      void session.newGame(analysed('judged'));
+      await settled();
+      session.move('h2h4');
+      session.move(legalMoves((await settled()).fen)[1]!.uci);
+      await settled();
+      session.takeBack();
+      await settled();
+      session.takeBack();
+      await settled();
+      session.move(BEST);
+      session.move(legalMoves((await settled()).fen)[0]!.uci);
+      // Turn 0 showed its best move and stays shown; turn 2 is another position now.
+      expect((await settled()).verdicts).toEqual([null, null, 'best', null]);
     });
   });
 
