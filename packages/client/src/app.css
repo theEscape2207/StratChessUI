@@ -299,6 +299,86 @@ main {
   color: var(--muted);
 }
 
+/* MoveFeedback. A phone gets one row, with "Best was" in place of the best move's row. */
+.move-feedback {
+  padding: 0 var(--space-5);
+}
+
+.feedback-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3) 0;
+}
+
+.feedback-row + .feedback-row {
+  border-top: 1px solid var(--hairline);
+}
+
+.feedback-row .quality-badge {
+  flex: none;
+  width: var(--badge-size);
+  height: var(--badge-size);
+  font-size: 12px;
+}
+
+.feedback-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.feedback-text p {
+  margin: 0;
+}
+
+.feedback-head {
+  font: var(--text-feedback);
+  font-size: 15px;
+  line-height: 20px;
+}
+
+.feedback-head span {
+  font-weight: 600;
+}
+
+.feedback-best-was {
+  font: var(--text-caption);
+  color: var(--muted);
+}
+
+.feedback-best-was b {
+  color: var(--ink);
+}
+
+.feedback-best {
+  display: none;
+}
+
+.feedback-pv {
+  overflow: hidden;
+  font: var(--text-pv);
+  color: var(--muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.feedback-chip {
+  flex: none;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font: var(--text-eval);
+}
+
+.feedback-chip.white {
+  color: var(--eval-black);
+  background: var(--eval-white);
+}
+
+.feedback-chip.black {
+  color: var(--eval-white);
+  background: var(--eval-black);
+}
+
 .more > summary,
 .transcript summary {
   padding: var(--space-3) var(--space-5);
@@ -749,6 +829,22 @@ button.stack svg {
 
   .search .search-pv {
     display: block;
+  }
+
+  .feedback-head {
+    font: var(--text-feedback);
+  }
+
+  .feedback-head span {
+    font-size: 15px;
+  }
+
+  .feedback-best {
+    display: flex;
+  }
+
+  .feedback-best-was {
+    display: none;
   }
 }
 

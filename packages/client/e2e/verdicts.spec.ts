@@ -84,6 +84,7 @@ test('with the checkbox off, no move has a verdict', async ({ page, hasTouch }) 
 
   await expectMoves(page, ['h3', 'Ra1']);
   await expect(page.getByTestId('quality-badge')).toHaveCount(0);
+  await expect(page.getByTestId('move-feedback')).toHaveCount(0);
 });
 
 test('the new game asks for verdicts unless unchecked, and keeps the choice', async ({ page }) => {

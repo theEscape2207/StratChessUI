@@ -16,10 +16,12 @@ import {
 import { Board } from './Board.tsx';
 import { CopyFen } from './CopyFen.tsx';
 import { EvalBar } from './EvalBar.tsx';
+import { shownFeedback } from './feedback.ts';
 import { GameOverDialog } from './GameOverDialog.tsx';
 import { HintButton } from './HintButton.tsx';
 import { gameOverText } from './gameover.ts';
 import { nextEval } from './eval.ts';
+import { MoveFeedback } from './MoveFeedback.tsx';
 import { MoveList } from './MoveList.tsx';
 import {
   FeedbackField,
@@ -250,6 +252,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
   const settingsShown = ready && !formHidden && engines.length > 0;
   // Replays the game, so once per game state rather than on each search line.
   const strips = useMemo(() => playerStrips(game), [game]);
+  const feedback = useMemo(() => game && shownFeedback(game), [game]);
   const verdict = game && boardVerdict(game);
   const status = statusLine(link, game, gameOverOpen);
 
@@ -309,6 +312,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
       <aside className="sidebar" aria-label="Game">
         <h2 className="sidebar-title">{game ? `Play ${game.engineName}` : 'New game'}</h2>
         {game && search && searchLine && <SearchInfo fen={search.fen} info={search.info} />}
+        {feedback && <MoveFeedback feedback={feedback} />}
         <MoveList
           startFen={game?.startFen ?? START_FEN}
           moves={game?.moves ?? []}
