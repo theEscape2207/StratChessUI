@@ -20,8 +20,12 @@ dialog closed, and a `notice` line when the server rejects something.
 
 **Actions** exactly three secondary buttons, icon over label: **Resign**, **Undo**, **Hint**. No
 primary button during play. Hint is disabled while the engine is thinking; Undo stays available. The
-toolbar holds Copy FEN and Settings only — move stepping belongs to GameReview. Settings appears
-once it has something to set; until then the toolbar is Copy FEN alone.
+toolbar holds Copy FEN, Copy PGN and Settings only — move stepping belongs to GameReview. Settings
+appears once it has something to set; until then the toolbar is Copy FEN and Copy PGN.
+
+**Copy PGN** copies the game so far, finished or not, for an outside analysis board: the human's
+verdicts go in as PGN glyphs, and the engine's level or limit as tags. Both copy buttons confirm
+with one `Copied` after the icons.
 
 **Resign** asks once, inline: the tap swaps the whole row for `Resign this game?` over two
 secondary buttons, **Keep playing** on the left and **Resign** on the right, clear of where Resign

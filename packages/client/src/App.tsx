@@ -5,6 +5,7 @@ import {
   canResign,
   canTakeBack,
   capturedPieces,
+  gamePgn,
   materialBalance,
   START_FEN,
   type EngineChoice,
@@ -14,7 +15,7 @@ import {
   type TranscriptLine,
 } from '@stratchess-ui/shared';
 import { Board } from './Board.tsx';
-import { CopyFen } from './CopyFen.tsx';
+import { CopyTools } from './CopyTools.tsx';
 import { EvalBar } from './EvalBar.tsx';
 import { GameOverDialog } from './GameOverDialog.tsx';
 import { HintButton } from './HintButton.tsx';
@@ -243,6 +244,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
   );
   const humanColor = game?.humanColor ?? 'white';
   const fen = game?.fen ?? START_FEN;
+  const pgn = useMemo(() => game && gamePgn(game, new Date()), [game]);
 
   const ready = engines !== undefined && link === 'connected';
   const playing = game !== undefined && game.phase !== 'over';
@@ -382,7 +384,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
           {/* Kept through a new game, so an open panel stays open; the server resets its lines. */}
           {(game || transcript.length > 0) && <Transcript lines={transcript} />}
           <div className="toolbar">
-            <CopyFen fen={fen} />
+            <CopyTools fen={fen} pgn={pgn} />
           </div>
         </details>
       </aside>

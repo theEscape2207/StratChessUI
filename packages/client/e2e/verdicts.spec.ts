@@ -77,6 +77,27 @@ test('with the checkbox on, a blunder shows on the board and in the move list', 
   expect(sideways).toBe(0);
 });
 
+test('Copy PGN carries the blunder as a glyph, and the start position', async ({
+  page,
+  context,
+  hasTouch,
+}) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await openSettled(page);
+  await newGameFrom(page, MATE_IN_ONE, true);
+  await playAndAwaitReply(page, 'h2h3', hasTouch);
+  await expect(listed(page, 'white', 'blunder')).toHaveText('??');
+
+  await page.getByRole('button', { name: 'Copy PGN' }).click();
+  await expect(page.getByTestId('copied')).toHaveText('Copied');
+  const pgn = await page.evaluate(() => navigator.clipboard.readText());
+  expect(pgn).toContain('[White "You"]');
+  expect(pgn).toContain(`[FEN "${MATE_IN_ONE}"]`);
+  expect(pgn).toMatch(/\[Depth "\d+"\]/);
+  // chessops numbers the move after a glyph afresh.
+  expect(pgn).toContain('1. h3 $4 1... Ra1 *');
+});
+
 test('with the checkbox off, no move has a verdict', async ({ page, hasTouch }) => {
   await openSettled(page);
   await newGameFrom(page, MATE_IN_ONE, false);

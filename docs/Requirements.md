@@ -69,6 +69,7 @@ which each browser remembers open or closed (#76). No separate view, no configur
 | Opening praise      | No best or excellent for the human's first moves from the standard start; faults still show; a FEN game has no opening  | Every sensible opening move is close to the engine's best, so praise there is noise; an opening book waits (#111, 2026-11-16)                                                    |
 | Hints               | The verdicts' position search gives the move: the piece first, then the arrow; three hinted turns a game, none refunded | A plain search, so a level's mistakes stay out; staged, so a beginner can still find the move. A hinted move earns no praise (#68, 2026-11-17)                                   |
 | Move feedback       | The verdicts' scores, and the best move's line only when another move was played; a best move shown counts as hinted    | A line after the move played would hand out the next turn's hint; without the rule, Undo turns any fault into a free best (#92, 2026-11-22)                                      |
+| PGN export          | Copy PGN in the toolbar, to the clipboard; human verdicts as glyphs, strength as custom tags                            | Keeps a game without a database and opens it in an outside analysis board; a stopgap for the owner, not for GameReview (#65, 2026-11-22)                                         |
 
 ## Architecture constraints (independent of stack)
 
@@ -175,9 +176,8 @@ in build tooling (Vite, ESLint, TypeScript) rather than in the chess or server c
 ## Open questions (later milestones)
 
 - **After M3:** how difficulty is named (#71), left open as a beginner won at the easiest setting
-  without it (#74); learning from move analysis (#92, #93); PGN export, #65 (recommended: retains
-  games without a database). Hints per game and the verdict thresholds (#114) are tuned from real
-  games.
+  without it (#74); learning from move analysis (#92, #93). Hints per game and the verdict
+  thresholds (#114) are tuned from real games.
 - **Several users:** one game per paired browser serves a household. Accounts, or a game that moves
   between a player's devices, have no milestone.
 - **Analysis:** linear move navigation or variation tree; continuous analysis; multiple engines;
