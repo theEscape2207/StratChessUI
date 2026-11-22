@@ -14,6 +14,7 @@ same design system. Piece images live in the design system and are hidden here.
 | [GameScreen](GameScreen/README.md)           | Play screen at 960px and wider         |
 | [GameScreenPhone](GameScreenPhone/README.md) | Play screen below 960px                |
 | [SearchInfo](SearchInfo/README.md)           | Engine search line, top of the sidebar |
+| [MoveFeedback](MoveFeedback/README.md)       | The human's move against the best one  |
 | [Transcript](Transcript/README.md)           | UCI transcript, above the toolbar      |
 | [EvalBar](EvalBar/README.md)                 | Evaluation bar beside the board        |
 | [PlayerStrip](PlayerStrip/README.md)         | Rows above and below the board         |

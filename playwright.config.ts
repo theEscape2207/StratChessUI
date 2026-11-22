@@ -10,6 +10,7 @@ import {
 const GAME_SPECS = [
   'board.spec.ts',
   'eval.spec.ts',
+  'feedback.spec.ts',
   'gameover.spec.ts',
   'hints.spec.ts',
   'layout.spec.ts',
