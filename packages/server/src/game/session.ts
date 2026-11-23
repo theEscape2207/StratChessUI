@@ -38,7 +38,13 @@ import {
 import { searchReport } from './search-report.ts';
 import { Throttle } from './throttle.ts';
 import { TranscriptFeed } from './transcript.ts';
-import { ANALYSIS, verdictOf, withoutOpeningPraise, withoutPraise } from './verdicts.ts';
+import {
+  ANALYSIS,
+  bestVerdict,
+  verdictOf,
+  withoutOpeningPraise,
+  withoutPraise,
+} from './verdicts.ts';
 
 export type SessionOptions = {
   profiles: readonly EngineProfile[];
@@ -54,11 +60,15 @@ export type SessionOptions = {
   rng?: () => number;
 };
 
+/** A move's score for the side to move on `scoreCp`'s scale, and as the browser sees it. */
+type MoveScore = { cp: number; score: Score };
+
 /**
  * An analysis search's best move, its score for the side to move on `scoreCp`'s scale, and the
- * score and PV as the browser sees them: from white's perspective, in SAN.
+ * score and PV as the browser sees them: from white's perspective, in SAN. A search that ranked two
+ * lines adds the second-best move and its score.
  */
-type Scored = { bestMove: string; cp: number; score: Score; pv: string[] };
+type Scored = MoveScore & { bestMove: string; pv: string[]; second?: MoveScore & { move: string } };
 
 /** `null`: the search ran and gave nothing to judge a move by. Undefined: it was cancelled. */
 type Analysed = Scored | null | undefined;
@@ -121,6 +131,18 @@ const RANKING_LIMIT = { depth: 1 };
 const FEEDBACK_PV_PLIES = 8;
 /** Per game rather than per turn: a beginner who needs one every turn wants an easier level. */
 export const HINTS_PER_GAME = 3;
+
+/**
+ * Rank 2 of a search of `fen`, if its score can stand beside rank 1's: exact, and from the same
+ * depth, as the last lines before `bestmove` are.
+ */
+function secondBest(fen: string, first: SearchInfo, second?: SearchInfo): Scored['second'] {
+  const move = second?.pv?.[0];
+  if (!second?.score || !move || second.bound || first.bound || second.depth !== first.depth)
+    return;
+  const { score } = searchReport(fen, second);
+  return score && { move, cp: scoreCp(second.score), score };
+}
 
 /** The best move's row of MoveFeedback, from the position search of the move's turn. */
 function bestLine(best: Scored): NonNullable<Feedback['best']> {
@@ -441,9 +463,11 @@ export class GameSession {
     if (kept !== undefined) return Promise.resolve(kept);
     if (analysis.running?.ply === ply) return analysis.running.result;
     const moves = game.state.moves.slice(0, ply);
+    // Only a verdict needs the second-best move.
+    const ranks = game.state.analysis ? 2 : 1;
     const running = {
       ply,
-      result: this.analysisSearch(game, analysis, moves, ANALYSIS.depth).then((best) => {
+      result: this.analysisSearch(game, analysis, moves, ANALYSIS.depth, ranks).then((best) => {
         // Dropped by a takeback or with its engine, either of which cancelled it.
         if (analysis.running !== running) return undefined;
         analysis.running = undefined;
@@ -457,25 +481,29 @@ export class GameSession {
 
   /**
    * Searches the game after `moves`, sending no search lines on: the eval bar is the opponent's.
-   * A failure ends the game, as it would at the opponent's turn.
+   * Ranks up to `ranks` lines, as many as the engine can. A failure ends the game, as it would at
+   * the opponent's turn.
    */
   private async analysisSearch(
     game: Game,
     analysis: Analysis,
     moves: readonly string[],
     depth: number,
+    ranks = 1,
   ): Promise<Analysed> {
     const { startFen, engineName } = game.state;
     const fen = game.positions[moves.length]!;
     // Before the search, as one cancelled part-way has written to the hash too.
     analysis.inHash = true;
+    const engine = game.engine!;
     let result;
     try {
-      result = await game.engine!.search({
+      result = await engine.search({
         fen: startFen,
         moves,
         limit: { depth },
         capMs: ANALYSIS.capMs,
+        multiPv: Math.min(ranks, engine.maxMultiPv),
       });
     } catch (error) {
       if (!(error instanceof SearchCancelledError)) this.fail(game, error);
@@ -491,7 +519,14 @@ export class GameSession {
     const pv = info.pv?.[0] === bestMove ? info.pv : [bestMove];
     const report = searchReport(fen, { ...info, pv });
     if (!report.score) return null;
-    return { bestMove, cp: scoreCp(info.score), score: report.score, pv: report.pv ?? [] };
+    const second = secondBest(fen, info, result.second);
+    return {
+      bestMove,
+      cp: scoreCp(info.score),
+      score: report.score,
+      pv: report.pv ?? [],
+      ...(second && { second }),
+    };
   }
 
   /**
@@ -507,17 +542,33 @@ export class GameSession {
     const best = await this.positionSearch(game, analysis, ply);
     if (this.turnIsGone(game, moves)) return false;
     if (!best) return true;
-    let verdict: Verdict | undefined = 'best';
+    let verdict: Verdict | undefined = bestVerdict(best.cp, best.second?.cp);
     let feedback: Feedback = { score: best.score };
     if (moves[ply] !== best.bestMove) {
-      const reply = await this.analysisSearch(game, analysis, moves, ANALYSIS.depth - 1);
+      const played = await this.playedScore(game, analysis, moves, best);
       if (this.turnIsGone(game, moves)) return false;
-      verdict = reply ? verdictOf(best.cp, -reply.cp) : undefined;
-      feedback = { ...(reply && { score: reply.score }), best: bestLine(best) };
+      verdict = played ? verdictOf(best.cp, played.cp) : undefined;
+      feedback = { ...(played && { score: played.score }), best: bestLine(best) };
     }
     this.judge(game, ply, verdict, feedback);
     this.publish(game);
     return true;
+  }
+
+  /**
+   * The score of the move that ended `moves`, not the best, for its mover: the second-best's from
+   * the position search when it is that move, as the gap that made the best great must match the
+   * verdict on the second, or else a reply search's. Null when the reply search gave nothing.
+   */
+  private async playedScore(
+    game: Game,
+    analysis: Analysis,
+    moves: readonly string[],
+    best: Scored,
+  ): Promise<MoveScore | null | undefined> {
+    if (best.second?.move === moves.at(-1)) return best.second;
+    const reply = await this.analysisSearch(game, analysis, moves, ANALYSIS.depth - 1);
+    return reply && { cp: -reply.cp, score: reply.score };
   }
 
   /**
@@ -530,7 +581,9 @@ export class GameSession {
     // Only a human turn has a position search, so an engine's move finds none.
     const best = game.state.analysis && game.searches.best[ply];
     if (!best) return;
-    if (moves[ply] === best.bestMove) return this.judge(game, ply, 'best', { score: best.score });
+    if (moves[ply] === best.bestMove) {
+      return this.judge(game, ply, bestVerdict(best.cp, best.second?.cp), { score: best.score });
+    }
     const verdict = verdictOf(best.cp, decidedCp(ended.result, humanColor));
     this.judge(game, ply, verdict, { best: bestLine(best) });
   }

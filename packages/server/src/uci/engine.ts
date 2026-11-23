@@ -54,13 +54,17 @@ export type SearchRequest = {
   limit: SearchLimit;
   /** Stops a search without a move time still running then, sooner than `maxSearchMs` would. */
   capMs?: number;
+  /** The lines to rank, at most `maxMultiPv`; 1 unless given, whatever an earlier search asked. */
+  multiPv?: number;
 };
 
 export type SearchResult = {
   generation: number;
   bestMove: string;
-  /** Last info line with a score, if the engine sent one. */
+  /** Last info line with a score, if the engine sent one; rank 1's at MultiPV above 1. */
   info?: SearchInfo;
+  /** Rank 2's last line with a score, at MultiPV above 1 and with a second legal move. */
+  second?: SearchInfo;
   /** The search had to be stopped: a depth search's result is then from a shallower depth. */
   capped: boolean;
 };
@@ -94,6 +98,8 @@ export class UciEngine {
   private queue: Promise<unknown> = Promise.resolve();
   private generation = 0;
   private active?: ActiveSearch;
+  /** The MultiPV last sent, which outlives the search and `ucinewgame`; unknown until then. */
+  private multiPv?: number;
 
   private constructor(
     profile: EngineProfile,
@@ -161,6 +167,12 @@ export class UciEngine {
 
   get alive(): boolean {
     return this.exitError === undefined;
+  }
+
+  /** The most lines a search can rank: 1 for an engine that announces no MultiPV. */
+  get maxMultiPv(): number {
+    const option = this.multiPvOption();
+    return option?.type === 'spin' ? (option.max ?? 1) : 1;
   }
 
   /**
@@ -259,7 +271,14 @@ export class UciEngine {
     if (this.exitError) throw this.exitError;
     const command = positionCommand(request.fen, request.moves ?? []);
     const go = goCommand(this.checkLimit(request.limit));
+    const multiPv = this.checkMultiPv(request.multiPv ?? 1);
 
+    // The `isready` below confirms the option along with the position.
+    const option = this.multiPvOption();
+    if (option && multiPv !== this.multiPv && this.maxMultiPv > 1) {
+      this.send(setOptionCommand(option.name, multiPv));
+      this.multiPv = multiPv;
+    }
     // StratChess only reports a bad FEN as an info string, so confirm the position before searching.
     this.send(command);
     const seen = await this.ready();
@@ -273,9 +292,13 @@ export class UciEngine {
     const search: ActiveSearch = { generation, cancelled: false, stopSent: false };
     this.active = search;
     let last: SearchInfo | undefined;
+    let second: SearchInfo | undefined;
     this.lineListener = (line) => {
       const info = parseInfo(line);
       if (!info) return;
+      const rank = info.multipv ?? 1;
+      if (rank === 2 && info.score) second = info;
+      if (rank !== 1) return;
       if (info.score) last = info;
       if (!search.cancelled) onInfo?.(info);
     };
@@ -308,7 +331,7 @@ export class UciEngine {
     if (!bestMove || bestMove === '(none)' || bestMove === '0000') {
       throw this.error(`engine returned no move: ${line}`);
     }
-    return { generation, bestMove, info: last, capped: search.stopSent };
+    return { generation, bestMove, info: last, ...(second && { second }), capped: search.stopSent };
   }
 
   private checkLimit(limit: SearchLimit): SearchLimit {
@@ -321,6 +344,17 @@ export class UciEngine {
       );
     }
     return limit;
+  }
+
+  private checkMultiPv(multiPv: number): number {
+    if (!Number.isInteger(multiPv) || multiPv < 1 || multiPv > this.maxMultiPv) {
+      throw new UciCommandError(`MultiPV ${multiPv} outside 1..${this.maxMultiPv}`);
+    }
+    return multiPv;
+  }
+
+  private multiPvOption(): UciOption | undefined {
+    return this.options.find((o) => o.name.toLowerCase() === 'multipv');
   }
 
   private cancelActive(): void {

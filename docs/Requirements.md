@@ -66,7 +66,8 @@ which each browser remembers open or closed (#76). No separate view, no configur
 | Remote access       | Cloudflare Tunnel to localhost, behind an Access email allow-list                                                       | No inbound port and nothing installed on a phone. Costs the domain's renewal; the Zero Trust Free plan needs a payment card on file. Tailscale is the fallback (#99, 2026-11-14) |
 | Beginner opponent   | The server scores every legal move with `go depth 1`, then chooses one by level                                         | Stock limits punish every blunder, even at `depth 1`. Plain UCI needs no engine change, and a level is a data change. Calibrated for StratChess only (#94, 2026-11-04)           |
 | Move verdicts       | The game's own engine searches before and after each human move; off unless asked, and the form asks unless told not to | The opponent's search is too weak to judge; a second process takes a slot and a Hash. Win chance given up decides: raw pawns fault a pawn lost in a won game (#91, 2026-11-16)   |
-| Opening praise      | No best or excellent for the human's first moves from the standard start; faults still show; a FEN game has no opening  | Every sensible opening move is close to the engine's best, so praise there is noise; an opening book waits (#111, 2026-11-16)                                                    |
+| Great move          | The engine's best move when the second-best gives up 10 points or more, both from a MultiPV 2 position search           | Both scores come from one search, as a second search's noise would decide it. A rank-2 move takes its score from there too, so the two verdicts agree (#120, 2026-11-23)         |
+| Opening praise      | No praise for the human's first moves from the standard start; faults still show; a FEN game has no opening             | Every sensible opening move is close to the engine's best, so praise there is noise; an opening book waits (#111, 2026-11-16)                                                    |
 | Hints               | The verdicts' position search gives the move: the piece first, then the arrow; three hinted turns a game, none refunded | A plain search, so a level's mistakes stay out; staged, so a beginner can still find the move. A hinted move earns no praise (#68, 2026-11-17)                                   |
 | Move feedback       | The verdicts' scores, and the best move's line only when another move was played; a best move shown counts as hinted    | A line after the move played would hand out the next turn's hint; without the rule, Undo turns any fault into a free best (#92, 2026-11-22)                                      |
 | PGN export          | Copy PGN in the toolbar, to the clipboard; human verdicts as glyphs, strength as custom tags                            | Keeps a game without a database and opens it in an outside analysis board; a stopgap for the owner, not for GameReview (#65, 2026-11-22)                                         |
@@ -116,8 +117,8 @@ progress`). The controller must send `stop` and wait for `bestmove` before the n
 - Options: Threads, Hash, `MultiPV` (1–218), `UCI_LimitStrength` with `UCI_Elo` (907–2355), plus
   tuning options from `SearchTuning.def`. No Chess960.
 - **`MultiPV` survives `ucinewgame`.** At N > 1 each info line carries `multipv k` and the last
-  line before `bestmove` is rank N, which the parser does not tell apart from rank 1: no profile
-  may set it above 1 until the server reads ranks.
+  line before `bestmove` is rank N. So every search sets the value it needs when it differs from the
+  last one sent, overriding a profile's, and the opponent always searches at 1.
 - **While `UCI_LimitStrength` is on, `bestmove` is the move played, not the best**, depth limits are
   cut short and low values reply almost at once. `UCI_Elo` is measured at `Threads=1` and
   `MultiPV 1`, against Stockfish 19, and is not a rating to show.

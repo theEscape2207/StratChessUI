@@ -18,6 +18,7 @@ export type ShownFeedback = {
 };
 
 const PHRASES: Record<Verdict, string> = {
+  great: 'is the only good move',
   best: 'is best',
   excellent: 'is excellent',
   inaccuracy: 'is an inaccuracy',

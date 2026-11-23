@@ -78,6 +78,8 @@ export type SearchInfo = {
   timeMs?: number;
   hashfull?: number;
   pv?: string[];
+  /** The line's rank at MultiPV above 1, best first; a line without one is rank 1. */
+  multipv?: number;
 };
 
 const NUMERIC: Record<string, keyof SearchInfo> = {
@@ -87,6 +89,7 @@ const NUMERIC: Record<string, keyof SearchInfo> = {
   nps: 'nps',
   time: 'timeMs',
   hashfull: 'hashfull',
+  multipv: 'multipv',
 };
 
 /** Parses an `info` line with search data; `info string` and unknown lines return undefined. */

@@ -106,8 +106,8 @@ describe('UciEngine', () => {
   });
 
   it('refuses an option the engine does not announce, or one out of range', async () => {
-    await expect(UciEngine.start(profile('normal', { MultiPV: 3 }), FAST)).rejects.toThrow(
-      'does not announce option MultiPV',
+    await expect(UciEngine.start(profile('normal', { UCI_Chess960: true }), FAST)).rejects.toThrow(
+      'does not announce option UCI_Chess960',
     );
     await expect(UciEngine.start(profile('normal', { Contempt: 500 }), FAST)).rejects.toThrow(
       'outside 0..100',
@@ -220,6 +220,16 @@ describe('UciEngine', () => {
     await expect(
       engine.search({ fen: START_FEN, limit: { movetimeMs: 10 * 60_000 } }),
     ).rejects.toBeInstanceOf(UciCommandError);
+  });
+
+  it('refuses more ranked lines than the engine announces, sending nothing', async () => {
+    engine = await UciEngine.start(profile('normal', {}, ['--no-multipv']), FAST);
+    const limit = { depth: 1 };
+    await expect(engine.search({ fen: START_FEN, limit, multiPv: 2 })).rejects.toThrow(
+      'MultiPV 2 outside 1..1',
+    );
+    await engine.search({ fen: START_FEN, limit });
+    expect(engine.transcript().filter((line) => line.includes('MultiPV'))).toEqual([]);
   });
 
   it('reports no move for a finished game and keeps the engine', async () => {

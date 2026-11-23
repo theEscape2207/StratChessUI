@@ -47,13 +47,13 @@ describe('gamePgn', () => {
       gamePgn(
         game({
           moves,
-          verdicts: ['best', null, 'excellent', null, null, null, 'inaccuracy'],
+          verdicts: ['best', null, 'excellent', null, 'great', null, 'inaccuracy'],
         }),
         DATE,
       ),
     );
     expect(fen).toBe(finalFen(START_FEN, moves));
-    expect(nags).toEqual([[1], undefined, [1], undefined, undefined, undefined, [6]]);
+    expect(nags).toEqual([[1], undefined, [1], undefined, [3], undefined, [6]]);
     expect(headers).toMatchObject({
       Date: '2026.01.05',
       White: 'You',

@@ -139,6 +139,11 @@ main {
   color: var(--q-ink);
 }
 
+.quality-badge.great {
+  color: var(--on-accent);
+  background: var(--q-great);
+}
+
 .quality-badge.best {
   color: var(--on-accent);
   background: var(--q-best);

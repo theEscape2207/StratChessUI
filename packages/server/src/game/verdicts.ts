@@ -1,6 +1,7 @@
 // Verdicts on the human's moves: how much win chance a move gave up against the engine's best. The
 // scores come from two searches of the game's own engine, one of the position before the move and
-// one of the position after it.
+// one of the position after it. The first also ranks the second-best move, which makes the best one
+// great when nothing else comes close.
 import { START_FEN, type Verdict } from '@stratchess-ui/shared';
 
 /**
@@ -13,6 +14,7 @@ export const ANALYSIS: {
   capMs: number;
   steepness: number;
   excellentBelow: number;
+  greatFrom: number;
   openingMoves: number;
   drops: readonly { verdict: Verdict; from: number }[];
 } = {
@@ -26,6 +28,11 @@ export const ANALYSIS: {
   steepness: 0.00368208,
   /** A move other than the best that drops less than this, in percentage points, is excellent. */
   excellentBelow: 2,
+  /**
+   * The engine's best move is great when the second-best drops at least this, in percentage points:
+   * every other move is then a mistake or worse.
+   */
+  greatFrom: 10,
   /** The human's first moves from the standard start that get no praise, only faults. */
   openingMoves: 6,
   /** The smallest drop for each verdict, in percentage points, worst first. */
@@ -45,6 +52,15 @@ export function winChance(cp: number): number {
 }
 
 /**
+ * The verdict on the engine's best move, from its score and the second-best move's for the mover.
+ * Without a second-best, as with one legal move or an engine that ranks one line, it is only best.
+ */
+export function bestVerdict(bestCp: number, secondCp: number | undefined): Verdict {
+  if (secondCp === undefined) return 'best';
+  return winChance(bestCp) - winChance(secondCp) >= ANALYSIS.greatFrom ? 'great' : 'best';
+}
+
+/**
  * The verdict on a move that is not the engine's best, from both moves' scores for the mover, or
  * undefined for a drop too large to praise and too small to fault.
  */
@@ -56,7 +72,7 @@ export function verdictOf(bestCp: number, playedCp: number): Verdict | undefined
 
 /** The verdict if it is a fault, for a move that earned no praise: the engine's own, played back. */
 export function withoutPraise(verdict: Verdict | undefined): Verdict | undefined {
-  return verdict === 'best' || verdict === 'excellent' ? undefined : verdict;
+  return verdict === 'great' || verdict === 'best' || verdict === 'excellent' ? undefined : verdict;
 }
 
 /**
