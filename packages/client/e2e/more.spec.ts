@@ -24,12 +24,18 @@ async function closeMore(page: Page) {
   await expect.poll(() => page.evaluate(() => localStorage.getItem('more-open'))).toBeNull();
 }
 
-function technical(page: Page) {
+function technicalInForm(page: Page) {
   return [
     page.getByLabel('Move Feedback'),
     searchLine(page),
     page.getByRole('combobox', { name: 'Limit' }),
     startPosition(page),
+  ];
+}
+
+function technical(page: Page) {
+  return [
+    ...technicalInForm(page),
     page.getByTestId('transcript'),
     page.getByRole('button', { name: 'Copy FEN' }),
     page.getByTestId('search'),
@@ -41,7 +47,8 @@ test('a level game starts and plays with the technical detail out of sight', asy
   hasTouch,
 }) => {
   await page.getByRole('combobox', { name: 'Engine' }).selectOption('fake-play');
-  for (const item of technical(page)) await expect(item).toBeHidden();
+  // Only the form's: a game the worker's last test ended resumes in review, with its toolbar.
+  for (const item of technicalInForm(page)) await expect(item).toBeHidden();
   await submitNewGame(page);
   await expectYourMove(page);
   await playAndAwaitReply(page, 'e2e4', hasTouch);
