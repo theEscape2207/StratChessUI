@@ -33,7 +33,7 @@ import {
 } from './NewGameForm.tsx';
 import { PairForm } from './PairForm.tsx';
 import { PlayerStrip } from './PlayerStrip.tsx';
-import { gamePositions } from './review.ts';
+import { boardAt, gamePositions } from './review.ts';
 import { BoardBadge } from './QualityBadge.tsx';
 import { ResignButton, ResignPrompt } from './Resign.tsx';
 import { SearchInfo } from './SearchInfo.tsx';
@@ -182,7 +182,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
   const [hintSent, setHintSent] = useState(false);
   const [resignAsked, setResignAsked] = useState(false);
   // GameReview's moves on the board, for the finished game it was chosen in; the last by default.
-  const [review, setReview] = useState<{ game: string; step: number }>();
+  const [review, setReview] = useState<{ gameKey: string; step: number }>();
   const [moreOpen, setMoreOpen] = useStoredFlag(MORE_OPEN_KEY);
   const [searchLine, setSearchLine] = useStoredFlag(SEARCH_LINE_KEY);
   const newGameButton = useRef<HTMLButtonElement>(null);
@@ -267,12 +267,12 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
   const positions = useMemo(() => game && gamePositions(game.startFen, game.moves), [game]);
   const gameKey = game && `${game.startFen} ${game.moves.join(' ')}`;
   const last = game?.moves.length ?? 0;
-  const step = over && review && review.game === gameKey ? review.step : last;
+  const step = over && review && review.gameKey === gameKey ? review.step : last;
   const setStep = (next: number) => {
-    if (gameKey) setReview({ game: gameKey, step: next });
+    if (gameKey) setReview({ gameKey, step: next });
   };
-  const fen = (step < last && positions?.[step]) || (game?.fen ?? START_FEN);
-  const lastMove = step < last ? game?.moves[step - 1] : game?.lastMove;
+  const { fen, lastMove } =
+    game && positions ? boardAt(game, positions, step) : { fen: START_FEN, lastMove: undefined };
   // Replays the game, so once per game state or step rather than on each search line.
   const strips = useMemo(
     () => playerStrips(game && { ...game, moves: game.moves.slice(0, step), fen }),

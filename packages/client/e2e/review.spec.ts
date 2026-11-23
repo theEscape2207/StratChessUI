@@ -76,6 +76,39 @@ test('steps back to a blunder, with its badge and feedback on a locked board', a
   await expectYourMove(page);
 });
 
+test('the move list keeps the selected move in view, and the page stays put', async ({ page }) => {
+  const server = await scriptedServer(page);
+  // Knights out and back, fifteen times: more rows than the list has room for.
+  const moves = Array.from({ length: 15 }, () => ['g1f3', 'g8f6', 'f3g1', 'f6g8']).flat();
+  server.game({
+    humanColor: 'white',
+    moves,
+    lastMove: 'f6g8',
+    fen: START,
+    phase: 'over',
+    result: 'draw',
+    termination: 'threefold repetition',
+  });
+  const list = page.getByTestId('moves');
+  const current = list.locator('[aria-current]');
+  const shown = () =>
+    current.evaluate((item) => {
+      const box = item.closest('ol')!.getBoundingClientRect();
+      const { top, bottom } = item.getBoundingClientRect();
+      return top >= box.top - 1 && bottom <= box.bottom + 1;
+    });
+  await expect(step(page, 'Last move')).toBeDisabled();
+  await expect(current).toHaveText('Ng8');
+  expect(await shown()).toBe(true);
+
+  const scrollY = await page.evaluate(() => window.scrollY);
+  await step(page, 'First move').click();
+  await step(page, 'Next move').click();
+  await expect(current).toHaveText('Nf3');
+  await expect.poll(shown).toBe(true);
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrollY);
+});
+
 test("review shows every verdict, and the strips' captures follow the board", async ({ page }) => {
   const server = await scriptedServer(page);
   // 1. e4 d5 2. exd5, and white resigned.

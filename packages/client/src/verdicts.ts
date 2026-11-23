@@ -2,9 +2,8 @@ import { pieceColorAt, turn, type GameState, type Verdict } from '@stratchess-ui
 
 export type BoardVerdict = { square: string; verdict: Verdict };
 
-/** Whether the move at index `ply` of `moves` is the human's. */
+/** The human's moves are every other one in `moves`, starting with the first when they moved first. */
 export function isHumanPly(game: Pick<GameState, 'startFen' | 'humanColor'>, ply: number): boolean {
-  // The human's moves are every other one, starting with the first when they moved first.
   const firstHuman = turn(game.startFen) === game.humanColor ? 0 : 1;
   return ply >= firstHuman && (ply - firstHuman) % 2 === 0;
 }

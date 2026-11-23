@@ -1,4 +1,4 @@
-import { applyUciMove } from '@stratchess-ui/shared';
+import { applyUciMove, type GameState } from '@stratchess-ui/shared';
 
 /**
  * The position after each move of a game, the start first, so `positions[n]` follows `n` moves.
@@ -12,4 +12,18 @@ export function gamePositions(startFen: string, moves: readonly string[]): strin
     positions.push(result.fen);
   }
   return positions;
+}
+
+/** The board after `step` of the game's moves; the server's own position where the replay fell short. */
+export function boardAt(
+  game: Pick<GameState, 'fen' | 'moves' | 'lastMove'>,
+  positions: readonly string[],
+  step: number,
+): { fen: string; lastMove?: string } {
+  const fen = positions[step];
+  if (fen === undefined) {
+    return { fen: game.fen, ...(game.lastMove && { lastMove: game.lastMove }) };
+  }
+  const lastMove = game.moves[step - 1];
+  return { fen, ...(lastMove && { lastMove }) };
 }

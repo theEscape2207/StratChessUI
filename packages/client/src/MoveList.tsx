@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { moveNumber, sanMoves, turn, type Verdict } from '@stratchess-ui/shared';
 import { QualityBadge } from './QualityBadge.tsx';
 import { listsVerdict } from './verdicts.ts';
@@ -15,6 +16,17 @@ type MoveListProps = {
 };
 
 /**
+ * Scrolls the list, never the page, until `item` is in view: Chessground keeps the board's bounds
+ * until it sees a scroll event, so moving the page under it would misplace taps.
+ */
+function keepInView(list: HTMLElement, item: HTMLElement) {
+  const box = list.getBoundingClientRect();
+  const { top, bottom } = item.getBoundingClientRect();
+  if (top < box.top) list.scrollTop -= box.top - top;
+  else if (bottom > box.bottom) list.scrollTop += bottom - box.bottom;
+}
+
+/**
  * The game's moves in SAN, a numbered row per white move and black's reply. A game from a FEN
  * keeps that FEN's move numbers and, when black moved first, opens with an empty white move.
  */
@@ -27,6 +39,11 @@ export function MoveList({ startFen, moves, verdicts, review }: MoveListProps) {
   const rows: [string | undefined, string | undefined][] = [];
   for (let i = 0; i < sans.length; i += 2) rows.push([sans[i], sans[i + 1]]);
   const current = review ? review.current + skipped : sans.length - 1;
+  const list = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    const item = list.current?.querySelector<HTMLElement>('[aria-current]');
+    if (list.current && item) keepInView(list.current, item);
+  }, [current, moves.length]);
   const move = (side: 'white' | 'black', san: string, index: number) => {
     const ply = index - skipped;
     const verdict = verdicts?.[ply];
@@ -49,7 +66,7 @@ export function MoveList({ startFen, moves, verdicts, review }: MoveListProps) {
     );
   };
   return (
-    <ol className="move-list" aria-label="Moves" data-testid="moves">
+    <ol ref={list} className="move-list" aria-label="Moves" data-testid="moves">
       {rows.map(([white, black], i) => (
         <li key={i}>
           <span className="number">{first + i}.</span>
