@@ -74,7 +74,7 @@ export type Tally = Record<Verdict, number>;
 /** How many of the human's moves earned each verdict; undefined for a game played without them. */
 export function verdictTally(game: JudgedMoves): Tally | undefined {
   if (!game.verdicts) return undefined;
-  const tally: Tally = { best: 0, excellent: 0, inaccuracy: 0, mistake: 0, blunder: 0 };
+  const tally: Tally = { great: 0, best: 0, excellent: 0, inaccuracy: 0, mistake: 0, blunder: 0 };
   for (const verdict of game.verdicts) if (verdict) tally[verdict]++;
   return tally;
 }

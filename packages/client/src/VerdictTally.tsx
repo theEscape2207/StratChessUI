@@ -4,6 +4,7 @@ import type { Tally } from './review.ts';
 
 const COLUMNS: [Verdict, string][][] = [
   [
+    ['great', 'Great'],
     ['best', 'Best'],
     ['excellent', 'Excellent'],
   ],

@@ -146,7 +146,7 @@ test("review shows every verdict, and the strips' captures follow the board", as
   server.game({
     humanColor: 'white',
     moves: ['e2e4', 'd7d5', 'e4d5'],
-    verdicts: ['best', null, 'excellent'],
+    verdicts: ['great', null, 'excellent'],
     fen: 'rnbqkbnr/ppp1pppp/8/3P4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2',
     lastMove: 'e4d5',
     phase: 'over',
@@ -156,9 +156,9 @@ test("review shows every verdict, and the strips' captures follow the board", as
   await expect(step(page, 'Last move')).toBeDisabled();
   const captures = page.getByTestId('strip-human').getByTestId('captures');
   await expect(captures.getByRole('img')).toHaveCount(1);
-  // Every verdict shows in review, best and excellent too.
+  // Every verdict shows in review, great and excellent too.
   await expect(page.getByTestId('moves').getByTestId('quality-badge')).toHaveCount(2);
-  await expect(tallyRow(sidebar(page), 'Best')).toHaveText(/Best1$/);
+  await expect(tallyRow(sidebar(page), 'Great')).toHaveText(/Great1$/);
   await expect(tallyRow(sidebar(page), 'Excellent')).toHaveText(/Excellent1$/);
 
   await step(page, 'Previous move').click();
