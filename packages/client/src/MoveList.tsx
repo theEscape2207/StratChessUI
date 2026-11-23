@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { moveNumber, sanMoves, turn, type Verdict } from '@stratchess-ui/shared';
+import { moveNumber, sanMoves, turn, type Score, type Verdict } from '@stratchess-ui/shared';
+import { formatScore } from './notation.ts';
 import { QualityBadge } from './QualityBadge.tsx';
 import { listsVerdict } from './verdicts.ts';
 
@@ -8,6 +9,8 @@ type MoveListProps = {
   moves: readonly string[];
   /** One per move, as in the game state. */
   verdicts?: readonly (Verdict | null)[];
+  /** One per move, shown after its SAN; GameReview gives the human's. */
+  scores?: readonly (Score | undefined)[];
   /**
    * GameReview: the index in `moves` of the move on the board, -1 at the start position, and every
    * move a button that selects it. Review shows every verdict, as its tally counts them all.
@@ -30,7 +33,7 @@ function keepInView(list: HTMLElement, item: HTMLElement) {
  * The game's moves in SAN, a numbered row per white move and black's reply. A game from a FEN
  * keeps that FEN's move numbers and, when black moved first, opens with an empty white move.
  */
-export function MoveList({ startFen, moves, verdicts, review }: MoveListProps) {
+export function MoveList({ startFen, moves, verdicts, scores, review }: MoveListProps) {
   const sans: (string | undefined)[] = sanMoves(startFen, moves);
   // The empty white move shifts the list one place from the game's moves.
   const skipped = turn(startFen) === 'black' ? 1 : 0;
@@ -48,6 +51,7 @@ export function MoveList({ startFen, moves, verdicts, review }: MoveListProps) {
     const ply = index - skipped;
     const verdict = verdicts?.[ply];
     const shown = verdict && (review || listsVerdict(verdict)) ? verdict : undefined;
+    const score = scores?.[ply];
     const props = {
       className: index === current ? `${side} current` : side,
       'aria-current': index === current || undefined,
@@ -56,6 +60,7 @@ export function MoveList({ startFen, moves, verdicts, review }: MoveListProps) {
       <>
         {shown && <QualityBadge verdict={shown} />}
         <span className="san">{san}</span>
+        {score && <span className="score">{formatScore(score)}</span>}
       </>
     );
     if (!review) return <span {...props}>{content}</span>;

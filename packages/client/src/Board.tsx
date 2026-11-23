@@ -1,5 +1,6 @@
 import { Chessground } from '@lichess-org/chessground';
 import type { Api } from '@lichess-org/chessground/api';
+import type { DrawShape } from '@lichess-org/chessground/draw';
 import type { Key } from '@lichess-org/chessground/types';
 import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react';
 import { legalDests, turn, type Color, type Hint } from '@stratchess-ui/shared';
@@ -14,6 +15,8 @@ type BoardProps = {
   movable?: Color;
   /** Drawn as a circle on the piece to move, or an arrow once it says where to. */
   hint?: Hint;
+  /** The engine's best move in UCI, drawn as an arrow apart from the hint's. */
+  bestMove?: string;
   onMove: (uci: string) => void;
   /** Drawn over the board, such as a dialog. */
   children?: ReactNode;
@@ -27,8 +30,7 @@ const PROMOTION_ROLES = { queen: 'q', rook: 'r', bishop: 'b', knight: 'n' } as c
 /** a1 is dark. Chessground's squares carry no colour of their own, so the stylesheet needs this. */
 const shade = (key: Key) => ((key.charCodeAt(0) + Number(key[1])) % 2 === 0 ? 'dark' : 'light');
 
-/** The last move's from and to squares. */
-function lastMoveSquares(uci: string | undefined): [Key, Key] | undefined {
+function moveSquares(uci: string | undefined): [Key, Key] | undefined {
   return uci ? [uci.slice(0, 2) as Key, uci.slice(2, 4) as Key] : undefined;
 }
 
@@ -40,6 +42,7 @@ export function Board({
   orientation,
   movable,
   hint,
+  bestMove,
   onMove,
   children,
 }: BoardProps) {
@@ -68,7 +71,7 @@ export function Board({
   }, []);
 
   useEffect(() => {
-    const squares = lastMoveSquares(lastMove);
+    const squares = moveSquares(lastMove);
     api.current?.set({
       fen: fen.split(' ')[0],
       orientation,
@@ -81,9 +84,14 @@ export function Board({
 
   const hintFrom = hint?.from as Key | undefined;
   const hintTo = hint?.to as Key | undefined;
+  const best = moveSquares(bestMove);
+  const [bestFrom, bestTo] = best ?? [];
   useEffect(() => {
-    api.current?.setAutoShapes(hintFrom ? [{ orig: hintFrom, dest: hintTo, brush: 'green' }] : []);
-  }, [hintFrom, hintTo]);
+    const shapes: DrawShape[] = [];
+    if (hintFrom) shapes.push({ orig: hintFrom, dest: hintTo, brush: 'green' });
+    if (bestFrom) shapes.push({ orig: bestFrom, dest: bestTo, brush: 'blue' });
+    api.current?.setAutoShapes(shapes);
+  }, [hintFrom, hintTo, bestFrom, bestTo]);
 
   const cancel = () => {
     setPromotion(undefined);
@@ -98,6 +106,7 @@ export function Board({
         data-testid="board"
         data-fen={fen}
         data-hint={hint && `${hint.from}${hint.to ?? ''}`}
+        data-best-move={bestMove}
       />
       {choosing && (
         // Pieces are drawn by Chessground's stylesheet, which applies inside a cg-wrap.
