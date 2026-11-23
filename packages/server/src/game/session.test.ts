@@ -57,6 +57,9 @@ const VERDICT_PROFILES = {
   'held-reply': [LOSS_ARG, '--hold=e2e4', '--hold-depth=9'],
   // Every position is so much better for the side to move, so a score's sign shows its perspective.
   biased: ['--bias=40'],
+  // The start position's second-best move loses 300 cp, so its best is the only good one.
+  'only-move': [`--loss=${legalMoves(START_FEN)[1]!.uci}:300`],
+  'only-move-no-multipv': [`--loss=${legalMoves(START_FEN)[1]!.uci}:300`, '--no-multipv'],
 };
 PROFILES.push(
   ...Object.entries(VERDICT_PROFILES).map(([id, args]) => ({
@@ -131,8 +134,9 @@ function open(
 
 // The standard start but for its castling rights: the same moves, in a game with no opening.
 const NO_OPENING = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1';
-// The start position's best move for the scored fake, which the verdict profiles run.
+// The start position's best move for the scored fake, which the verdict profiles run, and its rank 2.
 const BEST = legalMoves(START_FEN)[0]!.uci;
+const SECOND = legalMoves(START_FEN)[1]!.uci;
 const sent = (session: GameSession, command: string) =>
   session.takeTranscript()!.filter((l) => l.dir === 'sent' && l.text === command).length;
 const searches = (messages: ServerMessage[]) => messages.filter((m) => m.type === 'search');
@@ -1191,6 +1195,94 @@ describe('GameSession', () => {
           expect(ownVerdicts).toEqual([...Array(ANALYSIS.openingMoves).fill(null), 'best']);
         },
       );
+    });
+
+    describe('great', () => {
+      const multiPvSent = (session: GameSession) =>
+        lines(session).filter((text) => text.startsWith('setoption name MultiPV'));
+
+      it('praises the only good move, from the position search alone', async () => {
+        const { session, settled } = open();
+        void session.newGame(analysed('only-move', NO_OPENING));
+        await settled();
+        session.move(BEST);
+        expect((await settled()).verdicts).toEqual(['great', null]);
+        expect(sent(session, 'go depth 9')).toBe(0);
+      });
+
+      it('judges the second-best move by its rank in the same search, not a reply search', async () => {
+        const { session, settled } = open();
+        void session.newGame(analysed('only-move', NO_OPENING));
+        await settled();
+        session.move(SECOND);
+        const state = await settled();
+        expect(state.verdicts).toEqual(['blunder', null]);
+        expect(state.feedback![0]).toMatchObject({ score: { cp: -300 } });
+        expect(sent(session, 'go depth 9')).toBe(0);
+      });
+
+      it("ranks two lines for the position search and one for the opponent's", async () => {
+        const { session, settled } = open();
+        void session.newGame(analysed('only-move', NO_OPENING));
+        await settled();
+        session.move(BEST);
+        await settled();
+        await answered(session, 3);
+        const ranked = lines(session).filter((text) => /^(setoption name MultiPV|go )/.test(text));
+        expect(ranked).toEqual([
+          'setoption name MultiPV value 2',
+          'go depth 10',
+          'setoption name MultiPV value 1',
+          'go depth 3',
+          'setoption name MultiPV value 2',
+          'go depth 10',
+        ]);
+      });
+
+      it('gives none, and asks for no ranks, from an engine without MultiPV', async () => {
+        const { session, settled } = open();
+        void session.newGame(analysed('only-move-no-multipv', NO_OPENING));
+        await settled();
+        session.move(BEST);
+        expect((await settled()).verdicts).toEqual(['best', null]);
+        expect(multiPvSent(session)).toEqual([]);
+      });
+
+      it('ranks one line for a hint in a game that asked for no verdicts', async () => {
+        const { session, settled } = open();
+        void session.newGame({ ...game('only-move', 'white'), fen: NO_OPENING });
+        await settled();
+        session.hint();
+        expect((await settled()).hint).toBeDefined();
+        expect(multiPvSent(session)).toEqual(['setoption name MultiPV value 1']);
+      });
+
+      it('gives none to a forced move, which has no second-best', async () => {
+        // The king's only move takes the rook; the pawns keep the game going.
+        const { session, settled } = open();
+        void session.newGame(analysed('only-move', 'k7/8/8/8/8/7p/1r5P/K7 w - - 0 1'));
+        await settled();
+        session.move('a1b2');
+        expect((await settled()).verdicts).toEqual(['best', null]);
+      });
+
+      it('gives none in the opening', async () => {
+        const { session, settled } = open();
+        void session.newGame(analysed('only-move'));
+        await settled();
+        session.move(BEST);
+        expect((await settled()).verdicts).toEqual([null, null]);
+      });
+
+      it('gives none on a hinted turn', async () => {
+        const { session, settled } = open();
+        void session.newGame(analysed('only-move', NO_OPENING));
+        await settled();
+        session.hint();
+        await settled();
+        session.move(BEST);
+        expect((await settled()).verdicts).toEqual([null, null]);
+      });
     });
 
     it('publishes the move at once, then the verdict, then lets the opponent search', async () => {

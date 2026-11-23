@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { decidedCp, scoreCp } from './opponent.ts';
-import { ANALYSIS, verdictOf, winChance } from './verdicts.ts';
+import { ANALYSIS, bestVerdict, verdictOf, winChance } from './verdicts.ts';
 
 /** The score that gives this win chance, in percent. */
 const cpAt = (chance: number) => Math.log(chance / (100 - chance)) / ANALYSIS.steepness;
@@ -20,6 +20,29 @@ describe('winChance', () => {
     expect(winChance(scoreCp({ mate: 40 }))).toBe(100);
     expect(winChance(scoreCp({ mate: -1 }))).toBeCloseTo(0, 10);
     expect(winChance(scoreCp({ mate: -40 }))).toBeCloseTo(0, 10);
+  });
+});
+
+describe('bestVerdict', () => {
+  /** The verdict on the best move at a win chance of 60, with the second-best this many points below. */
+  const ahead = (points: number) => bestVerdict(cpAt(60), cpAt(60 - points));
+
+  it('calls the best move great once the second-best drops a mistake or more', () => {
+    expect(ahead(0)).toBe('best');
+    expect(ahead(9.9)).toBe('best');
+    expect(ahead(10.1)).toBe('great');
+    expect(ahead(59)).toBe('great');
+  });
+
+  it('calls a best move with no second-best, as the only legal move, best', () => {
+    expect(bestVerdict(-500, undefined)).toBe('best');
+  });
+
+  it('calls the only mate great against a small edge, not against a winning one or a slower mate', () => {
+    expect(bestVerdict(scoreCp({ mate: 3 }), 300)).toBe('great');
+    expect(bestVerdict(scoreCp({ mate: 3 }), 900)).toBe('best');
+    expect(bestVerdict(scoreCp({ mate: 2 }), scoreCp({ mate: 5 }))).toBe('best');
+    expect(bestVerdict(-300, scoreCp({ mate: -4 }))).toBe('great');
   });
 });
 

@@ -52,6 +52,9 @@ describe('UCI protocol', () => {
       bound: 'lower',
       nps: 900000,
     });
+    expect(
+      parseInfo('info depth 10 seldepth 14 multipv 2 score cp -31 nodes 5 pv d2d4'),
+    ).toMatchObject({ depth: 10, multipv: 2, score: { cp: -31 }, pv: ['d2d4'] });
     expect(parseInfo('info string treenodes main 7411 qs 2011')).toBeUndefined();
   });
 

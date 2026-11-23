@@ -17,6 +17,8 @@
 // With `--loss=<uci>:<cp>[,...]`, the scored modes score a position that move led to as so much
 // better for the side to move: the move lost that much.
 // With `--hash-max=<MiB>`, advertises a different Hash upper bound.
+// It announces MultiPV, unless given `--no-multipv`. At MultiPV above 1 the scored modes rank the
+// legal moves in order, the first as rank 1, each later one scored as a search after it would be.
 import { createInterface } from 'node:readline';
 import {
   applyUciMove,
@@ -41,6 +43,7 @@ const losses = new Map(
     .map(([uci, cp]) => [uci!, Number(cp)]),
 );
 const scored = mode === 'scored' || mode === 'scoreless';
+const noMultiPv = process.argv.includes('--no-multipv');
 
 const HANDSHAKE = [
   'id name StratChess',
@@ -49,6 +52,7 @@ const HANDSHAKE = [
   `option name Hash type spin default 192 min 1 max ${arg('hash-max') ?? '1536'}`,
   'option name SingularExtensions type check default true',
   'option name Contempt type spin default 0 min 0 max 100',
+  ...(noMultiPv ? [] : ['option name MultiPV type spin default 1 min 1 max 218']),
 ];
 
 const SEARCH = [
@@ -71,6 +75,7 @@ const out = (line: string) => process.stdout.write(`${line}\n`);
 
 let searching: { timer?: NodeJS.Timeout } | undefined;
 let position = 'startpos';
+let multiPv = 1;
 
 function finishSearch() {
   if (!searching) return;
@@ -95,12 +100,25 @@ function finishScored() {
     return out('bestmove 0000');
   }
   const mates = moves.some((m) => outcome([m.fen])?.termination === 'checkmate');
-  const material = (turn(fen) === 'white' ? 1 : -1) * materialBalance(fen) * 100 + bias;
-  const lost = losses.get(movesOf(position).at(-1) ?? '') ?? 0;
-  const score =
-    mode === 'scoreless' ? '' : mates ? ' score mate 1' : ` score cp ${material + lost}`;
-  out(`info depth 1 seldepth 1${score} nodes 1 pv ${scoredPv(moves[0]!).join(' ')}`);
+  const cp = scoredCp(fen, movesOf(position).at(-1));
+  const score = mode === 'scoreless' ? '' : mates ? ' score mate 1' : ` score cp ${cp}`;
+  if (multiPv === 1) {
+    out(`info depth 1 seldepth 1${score} nodes 1 pv ${scoredPv(moves[0]!).join(' ')}`);
+  } else {
+    // Rank 1 as at MultiPV 1; a later rank as the search of the position its move leads to scores it.
+    moves.slice(0, multiPv).forEach((move, k) => {
+      const rankScore = k === 0 || !score ? score : ` score cp ${-scoredCp(move.fen, move.uci)}`;
+      const pv = scoredPv(move).join(' ');
+      out(`info depth 1 seldepth 1 multipv ${k + 1}${rankScore} nodes 1 pv ${pv}`);
+    });
+  }
   out(`bestmove ${moves[0]!.uci}`);
+}
+
+/** The scored modes' score of `fen` for the side to move, reached by the move `last`. */
+function scoredCp(fen: string, last: string | undefined): number {
+  const material = (turn(fen) === 'white' ? 1 : -1) * materialBalance(fen) * 100;
+  return material + bias + (losses.get(last ?? '') ?? 0);
 }
 
 /** The best move, then first legal moves in a row: a PV longer than MoveFeedback shows. */
@@ -194,6 +212,11 @@ createInterface({ input: process.stdin }).on('line', (line) => {
     case 'isready':
       out('readyok');
       break;
+    case 'setoption': {
+      const match = /^setoption name MultiPV value (\d+)$/.exec(line);
+      if (match && !noMultiPv) multiPv = Number(match[1]);
+      break;
+    }
     case 'position': {
       if (line.startsWith('position fen ') && line.split(' ').length < 8) {
         out('info string position: rejected FEN, board reset to the starting position');

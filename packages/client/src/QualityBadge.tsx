@@ -3,6 +3,7 @@ import type { Color, Verdict } from '@stratchess-ui/shared';
 import type { BoardVerdict } from './verdicts.ts';
 
 const GLYPHS: Record<Verdict, string> = {
+  great: '!!',
   best: '★',
   excellent: '!',
   inaccuracy: '?!',

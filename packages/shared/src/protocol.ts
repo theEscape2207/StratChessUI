@@ -56,7 +56,7 @@ export type Termination =
 export type Outcome = { result: Color | 'draw'; termination: Termination };
 
 /** How a move of the human's compares with the engine's best, by the win chance it gave up. */
-export type Verdict = 'best' | 'excellent' | 'inaccuracy' | 'mistake' | 'blunder';
+export type Verdict = 'great' | 'best' | 'excellent' | 'inaccuracy' | 'mistake' | 'blunder';
 
 /**
  * A hint for the human's turn, in two stages: the square of the piece to move, then the square it

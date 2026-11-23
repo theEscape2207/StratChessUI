@@ -106,8 +106,8 @@ describe('UciEngine', () => {
   });
 
   it('refuses an option the engine does not announce, or one out of range', async () => {
-    await expect(UciEngine.start(profile('normal', { MultiPV: 3 }), FAST)).rejects.toThrow(
-      'does not announce option MultiPV',
+    await expect(UciEngine.start(profile('normal', { UCI_Chess960: true }), FAST)).rejects.toThrow(
+      'does not announce option UCI_Chess960',
     );
     await expect(UciEngine.start(profile('normal', { Contempt: 500 }), FAST)).rejects.toThrow(
       'outside 0..100',

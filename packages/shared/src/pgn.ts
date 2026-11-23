@@ -3,10 +3,11 @@ import type { GameState, Strength, Verdict } from './protocol.ts';
 import { sanMoves, START_FEN } from './rules.ts';
 
 /**
- * PGN's numeric annotation glyphs: $1 good (!), $2 poor (?), $4 very poor (??), $6 dubious (?!).
- * $3 (!!) is the brilliant move: not the engine's own choice, so kept for `great`, an only move (#120).
+ * PGN's numeric annotation glyphs: $1 good (!), $2 poor (?), $3 very good (!!), $4 very poor (??),
+ * $6 dubious (?!).
  */
 const VERDICT_NAGS: Record<Verdict, number> = {
+  great: 3,
   best: 1,
   excellent: 1,
   inaccuracy: 6,
