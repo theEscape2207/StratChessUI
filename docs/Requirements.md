@@ -92,7 +92,7 @@ which each browser remembers open or closed (#76). No separate view, no configur
 
 ## StratChess UCI behaviour the UI must handle
 
-Checked against release `v0.9.0`: its `StratEngine/UCIHandler.cpp` and the running binary. Update
+Checked against release `v0.10.0`: its release notes and the running binary. Update
 this when adopting a release labelled `uci-facing`. Adopting any release also rechecks the beginner
 opponent's levels, by #94's steps: score values are not part of the engine's UCI contract.
 
@@ -113,10 +113,16 @@ progress`). The controller must send `stop` and wait for `bestmove` before the n
   every search sends its position.
 - Supported limits: `wtime/btime/winc/binc/movestogo`, `depth`, `movetime`, `nodes`, `infinite`.
   No `ponder`, `mate` or `searchmoves`.
-- Options: Threads, Hash, plus tuning options from `SearchTuning.def`. No MultiPV, Chess960 or
-  strength limiting.
-- Per-iteration info: `depth seldepth score nodes nps hashfull time pv`. No `currmove` or
-  `multipv`.
+- Options: Threads, Hash, `MultiPV` (1–218), `UCI_LimitStrength` with `UCI_Elo` (907–2355), plus
+  tuning options from `SearchTuning.def`. No Chess960.
+- **`MultiPV` survives `ucinewgame`.** At N > 1 each info line carries `multipv k` and the last
+  line before `bestmove` is rank N, which the parser does not tell apart from rank 1: no profile
+  may set it above 1 until the server reads ranks.
+- **While `UCI_LimitStrength` is on, `bestmove` is the move played, not the best**, depth limits are
+  cut short and low values reply almost at once. `UCI_Elo` is measured at `Threads=1` and
+  `MultiPV 1`, against Stockfish 19, and is not a rating to show.
+- Per-iteration info: `depth seldepth score nodes nps hashfull time pv`, plus `multipv` at N > 1.
+  No `currmove`.
 - Iteration nodes count the main thread only; the final line counts all threads and quiescence.
 - The final info line carries the full PV.
 - Engine-specific `info string` lines (`treenodes main N qs N`, search telemetry counters) can
@@ -133,7 +139,7 @@ Fixed in the engine rather than worked around in the UI:
 | ------------------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------- |
 | theEscape2207/StratChess#911          | Report `nps` and `seldepth`                                                                           | M2                                 |
 | theEscape2207/StratChess#912          | Full PV on the final info line                                                                        | M2                                 |
-| theEscape2207/StratChess#94 (closed)  | MultiPV, merged 2026-11-21; not yet in a release                                                      | The `great` verdict (#120)         |
+| theEscape2207/StratChess#94 (closed)  | MultiPV, in `v0.10.0`                                                                                 | The `great` verdict (#120)         |
 | theEscape2207/StratChess#913 (closed) | Beginner strength. Closed without an engine change: the beginner opponent runs on the UI server (#94) | M3                                 |
 | theEscape2207/StratChess#914          | `currmove`/`currmovenumber` (optional)                                                                | No milestone; M2 closed without it |
 
