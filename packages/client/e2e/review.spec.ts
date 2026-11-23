@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './fixtures.ts';
 import {
   currentFen,
@@ -21,6 +21,13 @@ const moveButton = (page: Page, san: string) =>
   page.getByTestId('moves').getByRole('button', { name: san });
 const boardBadge = (page: Page) => page.getByTestId('board-badge');
 const feedback = (page: Page) => page.getByTestId('move-feedback');
+const evalBar = (page: Page) => page.getByTestId('eval-bar');
+const board = (page: Page) => page.getByTestId('board');
+// Not filtered on visibility: Playwright sees a straight arrow's line as a box of zero width.
+const blueArrow = (page: Page) => page.locator('svg.cg-shapes line[stroke="#003088"]');
+const sidebar = (page: Page) => page.getByRole('complementary', { name: 'Game' });
+const tallyRow = (scope: Locator, word: string) =>
+  scope.getByTestId('tally').getByRole('listitem').filter({ hasText: word });
 
 test('steps back to a blunder, with its badge and feedback on a locked board', async ({
   page,
@@ -31,6 +38,7 @@ test('steps back to a blunder, with its badge and feedback on a locked board', a
   await playAndAwaitReply(page, 'h2h3', hasTouch);
   await page.getByRole('button', { name: 'Resign' }).click();
   await page.getByRole('button', { name: 'Resign' }).click();
+  await expect(tallyRow(page.getByRole('dialog'), 'Blunder')).toHaveText(/Blunder1$/);
   await page.getByRole('dialog').getByRole('button', { name: 'Review game' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 
@@ -39,9 +47,23 @@ test('steps back to a blunder, with its badge and feedback on a locked board', a
   await expect(step(page, 'Last move')).toBeDisabled();
   await expect(feedback(page)).toHaveCount(0);
   await expect(boardBadge(page)).toHaveCount(0);
+  await expect(board(page)).not.toHaveAttribute('data-best-move');
+  await expect(tallyRow(sidebar(page), 'Blunder')).toHaveText(/Blunder1$/);
+  await expect(tallyRow(sidebar(page), 'Best')).toHaveText(/Best0$/);
+  // The engine's reply keeps the bar where h3 left it.
+  const afterH3 = await evalBar(page).getAttribute('aria-label');
+  expect(afterH3).not.toBe('Evaluation not yet known');
 
   await step(page, 'Previous move').click();
   await expectFen(page, AFTER_H3);
+  await expect(evalBar(page)).toHaveAttribute('aria-label', afterH3!);
+  // The list's score is the one MoveFeedback gives the move.
+  const score = await page.getByTestId('feedback-chip').first().textContent();
+  await expect(moveButton(page, 'h3').locator('.score')).toHaveText(score!);
+  await expect(moveButton(page, 'Ra1').locator('.score')).toHaveCount(0);
+  // The fake engine's best is its first legal move, here Ra1.
+  await expect(board(page)).toHaveAttribute('data-best-move', 'b1a1');
+  await expect(blueArrow(page)).toHaveCount(1);
   await expect(boardBadge(page)).toHaveAttribute('data-square', 'h3');
   await expect(boardBadge(page).getByRole('img', { name: 'blunder' })).toHaveText('??');
   await expect(page.getByTestId('feedback-played')).toContainText('h3 is a blunder');
@@ -55,6 +77,8 @@ test('steps back to a blunder, with its badge and feedback on a locked board', a
   await step(page, 'First move').click();
   await expectFen(page, MATE_IN_ONE);
   await expect(boardBadge(page)).toHaveCount(0);
+  await expect(evalBar(page)).toHaveAttribute('aria-label', 'Evaluation not yet known');
+  await expect(blueArrow(page)).toHaveCount(0);
   await tapSquare(page, 'b1', hasTouch);
   // Chessground draws a selection on its next frame, and keeps spare squares hidden.
   await page.evaluate(
@@ -99,6 +123,8 @@ test('the move list keeps the selected move in view, and the page stays put', as
     });
   await expect(step(page, 'Last move')).toBeDisabled();
   await expect(current).toHaveText('Ng8');
+  // Played without Move Feedback: nothing to count.
+  await expect(page.getByTestId('tally')).toHaveCount(0);
   expect(await shown()).toBe(true);
 
   const scrollY = await page.evaluate(() => window.scrollY);
@@ -127,6 +153,8 @@ test("review shows every verdict, and the strips' captures follow the board", as
   await expect(captures.getByRole('img')).toHaveCount(1);
   // Every verdict shows in review, best and excellent too.
   await expect(page.getByTestId('moves').getByTestId('quality-badge')).toHaveCount(2);
+  await expect(tallyRow(sidebar(page), 'Best')).toHaveText(/Best1$/);
+  await expect(tallyRow(sidebar(page), 'Excellent')).toHaveText(/Excellent1$/);
 
   await step(page, 'Previous move').click();
   await expect(captures.getByRole('img')).toHaveCount(0);

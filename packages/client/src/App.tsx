@@ -33,7 +33,14 @@ import {
 } from './NewGameForm.tsx';
 import { PairForm } from './PairForm.tsx';
 import { PlayerStrip } from './PlayerStrip.tsx';
-import { boardAt, gamePositions } from './review.ts';
+import {
+  bestMoveInstead,
+  boardAt,
+  gamePositions,
+  moveScores,
+  reviewEval,
+  verdictTally,
+} from './review.ts';
 import { BoardBadge } from './QualityBadge.tsx';
 import { ResignButton, ResignPrompt } from './Resign.tsx';
 import { SearchInfo } from './SearchInfo.tsx';
@@ -43,6 +50,7 @@ import { Transcript } from './Transcript.tsx';
 import { UndoButton } from './UndoButton.tsx';
 import { useGameSocket, type Link } from './useGameSocket.ts';
 import { useStoredFlag } from './useStoredFlag.ts';
+import { VerdictTally } from './VerdictTally.tsx';
 import { boardVerdict, plyVerdict } from './verdicts.ts';
 
 const TOKEN_KEY = 'pairing-token';
@@ -283,11 +291,21 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
     [game, over, step],
   );
   const verdict = game && (over ? plyVerdict(game, step - 1) : boardVerdict(game));
+  const judged = useMemo(
+    () => (game && over ? { scores: moveScores(game), tally: verdictTally(game) } : undefined),
+    [game, over],
+  );
+  const fenBefore = positions?.[step - 1];
+  const bestMove =
+    over && game && fenBefore ? bestMoveInstead(game, step - 1, fenBefore) : undefined;
   const status = statusLine(link, game, gameOverOpen);
 
   return (
     <main className="game">
-      <EvalBar score={evalScore} orientation={humanColor} />
+      <EvalBar
+        score={over && game ? reviewEval(game, step - 1) : evalScore}
+        orientation={humanColor}
+      />
       <div className="play">
         {strips.engine}
         <Board
@@ -299,12 +317,14 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
             link === 'connected' && game?.phase === 'human' && !undoSent ? humanColor : undefined
           }
           hint={playing ? game.hint : undefined}
+          bestMove={bestMove}
           onMove={(uci) => send({ type: 'move', uci })}
         >
           {verdict && <BoardBadge {...verdict} orientation={humanColor} />}
           {gameOverOpen && game?.phase === 'over' && (
             <GameOverDialog
               {...gameOverText(game)}
+              tally={judged?.tally}
               onClose={() => setGameOverOpen(false)}
               onNewGame={() => {
                 setGameOverOpen(false);
@@ -347,6 +367,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
           startFen={game?.startFen ?? START_FEN}
           moves={game?.moves ?? []}
           verdicts={game?.verdicts}
+          scores={judged?.scores}
           review={over ? { current: step - 1, onSelect: (ply) => setStep(ply + 1) } : undefined}
         />
         {over && (
@@ -356,6 +377,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
             <CopyTools fen={fen} pgn={pgn} />
           </div>
         )}
+        {judged?.tally && <VerdictTally tally={judged.tally} />}
         {over && ready && !formOpen && (
           <div className="actions">
             <button

@@ -629,6 +629,54 @@ main.game {
   vertical-align: middle;
 }
 
+.move-list .score {
+  margin-left: var(--space-2);
+  font: var(--text-pv);
+  color: var(--muted);
+}
+
+/* The good moves on the left, the ones to look at again on the right. */
+.tally {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: var(--space-5);
+  align-items: start;
+  padding: var(--space-3) var(--space-5);
+}
+
+.tally ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tally li {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  gap: var(--space-2);
+  align-items: center;
+  font: var(--text-caption);
+  color: var(--muted);
+}
+
+.tally li b {
+  font: var(--text-move);
+  color: var(--ink);
+}
+
+.tally .quality-badge {
+  width: 18px;
+  height: 18px;
+  font-size: 9px;
+}
+
+.game-over .tally {
+  padding: var(--space-4) var(--space-5) 0;
+}
+
 .actions {
   display: grid;
   grid-auto-flow: column;

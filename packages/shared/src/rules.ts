@@ -1,7 +1,7 @@
 import { castlingSide, Chess, IllegalSetup } from 'chessops/chess';
 import { chessgroundDests } from 'chessops/compat';
 import { InvalidFen, makeFen, parseFen } from 'chessops/fen';
-import { makeSanAndPlay } from 'chessops/san';
+import { makeSanAndPlay, parseSan } from 'chessops/san';
 import { isNormal, type Role } from 'chessops/types';
 import {
   makeSquare,
@@ -120,6 +120,17 @@ export function sanMoves(startFen: string, moves: readonly string[]): string[] {
     sans.push(makeSanAndPlay(pos, move));
   }
   return sans;
+}
+
+/** A move given in SAN, such as a PV's, in standard UCI; undefined when it is not legal there. */
+export function sanToUci(fen: string, san: string): string | undefined {
+  const pos = positionFromFen(fen);
+  if (typeof pos === 'string') return undefined;
+  const move = parseSan(pos, san);
+  if (!move) return undefined;
+  // chessops writes castling as the king onto its rook, which applyUciMove turns into standard UCI.
+  const result = applyUciMove(fen, makeUci(move));
+  return result.ok ? result.uci : undefined;
 }
 
 /**

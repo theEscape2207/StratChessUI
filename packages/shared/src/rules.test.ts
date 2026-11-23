@@ -9,6 +9,7 @@ import {
   parseStartFen,
   pieceColorAt,
   sanMoves,
+  sanToUci,
   START_FEN,
   turn,
 } from './rules.ts';
@@ -248,5 +249,14 @@ describe('rules', () => {
     expect(pieceColorAt(START_FEN, 'e4')).toBeUndefined();
     expect(pieceColorAt(START_FEN, 'z9')).toBeUndefined();
     expect(pieceColorAt('not a fen', 'e2')).toBeUndefined();
+  });
+
+  it("reads a SAN move as standard UCI, castling as the king's two squares", () => {
+    expect(sanToUci(START_FEN, 'Nf3')).toBe('g1f3');
+    const castles = 'r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1';
+    expect(sanToUci(castles, 'O-O')).toBe('e1g1');
+    expect(sanToUci(castles, 'O-O-O')).toBe('e1c1');
+    expect(sanToUci('8/P6k/8/8/8/8/8/K7 w - - 0 1', 'a8=N')).toBe('a7a8n');
+    expect(sanToUci(START_FEN, 'Nf6')).toBeUndefined();
   });
 });

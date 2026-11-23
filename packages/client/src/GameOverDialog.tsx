@@ -1,12 +1,16 @@
 import type { GameOverText } from './gameover.ts';
+import type { Tally } from './review.ts';
+import { VerdictTally } from './VerdictTally.tsx';
 
 type GameOverDialogProps = GameOverText & {
+  /** Absent for a game played with Move Feedback off. */
+  tally?: Tally;
   onNewGame: () => void;
   onClose: () => void;
 };
 
 /** Over the board when the server ends the game; a tap on the scrim, ×, or Review game closes it. */
-export function GameOverDialog({ title, line, onNewGame, onClose }: GameOverDialogProps) {
+export function GameOverDialog({ title, line, tally, onNewGame, onClose }: GameOverDialogProps) {
   return (
     <div className="game-over" data-testid="game-over-scrim" onClick={onClose}>
       <div
@@ -26,6 +30,7 @@ export function GameOverDialog({ title, line, onNewGame, onClose }: GameOverDial
             </svg>
           </button>
         </div>
+        {tally && <VerdictTally tally={tally} />}
         <div className="game-over-actions">
           <button type="button" className="primary" onClick={onNewGame}>
             New game
