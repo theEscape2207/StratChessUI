@@ -21,7 +21,7 @@ seen to fail. Later commits reach the PR with a plain `git push`.
 Wait with `gh pr checks <n> --watch`; right after creation it can report "no checks" before the
 run registers, so ask again. Green means **awaiting merge**: the owner merges on github.com, never
 `gh pr merge`. When the owner verifies by hand (a game on the phone), give the worktree's full
-path and the command to run there, usually `npm run build && npm start`.
+path and the test server's command to run there (CLAUDE.md → Workflow).
 
 ## 3. After the merge
 
