@@ -34,7 +34,7 @@ async function expectDialog(page: Page, title: string, line: string | RegExp) {
   await expect(dialog.getByTestId('game-over-line')).toHaveText(line);
 }
 
-test('opens when the human mates, and × leaves the final position and the form', async ({
+test('opens when the human mates, and × leaves the final position in review', async ({
   page,
   hasTouch,
 }) => {
@@ -50,7 +50,8 @@ test('opens when the human mates, and × leaves the final position and the form'
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expectFen(page, fen!);
   await expect(page.getByTestId('status')).toHaveText('game over: white wins by checkmate');
-  await expect(page.locator('form.new-game')).toBeVisible();
+  await expect(page.locator('form.new-game')).toBeHidden();
+  await expect(page.getByTestId('show-new-game')).toBeVisible();
 });
 
 test("stops with the server's reason when the engine fails, and a scrim tap closes", async ({

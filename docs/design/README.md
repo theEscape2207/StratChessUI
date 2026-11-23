@@ -13,6 +13,9 @@ same design system. Piece images live in the design system and are hidden here.
 | [PairScreen](PairScreen/README.md)           | The whole page before a device pairs   |
 | [GameScreen](GameScreen/README.md)           | Play screen at 960px and wider         |
 | [GameScreenPhone](GameScreenPhone/README.md) | Play screen below 960px                |
+| [GameReview](GameReview/README.md)           | Stepping through a finished game       |
+| [Board](Board/README.md)                     | The board, its badge and arrows        |
+| [MoveList](MoveList/README.md)               | The game's moves, selectable in review |
 | [SearchInfo](SearchInfo/README.md)           | Engine search line, top of the sidebar |
 | [MoveFeedback](MoveFeedback/README.md)       | The human's move against the best one  |
 | [Transcript](Transcript/README.md)           | UCI transcript, above the toolbar      |

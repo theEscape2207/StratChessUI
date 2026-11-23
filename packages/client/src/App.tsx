@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import {
   appendTranscript,
   canHint,
@@ -32,15 +33,17 @@ import {
 } from './NewGameForm.tsx';
 import { PairForm } from './PairForm.tsx';
 import { PlayerStrip } from './PlayerStrip.tsx';
+import { gamePositions } from './review.ts';
 import { BoardBadge } from './QualityBadge.tsx';
 import { ResignButton, ResignPrompt } from './Resign.tsx';
 import { SearchInfo } from './SearchInfo.tsx';
+import { StepButtons } from './StepButtons.tsx';
 import { materialLead, strengthLabel, stripChip } from './strip.ts';
 import { Transcript } from './Transcript.tsx';
 import { UndoButton } from './UndoButton.tsx';
 import { useGameSocket, type Link } from './useGameSocket.ts';
 import { useStoredFlag } from './useStoredFlag.ts';
-import { boardVerdict } from './verdicts.ts';
+import { boardVerdict, plyVerdict } from './verdicts.ts';
 
 const TOKEN_KEY = 'pairing-token';
 const MORE_OPEN_KEY = 'more-open';
@@ -76,6 +79,11 @@ function statusLine(link: Link, game: GameState | undefined, dialogOpen: boolean
   return game?.phase === 'over' && !dialogOpen
     ? { text: describeEnd(game), className: 'status result' }
     : undefined;
+}
+
+function sidebarTitle(game: GameState | undefined): string {
+  if (!game) return 'New game';
+  return game.phase === 'over' ? 'Game review' : `Play ${game.engineName}`;
 }
 
 /** Storage can be unavailable, as in some private windows; the browser then pairs every visit. */
@@ -173,6 +181,8 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
   // From the tap until the server answers, as a hint can take a search to find.
   const [hintSent, setHintSent] = useState(false);
   const [resignAsked, setResignAsked] = useState(false);
+  // GameReview's moves on the board, for the finished game it was chosen in; the last by default.
+  const [review, setReview] = useState<{ game: string; step: number }>();
   const [moreOpen, setMoreOpen] = useStoredFlag(MORE_OPEN_KEY);
   const [searchLine, setSearchLine] = useStoredFlag(SEARCH_LINE_KEY);
   const newGameButton = useRef<HTMLButtonElement>(null);
@@ -185,6 +195,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
     setUndoSent(false);
     setHintSent(false);
     setResignAsked(false);
+    setReview(undefined);
   };
   const { link, stalled, send, retry } = useGameSocket(
     token,
@@ -245,17 +256,33 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
     () => setMoreOpen(true),
   );
   const humanColor = game?.humanColor ?? 'white';
-  const fen = game?.fen ?? START_FEN;
   const pgn = useMemo(() => game && gamePgn(game, new Date()), [game]);
 
   const ready = engines !== undefined && link === 'connected';
   const playing = game !== undefined && game.phase !== 'over';
-  const formHidden = playing && !formOpen;
+  const over = game?.phase === 'over';
+  const formHidden = game !== undefined && !formOpen;
   const settingsShown = ready && !formHidden && engines.length > 0;
-  // Replays the game, so once per game state rather than on each search line.
-  const strips = useMemo(() => playerStrips(game), [game]);
-  const feedback = useMemo(() => game && shownFeedback(game), [game]);
-  const verdict = game && boardVerdict(game);
+
+  const positions = useMemo(() => game && gamePositions(game.startFen, game.moves), [game]);
+  const gameKey = game && `${game.startFen} ${game.moves.join(' ')}`;
+  const last = game?.moves.length ?? 0;
+  const step = over && review && review.game === gameKey ? review.step : last;
+  const setStep = (next: number) => {
+    if (gameKey) setReview({ game: gameKey, step: next });
+  };
+  const fen = (step < last && positions?.[step]) || (game?.fen ?? START_FEN);
+  const lastMove = step < last ? game?.moves[step - 1] : game?.lastMove;
+  // Replays the game, so once per game state or step rather than on each search line.
+  const strips = useMemo(
+    () => playerStrips(game && { ...game, moves: game.moves.slice(0, step), fen }),
+    [game, step, fen],
+  );
+  const feedback = useMemo(
+    () => game && (over ? shownFeedback(game, step - 1) : shownFeedback(game)),
+    [game, over, step],
+  );
+  const verdict = game && (over ? plyVerdict(game, step - 1) : boardVerdict(game));
   const status = statusLine(link, game, gameOverOpen);
 
   return (
@@ -265,13 +292,13 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
         {strips.engine}
         <Board
           fen={fen}
-          lastMove={game?.lastMove}
+          lastMove={lastMove}
           revision={revision}
           orientation={humanColor}
           movable={
             link === 'connected' && game?.phase === 'human' && !undoSent ? humanColor : undefined
           }
-          hint={game?.hint}
+          hint={playing ? game.hint : undefined}
           onMove={(uci) => send({ type: 'move', uci })}
         >
           {verdict && <BoardBadge {...verdict} orientation={humanColor} />}
@@ -281,7 +308,8 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
               onClose={() => setGameOverOpen(false)}
               onNewGame={() => {
                 setGameOverOpen(false);
-                // The form shows after a game, keeping the last settings: a rematch is one tap.
+                // Shown now, so its submit can take focus: the last settings stay, a rematch is one tap.
+                flushSync(() => setFormOpen(true));
                 newGameButton.current?.focus();
               }}
             />
@@ -312,15 +340,35 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
         </div>
       </div>
       <aside className="sidebar" aria-label="Game">
-        <h2 className="sidebar-title">{game ? `Play ${game.engineName}` : 'New game'}</h2>
-        {game && search && searchLine && <SearchInfo fen={search.fen} info={search.info} />}
+        <h2 className="sidebar-title">{sidebarTitle(game)}</h2>
+        {playing && search && searchLine && <SearchInfo fen={search.fen} info={search.info} />}
         {feedback && <MoveFeedback feedback={feedback} />}
         <MoveList
           startFen={game?.startFen ?? START_FEN}
           moves={game?.moves ?? []}
           verdicts={game?.verdicts}
+          review={over ? { current: step - 1, onSelect: (ply) => setStep(ply + 1) } : undefined}
         />
-        {game && resignAsked && (
+        {over && (
+          <div className="toolbar">
+            <StepButtons step={step} last={last} onStep={setStep} />
+            <span className="toolbar-gap" />
+            <CopyTools fen={fen} pgn={pgn} />
+          </div>
+        )}
+        {over && ready && !formOpen && (
+          <div className="actions">
+            <button
+              type="button"
+              className="primary"
+              data-testid="show-new-game"
+              onClick={() => setFormOpen(true)}
+            >
+              New game
+            </button>
+          </div>
+        )}
+        {playing && resignAsked && (
           <ResignPrompt
             disabled={link !== 'connected'}
             onKeepPlaying={() => setResignAsked(false)}
@@ -330,7 +378,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
             }}
           />
         )}
-        {game && !resignAsked && (
+        {playing && !resignAsked && (
           <div className="actions">
             <ResignButton
               disabled={link !== 'connected' || !canResign(game)}
@@ -362,7 +410,7 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
           <NewGameForm
             settings={settings}
             hidden={formHidden}
-            onCancel={playing ? () => setFormOpen(false) : undefined}
+            onCancel={game ? () => setFormOpen(false) : undefined}
             submitRef={newGameButton}
           />
         )}
@@ -387,9 +435,11 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
           </div>
           {/* Kept through a new game, so an open panel stays open; the server resets its lines. */}
           {(game || transcript.length > 0) && <Transcript lines={transcript} />}
-          <div className="toolbar">
-            <CopyTools fen={fen} pgn={pgn} />
-          </div>
+          {!over && (
+            <div className="toolbar">
+              <CopyTools fen={fen} pgn={pgn} />
+            </div>
+          )}
         </details>
       </aside>
     </main>

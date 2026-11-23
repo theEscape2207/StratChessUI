@@ -16,6 +16,7 @@ const GAME_SPECS = [
   'layout.spec.ts',
   'level.spec.ts',
   'more.spec.ts',
+  'review.spec.ts',
   'status.spec.ts',
   'strips.spec.ts',
   'takeback.spec.ts',

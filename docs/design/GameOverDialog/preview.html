@@ -1,4 +1,4 @@
-<!-- @dsCard group="Screens" height=380 subtitle="Over the board when the game ends: result, a short summary, New game or Review" -->
+<!-- @dsCard group="Screens" height=420 subtitle="Over the board when the game ends: result, the verdict tally, New game or Review" -->
 <!doctype html>
 <html><head><meta charset="utf-8"><link rel="stylesheet" href="../../../packages/client/src/tokens.css"><style>
   * { box-sizing: border-box; }
@@ -11,13 +11,17 @@
   h2 { margin: 0; font-size: 20px; line-height: 26px; font-weight: 800; }
   .by { margin-top: 2px; font: 400 0.85rem/20px var(--font-mono); color: var(--muted); }
   .close { position: absolute; top: 4px; right: 4px; width: var(--control-min-height); height: var(--control-min-height); border: 0; background: none; color: var(--muted); border-radius: var(--radius-sm); }
-  .tally { display: grid; grid-template-columns: repeat(3, 1fr); padding: var(--space-4) var(--space-4) var(--space-3); text-align: center; }
-  .tally div { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); font-size: 12px; line-height: 16px; font-weight: 600; color: var(--muted); }
-  .c { display: flex; gap: 6px; align-items: center; color: var(--ink); font-size: 14px; font-weight: 700; }
-  .b { width: 18px; height: 18px; border-radius: var(--radius-full); display: grid; place-items: center; font: 800 10px/1 var(--font-sans); }
+  /* The tally as in GameReview: the good moves on the left, the ones to look at again on the right. */
+  .tally { display: grid; grid-template-columns: 1fr 1fr; column-gap: var(--space-5); align-items: start; padding: var(--space-4) var(--space-5) var(--space-3); }
+  .tally ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+  .tally li { display: grid; grid-template-columns: 18px 1fr auto; gap: var(--space-2); align-items: center; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--muted); }
+  .tally li b { color: var(--ink); font-size: 14px; line-height: 20px; font-weight: 700; }
+  .b { width: 18px; height: 18px; border-radius: var(--radius-full); display: grid; place-items: center; font: 800 9px/1 var(--font-sans); }
   .best { background: var(--q-best); color: var(--on-accent); }
   .exc { background: var(--q-excellent); color: var(--q-ink); }
   .inacc { background: var(--q-inaccuracy); color: var(--q-ink); }
+  .mist { background: var(--q-mistake); color: var(--q-ink); }
+  .blun { background: var(--q-blunder); color: var(--on-accent); }
   .actions { display: grid; gap: var(--space-3); padding: 0 var(--space-4) var(--space-4); }
   .btn { font: 700 15px/20px var(--font-sans); min-height: var(--control-min-height); padding: 8px; border: 0; border-radius: var(--radius-md); }
   .primary { background: var(--accent); color: var(--on-accent); box-shadow: var(--shadow-button); font-size: 17px; padding: 10px; margin-bottom: 4px; }
@@ -34,10 +38,16 @@
           <div class="by">1-0 · by checkmate</div>
           <button class="close" aria-label="Close and review the game"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
         </div>
-        <div class="tally">
-          <div><span class="c"><span class="b best">★</span>5</span>Best</div>
-          <div><span class="c"><span class="b exc">!</span>2</span>Excellent</div>
-          <div><span class="c"><span class="b inacc">?!</span>0</span>Inaccuracy</div>
+        <div class="tally" aria-label="Your moves">
+          <ul>
+            <li><span class="b best" aria-hidden="true">★</span>Best<b>5</b></li>
+            <li><span class="b exc" aria-hidden="true">!</span>Excellent<b>2</b></li>
+          </ul>
+          <ul>
+            <li><span class="b inacc" aria-hidden="true">?!</span>Inaccuracy<b>1</b></li>
+            <li><span class="b mist" aria-hidden="true">?</span>Mistake<b>0</b></li>
+            <li><span class="b blun" aria-hidden="true">??</span>Blunder<b>0</b></li>
+          </ul>
         </div>
         <div class="actions">
           <button class="btn primary">New game</button>

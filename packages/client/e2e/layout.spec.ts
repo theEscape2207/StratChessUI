@@ -36,7 +36,7 @@ test('before the first game the sidebar shows the new-game form', async ({ page 
   await expect(page.getByRole('button', { name: 'Cancel' })).toBeHidden();
 });
 
-test('during play the form hides behind New game, and comes back after game over', async ({
+test('the form hides behind New game during play and in review, with Cancel to go back', async ({
   page,
   hasTouch,
 }) => {
@@ -55,9 +55,13 @@ test('during play the form hides behind New game, and comes back after game over
   await page.getByLabel('Start position').fill('R5k1/5ppp/8/8/8/8/8/6K1 b - - 0 30');
   await submitNewGame(page);
   await expect(page.getByTestId('game-over-line')).toHaveText('1-0 · by checkmate');
+  await page.getByRole('dialog').getByRole('button', { name: 'Review game' }).click();
+  await expect(form(page)).toBeHidden();
+  await reveal(page).click();
   await expect(form(page)).toBeVisible();
-  await expect(reveal(page)).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Cancel' })).toBeHidden();
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(form(page)).toBeHidden();
+  await reveal(page).click();
 
   await page.getByLabel('Start position').fill('');
   await newGame(page);

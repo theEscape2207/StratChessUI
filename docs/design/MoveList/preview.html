@@ -1,0 +1,27 @@
+<!-- @dsCard group="Sidebar" height=250 subtitle="Opening name, striped rows, current move selected" -->
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../../../packages/client/src/tokens.css"><style>
+  body { margin: 0; padding: 16px; background: var(--bg); font-family: var(--font-sans); }
+  .list { width: 300px; background: var(--panel); color: var(--ink); border-radius: var(--radius-md); overflow: hidden; }
+  .opening { font-size: 12px; line-height: 16px; color: var(--muted); padding: var(--space-3) var(--space-5); border-bottom: 1px solid var(--hairline); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  ol { list-style: none; margin: 0; padding: 0; }
+  li { display: grid; grid-template-columns: 40px 1fr 1fr; align-items: center; padding: 3px var(--space-5); font-size: 14px; line-height: 20px; font-weight: 700; }
+  li:nth-child(even) { background: var(--row-alt); }
+  .n { font-size: 12px; font-weight: 600; color: var(--muted); }
+  .m { justify-self: start; padding: 0 6px; border-radius: var(--radius-sm); display: inline-flex; gap: 6px; align-items: center; }
+  .m.cur { background: var(--panel-raised); }
+  .q { width: 16px; height: 16px; border-radius: var(--radius-full); display: grid; place-items: center; font: 800 9px/1 var(--font-sans); background: var(--q-inaccuracy); color: var(--q-ink); }
+</style></head>
+<body>
+  <div class="list">
+    <div class="opening">Italian Game: Giuoco Piano, Center Attack</div>
+    <ol>
+      <li><span class="n">10.</span><span class="m">d4</span><span class="m">exd4</span></li>
+      <li><span class="n">11.</span><span class="m">Qa4</span><span class="m">c5</span></li>
+      <li><span class="n">12.</span><span class="m cur" aria-current="true"><span class="q" aria-label="inaccuracy">?!</span>a3</span><span class="m">Nc6</span></li>
+      <li><span class="n">13.</span><span class="m">Bxc6</span><span class="m">bxc6</span></li>
+      <li><span class="n">14.</span><span class="m">Qxc6</span><span class="m">Rb8</span></li>
+      <li><span class="n">15.</span><span class="m">b4</span><span class="m">Rb6</span></li>
+    </ol>
+  </div>
+</body></html>

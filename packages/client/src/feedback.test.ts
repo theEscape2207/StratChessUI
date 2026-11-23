@@ -82,6 +82,33 @@ describe('shownFeedback', () => {
     });
   });
 
+  it("shows a given move when it is the human's, and nothing for an engine move or the start", () => {
+    const played = game(
+      'white',
+      ['e2e4', 'e7e5', 'a2a3'],
+      [scored(30), scored(25), scored(-40)],
+      ['best', null, 'inaccuracy'],
+    );
+    expect(shownFeedback(played, 0)).toEqual({
+      san: 'e4',
+      fen: START_FEN,
+      verdict: 'best',
+      score: { cp: 30 },
+    });
+    expect(shownFeedback(played, 1)).toBeUndefined();
+    expect(shownFeedback(played, -1)).toBeUndefined();
+    const black = game(
+      'black',
+      ['e7e5', 'e2e4', 'd7d5'],
+      [scored(0), null, scored(10)],
+      undefined,
+      BLACK_FIRST,
+    );
+    expect(shownFeedback(black, 0)).toMatchObject({ san: 'e5', fen: BLACK_FIRST });
+    expect(shownFeedback(black, 2)).toMatchObject({ san: 'd5' });
+    expect(shownFeedback(black, 1)).toBeUndefined();
+  });
+
   it('shows nothing without analysis', () => {
     expect(shownFeedback(game('white', ['e2e4']))).toBeUndefined();
     expect(shownFeedback(game('white', []))).toBeUndefined();
