@@ -62,6 +62,8 @@ change could fail; a docs-only change needs lint at most.
   surfacing mid-implementation means stop and write it.
 - **Finishing a branch, opening a PR or cleaning up after a merge:** skill `open-pull-request`.
   Reviewing another agent's issue, design or PR: skill `cross-agent-review`.
+- **The owner tests a worktree by hand** on the test server, `scripts\test-server.ps1` on port 8081
+  (README → Test a worktree from a phone), never `npm start`, which clashes with the live server.
 - Commit messages stay short; stage named files, never `git add -A`.
 
 **Public repo.** Every issue, PR or comment body goes through `--body-file` (an inline `--body`
