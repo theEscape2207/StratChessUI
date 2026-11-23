@@ -58,7 +58,7 @@ const unjudged: Fixture = { ...judged, verdicts: undefined, feedback: undefined 
 const blackFirst: Fixture = {
   startFen: AFTER_E4,
   moves: ['e7e5', 'g1f3', 'b8c6'],
-  verdicts: ['mistake', null, 'excellent'],
+  verdicts: ['mistake', null, 'great'],
   feedback: [{ score: { cp: 90 }, best: { score: { cp: 20 }, pv: ['c5'] } }, null, null],
 };
 
@@ -121,9 +121,9 @@ describe('verdictTally', () => {
       blunder: 0,
     });
     expect(verdictTally(blackFirst)).toEqual({
-      great: 0,
+      great: 1,
       best: 0,
-      excellent: 1,
+      excellent: 0,
       inaccuracy: 0,
       mistake: 1,
       blunder: 0,
