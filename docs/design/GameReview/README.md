@@ -27,8 +27,8 @@ from the hint's green. None when the move played was the best.
 selected one, so stepping onto the engine's reply keeps the bar where the human's move left it, rather
 than emptying it on every other step. Empty before the human's first move.
 
-**Tally** each verdict's count on the human's moves, in two columns: Best and Excellent on the
-left, Inaccuracy, Mistake and Blunder on the right. A row is an 18px QualityBadge, the word in
+**Tally** each verdict's count on the human's moves, in two columns: Great, Best and Excellent
+on the left, Inaccuracy, Mistake and Blunder on the right. A row is an 18px QualityBadge, the word in
 `caption` `muted`, the count in the `move` style at the row's end. A move with no verdict (a hinted
 turn, the opening's first moves) counts nowhere.
 

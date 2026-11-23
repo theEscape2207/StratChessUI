@@ -48,6 +48,7 @@
   .fb .row + .row { border-top: 1px solid var(--hairline); }
   .b { width: var(--badge-size); height: var(--badge-size); border-radius: var(--radius-full); display: grid; place-items: center; font: 800 12px/1 var(--font-sans); }
   .b.inacc { background: var(--q-inaccuracy); color: var(--q-ink); }
+  .b.great { background: var(--q-great); color: var(--on-accent); }
   .b.best { background: var(--q-best); color: var(--on-accent); }
   .b.exc { background: var(--q-excellent); color: var(--q-ink); }
   .head { font-size: 17px; line-height: 24px; font-weight: 800; }
@@ -158,6 +159,7 @@
     </div>
     <div class="tally" aria-label="Your moves">
       <ul>
+        <li><span class="b great" aria-hidden="true">!!</span>Great<b>0</b></li>
         <li><span class="b best" aria-hidden="true">★</span>Best<b>3</b></li>
         <li><span class="b exc" aria-hidden="true">!</span>Excellent<b>0</b></li>
       </ul>

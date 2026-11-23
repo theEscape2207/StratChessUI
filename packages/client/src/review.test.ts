@@ -113,6 +113,7 @@ describe('bestMoveInstead', () => {
 describe('verdictTally', () => {
   it("counts the human's verdicts", () => {
     expect(verdictTally(judged)).toEqual({
+      great: 0,
       best: 1,
       excellent: 0,
       inaccuracy: 1,
@@ -120,6 +121,7 @@ describe('verdictTally', () => {
       blunder: 0,
     });
     expect(verdictTally(blackFirst)).toEqual({
+      great: 0,
       best: 0,
       excellent: 1,
       inaccuracy: 0,

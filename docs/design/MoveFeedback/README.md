@@ -20,10 +20,11 @@ the human's; none on the engine's moves.
 best, the engine's best move, score and PV (SAN, starting with the best move, numbered from the
 position before the move). Scores are from white's side.
 
-**Anatomy** QualityBadge · headline in the `feedback` style (SAN bold; "is best", "is excellent",
-"is an inaccuracy", "is a mistake" or "is a blunder" lighter) · eval chip in the `eval` style, written
-as SearchInfo writes a score: `eval-white` ground for scores ≥ 0, `eval-black` for negative. The PV
-under the best move is `pv` style in `muted`, one line, ellipsised.
+**Anatomy** QualityBadge · headline in the `feedback` style (SAN bold; "is the only good move", "is
+best", "is excellent", "is an inaccuracy", "is a mistake" or "is a blunder" lighter) · eval chip in
+the `eval` style, written as SearchInfo writes a score: `eval-white` ground for scores ≥ 0,
+`eval-black` for negative. The PV under the best move is `pv` style in `muted`, one line,
+ellipsised.
 
 **Below 960px** one row, per GameScreenPhone: badge, headline and chip, with "Best was O-O (0.00)"
 under the headline in place of the best row. No PV.
