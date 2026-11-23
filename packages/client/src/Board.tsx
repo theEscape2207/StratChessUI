@@ -30,7 +30,6 @@ const PROMOTION_ROLES = { queen: 'q', rook: 'r', bishop: 'b', knight: 'n' } as c
 /** a1 is dark. Chessground's squares carry no colour of their own, so the stylesheet needs this. */
 const shade = (key: Key) => ((key.charCodeAt(0) + Number(key[1])) % 2 === 0 ? 'dark' : 'light');
 
-/** A UCI move's from and to squares. */
 function moveSquares(uci: string | undefined): [Key, Key] | undefined {
   return uci ? [uci.slice(0, 2) as Key, uci.slice(2, 4) as Key] : undefined;
 }

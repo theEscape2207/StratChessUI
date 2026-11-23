@@ -9,8 +9,7 @@ import {
   verdictTally,
 } from './review.ts';
 
-const BLACK_FIRST = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1';
-const AFTER_E4 = BLACK_FIRST;
+const AFTER_E4 = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1';
 const AFTER_E4_E5 = 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2';
 
 describe('gamePositions', () => {
@@ -39,12 +38,11 @@ describe('boardAt', () => {
   });
 });
 
-type Judged = Pick<GameState, 'startFen' | 'moves' | 'humanColor' | 'verdicts' | 'feedback'>;
+type Fixture = Pick<GameState, 'startFen' | 'moves' | 'verdicts' | 'feedback'>;
 
 // 1. e4 e5 2. Nf3 Nc6, the human playing white: e4 was best, Nf3 an inaccuracy where d4 was best.
-const judged: Judged = {
+const judged: Fixture = {
   startFen: START_FEN,
-  humanColor: 'white',
   moves: ['e2e4', 'e7e5', 'g1f3', 'b8c6'],
   verdicts: ['best', null, 'inaccuracy', null],
   feedback: [
@@ -54,12 +52,11 @@ const judged: Judged = {
     null,
   ],
 };
-const unjudged: Judged = { ...judged, verdicts: undefined, feedback: undefined };
+const unjudged: Fixture = { ...judged, verdicts: undefined, feedback: undefined };
 
 // From the position after 1. e4, black to move first, the human playing black: 1... e5 2. Nf3 Nc6.
-const blackFirst: Judged = {
-  startFen: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
-  humanColor: 'black',
+const blackFirst: Fixture = {
+  startFen: AFTER_E4,
   moves: ['e7e5', 'g1f3', 'b8c6'],
   verdicts: ['mistake', null, 'excellent'],
   feedback: [{ score: { cp: 90 }, best: { score: { cp: 20 }, pv: ['c5'] } }, null, null],
@@ -102,14 +99,14 @@ describe('bestMoveInstead', () => {
   const positions = gamePositions(judged.startFen, judged.moves);
 
   it("reads the best move's SAN in the position the human moved from", () => {
-    expect(bestMoveInstead(judged, 2, positions[2]!)).toBe('d2d4');
-    expect(bestMoveInstead(blackFirst, 0, BLACK_FIRST)).toBe('c7c5');
+    expect(bestMoveInstead(judged, positions, 2)).toBe('d2d4');
+    expect(bestMoveInstead(blackFirst, [AFTER_E4], 0)).toBe('c7c5');
   });
 
   it("has none where the move played was best, on the engine's moves, and without feedback", () => {
-    expect(bestMoveInstead(judged, 0, positions[0]!)).toBeUndefined();
-    expect(bestMoveInstead(judged, 1, positions[1]!)).toBeUndefined();
-    expect(bestMoveInstead(unjudged, 2, positions[2]!)).toBeUndefined();
+    expect(bestMoveInstead(judged, positions, 0)).toBeUndefined();
+    expect(bestMoveInstead(judged, positions, 1)).toBeUndefined();
+    expect(bestMoveInstead(unjudged, positions, 2)).toBeUndefined();
   });
 });
 

@@ -6,7 +6,7 @@ import {
   type Verdict,
 } from '@stratchess-ui/shared';
 
-type Judged = Pick<GameState, 'moves' | 'verdicts' | 'feedback'>;
+type JudgedMoves = Pick<GameState, 'moves' | 'verdicts' | 'feedback'>;
 
 /**
  * The position after each move of a game, the start first, so `positions[n]` follows `n` moves.
@@ -39,7 +39,7 @@ export function boardAt(
 // The server stores verdicts and feedback for the human's moves only, `null` on the engine's.
 
 /** The MoveList's score per move: the stored one on each of the human's moves, none on the engine's. */
-export function moveScores(game: Judged): (Score | undefined)[] {
+export function moveScores(game: JudgedMoves): (Score | undefined)[] {
   return game.moves.map((_, ply) => game.feedback?.[ply]?.score);
 }
 
@@ -47,7 +47,7 @@ export function moveScores(game: Judged): (Score | undefined)[] {
  * The EvalBar's score with the move at index `ply` on the board: the human's latest scored move at
  * or before it, so stepping onto the engine's reply keeps the bar still. Undefined before any.
  */
-export function reviewEval(game: Judged, ply: number): Score | undefined {
+export function reviewEval(game: JudgedMoves, ply: number): Score | undefined {
   for (let at = ply; at >= 0; at--) {
     const score = game.feedback?.[at]?.score;
     if (score) return score;
@@ -56,18 +56,23 @@ export function reviewEval(game: Judged, ply: number): Score | undefined {
 }
 
 /**
- * The engine's best move in standard UCI where the human's move at index `ply` was not it.
- * `fenBefore` is the position the move was played from, where the best move's SAN is read.
+ * The engine's best move in standard UCI where the human's move at index `ply` was not it, read in
+ * the position the move was played from.
  */
-export function bestMoveInstead(game: Judged, ply: number, fenBefore: string): string | undefined {
+export function bestMoveInstead(
+  game: JudgedMoves,
+  positions: readonly string[],
+  ply: number,
+): string | undefined {
   const san = game.feedback?.[ply]?.best?.pv[0];
-  return san === undefined ? undefined : sanToUci(fenBefore, san);
+  const fen = positions[ply];
+  return san === undefined || fen === undefined ? undefined : sanToUci(fen, san);
 }
 
 export type Tally = Record<Verdict, number>;
 
 /** How many of the human's moves earned each verdict; undefined for a game played without them. */
-export function verdictTally(game: Judged): Tally | undefined {
+export function verdictTally(game: JudgedMoves): Tally | undefined {
   if (!game.verdicts) return undefined;
   const tally: Tally = { best: 0, excellent: 0, inaccuracy: 0, mistake: 0, blunder: 0 };
   for (const verdict of game.verdicts) if (verdict) tally[verdict]++;

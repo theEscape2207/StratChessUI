@@ -295,9 +295,8 @@ function Game({ token, onUnpaired }: { token: string; onUnpaired: () => void }) 
     () => (game && over ? { scores: moveScores(game), tally: verdictTally(game) } : undefined),
     [game, over],
   );
-  const fenBefore = positions?.[step - 1];
   const bestMove =
-    over && game && fenBefore ? bestMoveInstead(game, step - 1, fenBefore) : undefined;
+    over && game && positions ? bestMoveInstead(game, positions, step - 1) : undefined;
   const status = statusLine(link, game, gameOverOpen);
 
   return (

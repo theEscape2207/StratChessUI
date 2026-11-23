@@ -24,6 +24,7 @@ const feedback = (page: Page) => page.getByTestId('move-feedback');
 const evalBar = (page: Page) => page.getByTestId('eval-bar');
 const board = (page: Page) => page.getByTestId('board');
 // Not filtered on visibility: Playwright sees a straight arrow's line as a box of zero width.
+// Chessground's blue brush, which the design gives the best move apart from the hint's green.
 const blueArrow = (page: Page) => page.locator('svg.cg-shapes line[stroke="#003088"]');
 const sidebar = (page: Page) => page.getByRole('complementary', { name: 'Game' });
 const tallyRow = (scope: Locator, word: string) =>
@@ -79,6 +80,10 @@ test('steps back to a blunder, with its badge and feedback on a locked board', a
   await expect(boardBadge(page)).toHaveCount(0);
   await expect(evalBar(page)).toHaveAttribute('aria-label', 'Evaluation not yet known');
   await expect(blueArrow(page)).toHaveCount(0);
+  await step(page, 'Last move').click();
+  await expectFen(page, final!);
+  await expect(board(page)).not.toHaveAttribute('data-best-move');
+  await step(page, 'First move').click();
   await tapSquare(page, 'b1', hasTouch);
   // Chessground draws a selection on its next frame, and keeps spare squares hidden.
   await page.evaluate(
