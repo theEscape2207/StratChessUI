@@ -5,7 +5,7 @@ type GameOverDialogProps = GameOverText & {
   onClose: () => void;
 };
 
-/** Over the board when the server ends the game; a tap on the scrim closes it like ×. */
+/** Over the board when the server ends the game; a tap on the scrim, ×, or Review game closes it. */
 export function GameOverDialog({ title, line, onNewGame, onClose }: GameOverDialogProps) {
   return (
     <div className="game-over" data-testid="game-over-scrim" onClick={onClose}>
@@ -29,6 +29,9 @@ export function GameOverDialog({ title, line, onNewGame, onClose }: GameOverDial
         <div className="game-over-actions">
           <button type="button" className="primary" onClick={onNewGame}>
             New game
+          </button>
+          <button type="button" onClick={onClose}>
+            Review game
           </button>
         </div>
       </div>

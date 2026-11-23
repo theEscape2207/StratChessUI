@@ -6,7 +6,7 @@ import {
   type Score,
   type Verdict,
 } from '@stratchess-ui/shared';
-import { latestHumanPly } from './verdicts.ts';
+import { isHumanPly, latestHumanPly } from './verdicts.ts';
 
 export type ShownFeedback = {
   san: string;
@@ -30,14 +30,15 @@ export function verdictPhrase(verdict: Verdict): string {
 }
 
 /**
- * The feedback on the human's latest move, kept through the engine's reply. Undefined when that move
- * has none, or none yet, so the last move's feedback goes as soon as the human moves again.
+ * The feedback on the move at index `ply`, by default the human's latest, which play keeps through
+ * the engine's reply. Undefined for an engine move and for a move with none, or none yet, so the last
+ * move's feedback goes as soon as the human moves again.
  */
 export function shownFeedback(
   game: Pick<GameState, 'startFen' | 'moves' | 'humanColor' | 'verdicts' | 'feedback'>,
+  ply = latestHumanPly(game),
 ): ShownFeedback | undefined {
-  const ply = latestHumanPly(game);
-  if (ply === undefined) return undefined;
+  if (ply === undefined || !isHumanPly(game, ply)) return undefined;
   const feedback = game.feedback?.[ply];
   if (!feedback) return undefined;
   const before = game.moves.slice(0, ply);

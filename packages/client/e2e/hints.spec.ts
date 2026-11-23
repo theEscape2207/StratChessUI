@@ -82,7 +82,7 @@ test('sends one request until the server answers, with a game state or an error'
   await expect(hint(page)).toBeEnabled();
 });
 
-test('is disabled while the engine thinks, with none left, and once the game is over', async ({
+test('is disabled while the engine thinks and with none left, and goes once the game is over', async ({
   page,
 }) => {
   const server = await scriptedServer(page);
@@ -94,7 +94,7 @@ test('is disabled while the engine thinks, with none left, and once the game is 
   server.game({ ...YOUR_MOVE, hintsLeft: 0, hint: { from: 'e2' } });
   await expect(hint(page)).toBeEnabled();
   server.game({ ...YOUR_MOVE, phase: 'over', reason: 'the engine failed' });
-  await expect(hint(page)).toBeDisabled();
+  await expect(hint(page)).toHaveCount(0);
 });
 
 test('clears the board once the hinted turn is played', async ({ page }) => {

@@ -1,0 +1,50 @@
+<!-- @dsCard group="Board" height=420 subtitle="Static rendition: last move a2-a3 with an inaccuracy badge, legal-move dots for the f3 knight" -->
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../../../packages/client/src/tokens.css"><style>img[src^="/_blob/"] { visibility: hidden; }</style><style>
+  body { margin: 0; padding: 16px; background: var(--bg); font-family: var(--font-sans); }
+  .board { position: relative; width: min(384px, calc(100vw - 32px)); aspect-ratio: 1; display: grid; grid-template-columns: repeat(8, 1fr); border-radius: var(--radius-none); }
+  .sq { position: relative; }
+  .sq.l { background: var(--board-light); color: var(--board-dark); }
+  .sq.d { background: var(--board-dark); color: var(--board-light); }
+  .sq.l.hl { background: var(--highlight-light); }
+  .sq.d.hl { background: var(--highlight-dark); }
+  .sq.sel { box-shadow: inset 0 0 0 999px var(--move-dest); }
+  .sq.dest::after { content: ""; position: absolute; inset: 39%; border-radius: var(--radius-full); background: var(--move-dest); }
+  .sq img { position: absolute; inset: 4% 10% 16%; width: 80%; height: 80%; }
+  .rank, .file { position: absolute; font-size: 11px; line-height: 1; font-weight: 700; }
+  .rank { top: var(--space-1); left: var(--space-1); }
+  .file { bottom: var(--space-1); right: var(--space-1); }
+  .badge { position: absolute; top: -8px; right: -8px; z-index: var(--z-badge); width: 20px; height: 20px; border-radius: var(--radius-full);
+    display: grid; place-items: center; font: 800 11px/1 var(--font-sans); background: var(--q-inaccuracy); color: var(--q-ink); box-shadow: var(--shadow-badge); }
+</style></head>
+<body>
+<div class="board" id="b" role="img" aria-label="Chess position, white to move"></div>
+<script>
+  const P = {
+    K: '8ee2b417de8f454bcb0de92437d73f46', Q: 'e454a306c7810aa9eb869294fa2baccf', R: 'd05dc8105723665a1bfa98259fc0796d',
+    B: 'faaa38890928904d4e75dda4ad4e4e1a', N: 'cf0830de755ba00c4de4aa20326dd360', P: '4c9e00e5fe867c50282a7c8754399ccb',
+    k: '6afdeec8ffc43688dcbc81683287d575', q: '332feac2e807be2365ed6394402d68d6', r: 'e29d90b26527271e01938ea80ccf4705',
+    b: 'c4b4b6529808a49324f8fba489eb0438', n: 'ac6f7b704414b462d811e356f2931755', p: '4a9c38d9e825c976c093cbce59ab22e6',
+  };
+  const fen = 'r1bq1rk1/pp3ppp/2n5/1Bppp3/Qn1PP3/P4N2/1P3PPP/RNB1K2R';
+  const hl = ['a2', 'a3'], sel = 'f3', dests = ['d2', 'g5', 'h4', 'e5', 'g1'], badge = 'a3';
+  const b = document.getElementById('b');
+  fen.split('/').forEach((row, r) => {
+    let f = 0;
+    for (const ch of row) {
+      if (/\d/.test(ch)) { for (let i = 0; i < +ch; i++) add(r, f++, null); }
+      else add(r, f++, ch);
+    }
+  });
+  function add(r, f, piece) {
+    const sq = 'abcdefgh'[f] + (8 - r);
+    const el = document.createElement('div');
+    el.className = 'sq ' + ((r + f) % 2 ? 'd' : 'l') + (hl.includes(sq) ? ' hl' : '') + (sq === sel ? ' sel' : '') + (dests.includes(sq) && !piece ? ' dest' : '');
+    if (piece) { const img = document.createElement('img'); img.src = '/_blob/' + P[piece]; img.alt = ''; el.append(img); }
+    if (f === 0) el.insertAdjacentHTML('beforeend', '<span class="rank">' + (8 - r) + '</span>');
+    if (r === 7) el.insertAdjacentHTML('beforeend', '<span class="file">' + 'abcdefgh'[f] + '</span>');
+    if (sq === badge) el.insertAdjacentHTML('beforeend', '<span class="badge" aria-label="inaccuracy">?!</span>');
+    b.append(el);
+  }
+</script>
+</body></html>

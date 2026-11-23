@@ -120,12 +120,12 @@ test('sends one takeback until the server answers, with a game state or an error
   await expect(selected).toHaveCount(1);
 });
 
-test('is disabled once the game is over', async ({ page }) => {
+test('goes once the game is over, with the rest of the in-game actions', async ({ page }) => {
   const server = await scriptedServer(page);
   server.game(IN_PLAY);
   await expect(undo(page)).toBeEnabled();
   server.game({ ...IN_PLAY, phase: 'over', reason: 'the engine failed' });
-  await expect(undo(page)).toBeDisabled();
+  await expect(undo(page)).toHaveCount(0);
 });
 
 test('forgets what the engine said about the moves taken back', async ({ page }) => {

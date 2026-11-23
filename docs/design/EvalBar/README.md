@@ -12,4 +12,8 @@ the board orientation (the bar flips with it).
 fills 100%. The number (`eval` style, no sign, `M4` for mate) sits at the leading side's end, in
 the opposite bar colour.
 
+**In GameReview** the bar follows the selected move with the score stored for the human's latest
+scored move at or before it; empty (half, no number) before their first move, and in a game played
+with Move Feedback off.
+
 New in this system; StratChessUI has no eval display yet (milestone 2: live search info).

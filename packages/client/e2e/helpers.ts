@@ -115,6 +115,23 @@ export async function openSettled(page: Page) {
   await showNewGameForm(page);
 }
 
+// White mates with Rb8 and has equal material otherwise. The fake-play engine scores a mate in
+// one as a mate and anything else by material, so any other move gives up a won game: a blunder.
+export const MATE_IN_ONE = '6k1/5ppp/8/8/8/8/r4PPP/1R4K1 w - - 0 1';
+
+/** Starts a game against the fake-play engine from `fen`, with or without Move Feedback. */
+export async function newGameFromFen(page: Page, fen: string, analysis: boolean) {
+  await showNewGameForm(page);
+  await page.getByRole('combobox', { name: 'Engine' }).selectOption('fake-play');
+  await page.getByRole('combobox', { name: 'Limit' }).selectOption('depth');
+  await page.getByLabel('Start position').fill(fen);
+  await page.getByLabel('Move Feedback').setChecked(analysis);
+  await submitNewGame(page);
+  // The game this browser resumed can read "your move" too, so wait for the new one's position.
+  await expectFen(page, fen);
+  await expectYourMove(page);
+}
+
 /** Starts a game with a depth limit, which the fake answers at once; it sleeps out a move time. */
 export async function newGame(page: Page, side: 'white' | 'black' = 'white') {
   await showNewGameForm(page);

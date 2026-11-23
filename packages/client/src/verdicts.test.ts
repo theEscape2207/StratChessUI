@@ -6,7 +6,7 @@ import {
   type GameState,
   type Verdict,
 } from '@stratchess-ui/shared';
-import { boardVerdict, listsVerdict } from './verdicts.ts';
+import { boardVerdict, listsVerdict, plyVerdict } from './verdicts.ts';
 
 const BLACK_FIRST = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1';
 
@@ -104,4 +104,29 @@ it.each([
   [null, false],
 ] as const)('lists %s in the move list: %s', (verdict, listed) => {
   expect(listsVerdict(verdict)).toBe(listed);
+});
+
+describe('plyVerdict', () => {
+  it("puts a human move's verdict on its to-square, wherever the game has got to", () => {
+    const played = game(
+      'white',
+      ['e2e4', 'e7e5', 'g1f3', 'b8c6'],
+      ['best', null, 'inaccuracy', null],
+    );
+    expect(plyVerdict(played, 0)).toEqual({ square: 'e4', verdict: 'best' });
+    expect(plyVerdict(played, 2)).toEqual({ square: 'f3', verdict: 'inaccuracy' });
+  });
+
+  it('shows nothing for an engine move, the start position or a move without a verdict', () => {
+    const played = game('black', ['e2e4', 'e7e5', 'g1f3'], ['mistake', null, 'best']);
+    expect(plyVerdict(played, 0)).toBeUndefined();
+    expect(plyVerdict(played, 1)).toBeUndefined();
+    expect(plyVerdict(played, -1)).toBeUndefined();
+  });
+
+  it('counts the moves from a FEN where black moves first', () => {
+    const played = game('black', ['e7e5', 'e2e4'], ['inaccuracy', 'blunder'], BLACK_FIRST);
+    expect(plyVerdict(played, 0)).toEqual({ square: 'e5', verdict: 'inaccuracy' });
+    expect(plyVerdict(played, 1)).toBeUndefined();
+  });
 });

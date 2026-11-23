@@ -1,0 +1,203 @@
+<!-- @dsCard group="Screens" height=840 width=1100 subtitle="After the game, desktop: stepping through the human's verdicts, scores and best moves" -->
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../../../packages/client/src/tokens.css"><style>img[src^="/_blob/"] { visibility: hidden; }</style><style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-sans); }
+  .screen { width: 1100px; height: 840px; padding: var(--space-5); display: grid; grid-template-columns: var(--eval-bar-width) var(--board-max) var(--sidebar-width); gap: var(--space-4); justify-content: center; }
+
+  /* Eval bar */
+  .eval { align-self: start; margin-top: 60px; position: relative; height: var(--board-max); background: var(--eval-black); border-radius: var(--radius-sm); overflow: hidden; outline: 1px solid var(--hairline); }
+  .eval .w { position: absolute; left: 0; right: 0; bottom: 0; height: 44%; background: var(--eval-white); }
+  .eval .n { position: absolute; left: 0; right: 0; top: 4px; text-align: center; font: 700 9px/1 var(--font-mono); color: var(--eval-white); }
+
+  /* Board column */
+  .col { display: flex; flex-direction: column; gap: var(--space-3); }
+  .strip { height: 48px; display: grid; grid-template-columns: 40px 1fr auto; gap: var(--space-3); align-items: center; }
+  .av { width: 40px; height: 40px; border-radius: var(--radius-sm); display: grid; place-items: center; font: 800 15px/1 var(--font-sans); }
+  .av.engine { background: var(--accent); color: var(--on-accent); }
+  .av.you { background: var(--panel-raised); }
+  .name { font-size: 14px; line-height: 20px; font-weight: 700; }
+  .name span { font-weight: 400; color: var(--muted); }
+  .caps { display: flex; align-items: center; height: 16px; }
+  .caps img { width: 16px; height: 16px; margin-right: -5px; }
+  .caps b { margin-left: 8px; font: 600 12px/16px var(--font-sans); color: var(--muted); }
+  .chip { font: 700 13px/16px var(--font-mono); padding: 6px 10px; border-radius: var(--radius-sm); background: var(--panel); }
+  .chip.on { background: var(--panel-raised); }
+  .dots::after { content: "…"; }
+
+  .board { position: relative; width: var(--board-max); aspect-ratio: 1; display: grid; grid-template-columns: repeat(8, 1fr); }
+  .sq { position: relative; }
+  .sq.l { background: var(--board-light); color: var(--board-dark); }
+  .sq.d { background: var(--board-dark); color: var(--board-light); }
+  .sq.l.hl { background: var(--highlight-light); }
+  .sq.d.hl { background: var(--highlight-dark); }
+  .sq img { position: absolute; inset: 4% 10% 16%; width: 80%; height: 80%; }
+  .rank, .file { position: absolute; font-size: 13px; line-height: 16px; font-weight: 700; }
+  .rank { top: var(--space-1); left: 4px; }
+  .file { bottom: var(--space-1); right: 4px; }
+  .qb { position: absolute; top: -10px; right: -10px; z-index: var(--z-badge); width: var(--badge-size); height: var(--badge-size); border-radius: var(--radius-full);
+    display: grid; place-items: center; font: 800 12px/1 var(--font-sans); background: var(--q-inaccuracy); color: var(--q-ink); box-shadow: var(--shadow-badge); }
+  .status.result { margin-top: var(--space-1); font: 700 20px/26px var(--font-sans); color: var(--ink); }
+  .status { margin: 0; font: 400 0.85rem/20px var(--font-mono); color: var(--muted); overflow-wrap: anywhere; }
+
+  /* Sidebar */
+  .side { background: var(--panel); border-radius: var(--radius-md); display: flex; flex-direction: column; overflow: hidden; height: 768px; }
+  .side h2 { margin: 0; padding: var(--space-4) var(--space-5); font-size: 18px; line-height: 24px; font-weight: 800; text-align: center; background: var(--panel-raised); }
+  .fb { padding: var(--space-3) var(--space-5); }
+  .fb .row { display: grid; grid-template-columns: auto 1fr auto; gap: var(--space-3); align-items: center; padding: var(--space-3) 0; }
+  .fb .row + .row { border-top: 1px solid var(--hairline); }
+  .b { width: var(--badge-size); height: var(--badge-size); border-radius: var(--radius-full); display: grid; place-items: center; font: 800 12px/1 var(--font-sans); }
+  .b.inacc { background: var(--q-inaccuracy); color: var(--q-ink); }
+  .b.best { background: var(--q-best); color: var(--on-accent); }
+  .b.exc { background: var(--q-excellent); color: var(--q-ink); }
+  .head { font-size: 17px; line-height: 24px; font-weight: 800; }
+  .head span { font-weight: 600; font-size: 15px; }
+  .pv { font: 400 12px/16px var(--font-mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
+  .ev { font: 700 13px/16px var(--font-mono); padding: 4px 8px; border-radius: var(--radius-sm); }
+  .ev.neg { background: var(--eval-black); color: var(--eval-white); }
+  .ev.pos { background: var(--eval-white); color: var(--eval-black); }
+
+  .opening { display: flex; justify-content: space-between; gap: var(--space-3); font-size: 12px; line-height: 16px; color: var(--muted); padding: var(--space-3) var(--space-5); border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); }
+  .opening span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  ol { list-style: none; margin: 0; padding: 0; flex: 1; overflow: hidden; }
+  li { display: grid; grid-template-columns: 40px 1fr 1fr; align-items: center; padding: 3px var(--space-5); font-size: 14px; line-height: 20px; font-weight: 700; }
+  li:nth-child(even) { background: var(--row-alt); }
+  .n { font-size: 12px; font-weight: 600; color: var(--muted); }
+  .m { justify-self: start; padding: 0 6px; border-radius: var(--radius-sm); display: inline-flex; gap: 6px; align-items: center; }
+  .m.cur { background: var(--panel-raised); }
+  .sc { font: 400 12px/16px var(--font-mono); color: var(--muted); }
+  .q.best { background: var(--q-best); color: var(--on-accent); }
+  .q { width: 16px; height: 16px; border-radius: var(--radius-full); display: grid; place-items: center; font: 800 9px/1 var(--font-sans); background: var(--q-inaccuracy); color: var(--q-ink); }
+
+  /* Tally: the good moves on the left, the ones to look at again on the right. */
+  .tally { display: grid; grid-template-columns: 1fr 1fr; column-gap: var(--space-5); align-items: start; padding: var(--space-3) var(--space-5); border-top: 1px solid var(--hairline); }
+  .tally ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+  .tally li { display: grid; grid-template-columns: 18px 1fr auto; gap: var(--space-2); align-items: center; padding: 0; background: none; font: 600 12px/16px var(--font-sans); color: var(--muted); }
+  .tally li b { font: 700 14px/20px var(--font-sans); color: var(--ink); }
+  .tally .b { width: 18px; height: 18px; font-size: 9px; }
+  .b.mist { background: var(--q-mistake); color: var(--q-ink); }
+  .b.blun { background: var(--q-blunder); color: var(--on-accent); }
+
+  .actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); padding: var(--space-4) var(--space-5); border-top: 1px solid var(--hairline); }
+  .btn.stack { flex-direction: column; gap: var(--space-2); padding: 10px 4px; font-size: 13px; line-height: 16px; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn { font: 700 15px/20px var(--font-sans); min-height: var(--control-min-height); padding: 8px 12px; border: 0; border-radius: var(--radius-md); cursor: pointer;
+    display: inline-flex; gap: var(--space-3); align-items: center; justify-content: center; background: var(--panel-raised); color: var(--ink); box-shadow: var(--shadow-button-secondary); }
+  .btn:focus-visible, .ic:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .tools .copied { font: 600 12px/16px var(--font-sans); color: var(--muted); }
+  .more { padding: var(--space-3) var(--space-5); border-top: 1px solid var(--hairline); font: 600 12px/16px var(--font-sans); }
+  .arrow { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
+  .tools { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-top: 1px solid var(--hairline); }
+  .tools .sp { flex: 1; }
+  .ic { width: var(--control-min-height); height: var(--control-min-height); display: grid; place-items: center; border: 0; background: none; color: var(--muted); border-radius: var(--radius-sm); cursor: pointer; }
+  svg { width: 20px; height: 20px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+  .sq.check { background-image: radial-gradient(ellipse at center, var(--check) 0%, rgba(231, 0, 0, 0) 75%); }
+  .qb.best { background: var(--q-best); color: var(--on-accent); }
+  .won { background: var(--accent); color: var(--on-accent); }
+  .result { margin: 0; padding: var(--space-4) var(--space-5) 0; font-size: 20px; line-height: 26px; font-weight: 700; }
+  .result small { display: block; font: 400 0.85rem/20px var(--font-mono); color: var(--muted); }
+  .primary { background: var(--accent); color: var(--on-accent); box-shadow: var(--shadow-button); font-size: 17px; }
+  .primary:hover { background: var(--accent-hover); }
+  .newgame { padding: 0 var(--space-5) var(--space-4); }
+  .newgame .btn { width: 100%; }
+
+  .q.blunder { background: var(--q-blunder); color: var(--on-accent); }
+  .ic:disabled { opacity: .45; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="eval" role="meter" aria-label="Evaluation +0.2 for white"><div class="w" style="height:51%"></div><span class="n" style="top:auto;bottom:4px;color:var(--eval-black)">0.2</span></div>
+
+  <div class="col">
+    <div class="strip">
+      <div class="av engine" aria-hidden="true">S</div>
+      <div><div class="name">StratChess <span>depth 2</span></div>
+        <div class="caps"></div></div>
+      <span class="chip">lost</span>
+    </div>
+    <div class="board" id="board" role="img" aria-label="After 4. Nc3, an inaccuracy; the arrow shows O-O, the best move">
+      <svg class="arrow" viewBox="0 0 8 8" aria-hidden="true">
+        <defs><marker id="head" orient="auto" markerWidth="4" markerHeight="4" refX="2.05" refY="2"><path d="M0,0 V4 L3,2 Z" fill="#003088" stroke="none"/></marker></defs>
+        <line x1="4.5" y1="7.5" x2="6.3" y2="7.5" stroke="#003088" stroke-width="0.156" stroke-linecap="round" marker-end="url(#head)"/>
+      </svg>
+    </div>
+    <div class="strip">
+      <div class="av you" aria-hidden="true">Y</div>
+      <div><div class="name">You <span>white</span></div>
+        <div class="caps"></div></div>
+      <span class="chip won">won</span>
+    </div>
+    <p class="status result">game over: white wins by checkmate</p>
+  </div>
+
+  <aside class="side">
+    <h2>Game review</h2>
+    <div class="fb">
+      <div class="row"><span class="b inacc" aria-hidden="true">?!</span><div class="head">Nc3 <span>is an inaccuracy</span></div><span class="ev pos">+0.20</span></div>
+      <div class="row"><span class="b best" aria-hidden="true">★</span><div><div class="head">O-O <span>is best</span></div><div class="pv">4. O-O Nf6 5. h3 Bh5</div></div><span class="ev pos">+0.55</span></div>
+    </div>
+    <div class="opening"><span>Philidor Defense</span></div>
+    <ol>
+      <li><span class="n">1.</span><span class="m">e4 <span class="sc">+0.30</span></span><span class="m">e5</span></li>
+      <li><span class="n">2.</span><span class="m">Nf3 <span class="sc">+0.35</span></span><span class="m">d6</span></li>
+      <li><span class="n">3.</span><span class="m">Bc4 <span class="sc">+0.40</span></span><span class="m">Bg4</span></li>
+      <li><span class="n">4.</span><span class="m cur" aria-current="true"><span class="q" aria-label="inaccuracy">?!</span>Nc3 <span class="sc">+0.20</span></span><span class="m">g6</span></li>
+      <li><span class="n">5.</span><span class="m"><span class="q best" aria-label="best">★</span>Nxe5 <span class="sc">+1.60</span></span><span class="m">Bxd1</span></li>
+      <li><span class="n">6.</span><span class="m"><span class="q best" aria-label="best">★</span>Bxf7+ <span class="sc">#2</span></span><span class="m">Ke7</span></li>
+      <li><span class="n">7.</span><span class="m"><span class="q best" aria-label="best">★</span>Nd5#</span><span class="m"></span></li>
+    </ol>
+    <div class="tools">
+      <button class="ic" aria-label="First move"><svg viewBox="0 0 24 24"><path d="M6 6v12M18 6l-6 6 6 6"/></svg></button>
+      <button class="ic" aria-label="Previous move"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+      <button class="ic" aria-label="Next move"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+      <button class="ic" aria-label="Last move"><svg viewBox="0 0 24 24"><path d="M18 6v12M6 6l6 6-6 6"/></svg></button>
+      <span class="sp"></span>
+      <button class="ic" aria-label="Copy FEN"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg></button>
+      <button class="ic" aria-label="Copy PGN"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 12h6M9 16h6"/></svg></button>
+    </div>
+    <div class="tally" aria-label="Your moves">
+      <ul>
+        <li><span class="b best" aria-hidden="true">★</span>Best<b>3</b></li>
+        <li><span class="b exc" aria-hidden="true">!</span>Excellent<b>0</b></li>
+      </ul>
+      <ul>
+        <li><span class="b inacc" aria-hidden="true">?!</span>Inaccuracy<b>1</b></li>
+        <li><span class="b mist" aria-hidden="true">?</span>Mistake<b>0</b></li>
+        <li><span class="b blun" aria-hidden="true">??</span>Blunder<b>0</b></li>
+      </ul>
+    </div>
+    <div class="newgame"><button class="btn primary">New game</button></div>
+    <div class="more">More</div>
+  </aside>
+</div>
+<script>
+  const P = {
+    K: '8ee2b417de8f454bcb0de92437d73f46', Q: 'e454a306c7810aa9eb869294fa2baccf', R: 'd05dc8105723665a1bfa98259fc0796d',
+    B: 'faaa38890928904d4e75dda4ad4e4e1a', N: 'cf0830de755ba00c4de4aa20326dd360', P: '4c9e00e5fe867c50282a7c8754399ccb',
+    k: '6afdeec8ffc43688dcbc81683287d575', q: '332feac2e807be2365ed6394402d68d6', r: 'e29d90b26527271e01938ea80ccf4705',
+    b: 'c4b4b6529808a49324f8fba489eb0438', n: 'ac6f7b704414b462d811e356f2931755', p: '4a9c38d9e825c976c093cbce59ab22e6',
+  };
+  // After 1. e4 e5 2. Nf3 d6 3. Bc4 Bg4 4. Nc3.
+  const fen = 'rn1qkbnr/ppp2ppp/3p4/4p3/2B1P1b1/2N2N2/PPPP1PPP/R1BQK2R';
+  const hl = ['b1', 'c3'], badge = 'c3';
+  const board = document.getElementById('board');
+  fen.split('/').forEach((row, r) => {
+    let f = 0;
+    for (const ch of row) {
+      if (/\d/.test(ch)) { for (let i = 0; i < +ch; i++) add(r, f++, null); }
+      else add(r, f++, ch);
+    }
+  });
+  function add(r, f, piece) {
+    const sq = 'abcdefgh'[f] + (8 - r);
+    const el = document.createElement('div');
+    el.className = 'sq ' + ((r + f) % 2 ? 'd' : 'l') + (hl.includes(sq) ? ' hl' : '');
+    if (piece) { const img = document.createElement('img'); img.src = '/_blob/' + P[piece]; img.alt = ''; el.append(img); }
+    if (f === 0) el.insertAdjacentHTML('beforeend', '<span class="rank">' + (8 - r) + '</span>');
+    if (r === 7) el.insertAdjacentHTML('beforeend', '<span class="file">' + 'abcdefgh'[f] + '</span>');
+    if (sq === badge) el.insertAdjacentHTML('beforeend', '<span class="qb" aria-label="inaccuracy">?!</span>');
+    board.append(el);
+  }
+</script>
+</body></html>

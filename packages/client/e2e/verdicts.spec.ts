@@ -1,19 +1,15 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './fixtures.ts';
 import {
-  expectFen,
   expectMoves,
-  expectYourMove,
+  MATE_IN_ONE,
+  newGameFromFen,
   openSettled,
   playAndAwaitReply,
   scriptedServer,
   showNewGameForm,
   submitNewGame,
 } from './helpers.ts';
-
-// White mates with Rb8 and has equal material otherwise. The fake-play engine scores a mate in
-// one as a mate and anything else by material, so any other move gives up a won game: a blunder.
-const MATE_IN_ONE = '6k1/5ppp/8/8/8/8/r4PPP/1R4K1 w - - 0 1';
 
 const feedback = (page: Page) => page.getByLabel('Move Feedback');
 const boardBadge = (page: Page) => page.getByTestId('board-badge');
@@ -24,18 +20,6 @@ const listed = (page: Page, side: 'white' | 'black', verdict: string) =>
 /** Within a pixel, as layout rounds to fractions of one. */
 function expectNear(actual: number, expected: number) {
   expect(Math.abs(actual - expected)).toBeLessThanOrEqual(1);
-}
-
-async function newGameFrom(page: Page, fen: string, analysis: boolean) {
-  await showNewGameForm(page);
-  await page.getByRole('combobox', { name: 'Engine' }).selectOption('fake-play');
-  await page.getByRole('combobox', { name: 'Limit' }).selectOption('depth');
-  await page.getByLabel('Start position').fill(fen);
-  await feedback(page).setChecked(analysis);
-  await submitNewGame(page);
-  // The game this browser resumed can read "your move" too, so wait for the new one's position.
-  await expectFen(page, fen);
-  await expectYourMove(page);
 }
 
 async function box(locator: Locator) {
@@ -57,7 +41,7 @@ test('with the checkbox on, a blunder shows on the board and in the move list', 
   hasTouch,
 }) => {
   await openSettled(page);
-  await newGameFrom(page, MATE_IN_ONE, true);
+  await newGameFromFen(page, MATE_IN_ONE, true);
   await playAndAwaitReply(page, 'h2h3', hasTouch);
 
   await expect(boardBadge(page)).toHaveAttribute('data-square', 'h3');
@@ -84,7 +68,7 @@ test('Copy PGN carries the blunder as a glyph, and the start position', async ({
 }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await openSettled(page);
-  await newGameFrom(page, MATE_IN_ONE, true);
+  await newGameFromFen(page, MATE_IN_ONE, true);
   await playAndAwaitReply(page, 'h2h3', hasTouch);
   await expect(listed(page, 'white', 'blunder')).toHaveText('??');
 
@@ -100,7 +84,7 @@ test('Copy PGN carries the blunder as a glyph, and the start position', async ({
 
 test('with the checkbox off, no move has a verdict', async ({ page, hasTouch }) => {
   await openSettled(page);
-  await newGameFrom(page, MATE_IN_ONE, false);
+  await newGameFromFen(page, MATE_IN_ONE, false);
   await playAndAwaitReply(page, 'h2h3', hasTouch);
 
   await expectMoves(page, ['h3', 'Ra1']);
