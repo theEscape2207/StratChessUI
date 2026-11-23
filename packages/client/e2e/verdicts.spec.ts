@@ -140,6 +140,21 @@ test("the board shows the human's latest verdict until the engine captures there
   await expect(boardBadge(page)).toHaveCount(0);
 });
 
+test('a great move shows !! on the board', async ({ page }) => {
+  const server = await scriptedServer(page);
+  // 1. e4 e5 2. Nf3, the human playing black: during play the list shows faults only.
+  server.game({
+    moves: ['e2e4', 'e7e5', 'g1f3'],
+    verdicts: [null, 'great', null],
+    fen: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2',
+    lastMove: 'g1f3',
+    phase: 'human',
+  });
+  await expect(boardBadge(page)).toHaveAttribute('data-square', 'e5');
+  await expect(boardBadge(page).getByRole('img', { name: 'great' })).toHaveText('!!');
+  await expect(listBadges(page)).toHaveCount(0);
+});
+
 test('a game black opens keeps each verdict on its own move in the list', async ({ page }) => {
   const server = await scriptedServer(page);
   // From the position after 1. e4: 1... e5 2. Nf3, the human playing white.
