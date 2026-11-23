@@ -222,6 +222,16 @@ describe('UciEngine', () => {
     ).rejects.toBeInstanceOf(UciCommandError);
   });
 
+  it('refuses more ranked lines than the engine announces, sending nothing', async () => {
+    engine = await UciEngine.start(profile('normal', {}, ['--no-multipv']), FAST);
+    const limit = { depth: 1 };
+    await expect(engine.search({ fen: START_FEN, limit, multiPv: 2 })).rejects.toThrow(
+      'MultiPV 2 outside 1..1',
+    );
+    await engine.search({ fen: START_FEN, limit });
+    expect(engine.transcript().filter((line) => line.includes('MultiPV'))).toEqual([]);
+  });
+
   it('reports no move for a finished game and keeps the engine', async () => {
     const STALEMATE = '7k/5Q2/6K1/8/8/8/8/8 b - - 0 1'; // the fake answers bestmove 0000 here
     engine = await UciEngine.start(profile(), FAST);

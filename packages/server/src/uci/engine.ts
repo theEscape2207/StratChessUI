@@ -274,8 +274,9 @@ export class UciEngine {
     const multiPv = this.checkMultiPv(request.multiPv ?? 1);
 
     // The `isready` below confirms the option along with the position.
-    if (multiPv !== this.multiPv && this.maxMultiPv > 1) {
-      this.send(setOptionCommand(this.multiPvOption()!.name, multiPv));
+    const option = this.multiPvOption();
+    if (option && multiPv !== this.multiPv && this.maxMultiPv > 1) {
+      this.send(setOptionCommand(option.name, multiPv));
       this.multiPv = multiPv;
     }
     // StratChess only reports a bad FEN as an info string, so confirm the position before searching.

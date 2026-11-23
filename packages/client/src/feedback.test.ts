@@ -116,6 +116,7 @@ describe('shownFeedback', () => {
 });
 
 it.each([
+  ['great', 'is the only good move'],
   ['best', 'is best'],
   ['excellent', 'is excellent'],
   ['inaccuracy', 'is an inaccuracy'],

@@ -136,11 +136,12 @@ export const HINTS_PER_GAME = 3;
  * Rank 2 of a search of `fen`, if its score can stand beside rank 1's: exact, and from the same
  * depth, as the last lines before `bestmove` are.
  */
-function secondBest(fen: string, first: SearchInfo, info?: SearchInfo): Scored['second'] {
-  const move = info?.pv?.[0];
-  if (!info?.score || !move || info.bound || first.bound || info.depth !== first.depth) return;
-  const { score } = searchReport(fen, info);
-  return score && { move, cp: scoreCp(info.score), score };
+function secondBest(fen: string, first: SearchInfo, second?: SearchInfo): Scored['second'] {
+  const move = second?.pv?.[0];
+  if (!second?.score || !move || second.bound || first.bound || second.depth !== first.depth)
+    return;
+  const { score } = searchReport(fen, second);
+  return score && { move, cp: scoreCp(second.score), score };
 }
 
 /** The best move's row of MoveFeedback, from the position search of the move's turn. */
