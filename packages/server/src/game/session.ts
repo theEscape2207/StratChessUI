@@ -145,8 +145,13 @@ function secondBest(fen: string, first: SearchInfo, second?: SearchInfo): Scored
 }
 
 /** The best move's row of MoveFeedback, from the position search of the move's turn. */
-function bestLine(best: Scored): NonNullable<Feedback['best']> {
-  return { score: best.score, pv: best.pv.slice(0, FEEDBACK_PV_PLIES) };
+/**
+ * The best move's line, for a move played instead that scored `playedCp` for its mover. A score
+ * above the best's comes from another search, at another depth, so neither is wrong.
+ */
+function bestLine(best: Scored, playedCp: number | undefined): NonNullable<Feedback['best']> {
+  const line = { score: best.score, pv: best.pv.slice(0, FEEDBACK_PV_PLIES) };
+  return playedCp !== undefined && playedCp > best.cp ? { ...line, outscored: true } : line;
 }
 
 export class GameSession {
@@ -548,7 +553,7 @@ export class GameSession {
       const played = await this.playedScore(game, analysis, moves, best);
       if (this.turnIsGone(game, moves)) return false;
       verdict = played ? verdictOf(best.cp, played.cp) : undefined;
-      feedback = { ...(played && { score: played.score }), best: bestLine(best) };
+      feedback = { ...(played && { score: played.score }), best: bestLine(best, played?.cp) };
     }
     this.judge(game, ply, verdict, feedback);
     this.publish(game);
@@ -584,8 +589,10 @@ export class GameSession {
     if (moves[ply] === best.bestMove) {
       return this.judge(game, ply, bestVerdict(best.cp, best.second?.cp), { score: best.score });
     }
-    const verdict = verdictOf(best.cp, decidedCp(ended.result, humanColor));
-    this.judge(game, ply, verdict, { best: bestLine(best) });
+    // Nothing beats a mate, so another mate is best too, and shows no line.
+    if (ended.termination === 'checkmate') return this.judge(game, ply, 'best', {});
+    const playedCp = decidedCp(ended.result, humanColor);
+    this.judge(game, ply, verdictOf(best.cp, playedCp), { best: bestLine(best, playedCp) });
   }
 
   /**

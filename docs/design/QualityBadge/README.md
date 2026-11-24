@@ -15,6 +15,9 @@ points, never in pawns or as Elo: three pawns matter at equality and not at +15.
 win chance to be a mistake. It needs the second-best move's score from the same search, so a forced
 move, or an engine that cannot rank two moves, earns none.
 
+**Mate** `#` on the `q-best` fill, in place of the verdict of a move that mates: nothing beats a mate,
+and "is checkmate" says more than any verdict.
+
 **Colours** `q-*` fills; light fills (`q-excellent`, `q-inaccuracy`, `q-mistake`) take `q-ink`, the
 rest `on-accent`.
 

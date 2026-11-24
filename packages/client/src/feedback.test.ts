@@ -20,8 +20,9 @@ function game(
   feedback?: (Feedback | null)[],
   verdicts?: (Verdict | null)[],
   startFen = START_FEN,
-): Pick<GameState, 'startFen' | 'moves' | 'humanColor' | 'verdicts' | 'feedback'> {
-  return { startFen, moves, humanColor, feedback, verdicts };
+  termination?: GameState['termination'],
+): Pick<GameState, 'startFen' | 'moves' | 'humanColor' | 'verdicts' | 'feedback' | 'termination'> {
+  return { startFen, moves, humanColor, feedback, verdicts, ...(termination && { termination }) };
 }
 
 describe('shownFeedback', () => {
@@ -107,6 +108,21 @@ describe('shownFeedback', () => {
     expect(shownFeedback(black, 0)).toMatchObject({ san: 'e5', fen: BLACK_FIRST });
     expect(shownFeedback(black, 2)).toMatchObject({ san: 'd5' });
     expect(shownFeedback(black, 1)).toBeUndefined();
+  });
+
+  it('marks the move that mated, and no earlier one', () => {
+    // Scholar's mate: white's fourth move mates.
+    const moves = ['e2e4', 'e7e5', 'f1c4', 'b8c6', 'd1h5', 'g8f6', 'h5f7'];
+    const feedback = moves.map((_, ply) => (ply % 2 ? null : {}));
+    const verdicts = moves.map((_, ply) => (ply % 2 ? null : ('best' as const)));
+    const mated = game('white', moves, feedback, verdicts, START_FEN, 'checkmate');
+    expect(shownFeedback(mated)).toEqual({
+      san: 'Qxf7#',
+      fen: expect.any(String),
+      verdict: 'best',
+      mates: true,
+    });
+    expect(shownFeedback(mated, 4)).not.toHaveProperty('mates');
   });
 
   it('shows nothing without analysis', () => {

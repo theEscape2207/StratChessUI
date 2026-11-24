@@ -136,3 +136,53 @@ test("it stays while the engine thinks, and goes with the human's next move", as
     await expect(bestRow(page)).toBeHidden();
   }
 });
+
+test('a best that the move played outscored shows as the alternative', async ({ page }) => {
+  const server = await scriptedServer(page);
+  server.game({
+    humanColor: 'white',
+    moves: ['e2e4', 'e7e5', 'g1f3'],
+    fen: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2',
+    lastMove: 'g1f3',
+    phase: 'thinking',
+    analysis: true,
+    verdicts: [null, null, 'excellent'],
+    feedback: [
+      { score: { cp: 35 } },
+      null,
+      { score: { cp: 387 }, best: { score: { cp: 375 }, pv: ['Nc3', 'Nc6'], outscored: true } },
+    ],
+  });
+  await expect(played(page).locator('.feedback-head')).toHaveText('Nf3 is excellent');
+  if (isDesktop(page)) {
+    await expect(bestRow(page).locator('.feedback-head')).toHaveText('Nc3 is the alternative');
+    await expect(bestRow(page).getByRole('img')).toHaveCount(0);
+    await expect(bestRow(page).getByTestId('feedback-chip')).toHaveText('+3.75');
+  } else {
+    await expect(bestWas(page)).toHaveText('Alternative was Nc3 (+3.75)');
+  }
+});
+
+test('a move that mates shows the mate, with no best move', async ({ page }) => {
+  const server = await scriptedServer(page);
+  // Scholar's mate, the human playing white.
+  server.game({
+    humanColor: 'white',
+    moves: ['e2e4', 'e7e5', 'f1c4', 'b8c6', 'd1h5', 'g8f6', 'h5f7'],
+    fen: 'r1bqkb1r/pppp1Qpp/2n2n2/4p3/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 0 4',
+    lastMove: 'h5f7',
+    phase: 'over',
+    result: 'white',
+    termination: 'checkmate',
+    analysis: true,
+    verdicts: [null, null, null, null, null, null, 'best'],
+    feedback: [null, null, null, null, null, null, {}],
+  });
+  await expect(played(page).locator('.feedback-head')).toHaveText('Qxf7# is checkmate');
+  await expect(played(page).getByRole('img', { name: 'checkmate' })).toHaveText('#');
+  await expect(page.getByTestId('board-badge').getByRole('img', { name: 'checkmate' })).toHaveText(
+    '#',
+  );
+  await expect(bestWas(page)).toHaveCount(0);
+  await expect(bestRow(page)).toHaveCount(0);
+});

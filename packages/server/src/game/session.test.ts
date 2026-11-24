@@ -60,6 +60,8 @@ const VERDICT_PROFILES = {
   // The start position's second-best move loses 300 cp, so its best is the only good one.
   'only-move': [`--loss=${legalMoves(START_FEN)[1]!.uci}:300`],
   'only-move-no-multipv': [`--loss=${legalMoves(START_FEN)[1]!.uci}:300`, '--no-multipv'],
+  // h2h4, outside the position search's two ranks, scores 20 cp above the best in its own search.
+  outscoring: ['--loss=h2h4:-20'],
 };
 PROFILES.push(
   ...Object.entries(VERDICT_PROFILES).map(([id, args]) => ({
@@ -1340,6 +1342,24 @@ describe('GameSession', () => {
       expect(sent(session, 'go depth 9')).toBe(0);
     });
 
+    it('judges a mate the engine did not rank first as best, with no line', async () => {
+      // White mates on a8 or on f8.
+      const fen = '7k/8/6K1/8/8/8/8/R4Q2 w - - 0 1';
+      const mates = legalMoves(fen).filter((m) => outcome([m.fen])?.termination === 'checkmate');
+      const other = mates.find((m) => m.uci !== legalMoves(fen)[0]!.uci)!;
+      const { session, settled } = open();
+      void session.newGame({ ...analysed('judged'), fen });
+      await settled();
+      await answered(session, 1);
+      session.move(other.uci);
+      expect(await settled()).toMatchObject({
+        phase: 'over',
+        termination: 'checkmate',
+        verdicts: ['best'],
+        feedback: [{}],
+      });
+    });
+
     describe('in a level game', () => {
       const steady = () => 0.99;
       const level = (humanColor: NewGameRequest['humanColor'], analysis?: true) =>
@@ -1559,6 +1579,18 @@ describe('GameSession', () => {
       expect(played!.best!.pv[0]).toBe(BEST_SAN);
       // A browser that reattaches gets it with the game.
       expect(session.state).toEqual(state);
+    });
+
+    it.each([
+      ['h2h4', 'above the best', { outscored: true }],
+      ['a2a3', 'level with the best', {}],
+    ])('marks the best as outscored only for a move scored %s: %s', async (move, _, mark) => {
+      const { session, settled } = open();
+      void session.newGame(analysed('outscoring'));
+      await settled();
+      session.move(move);
+      const [played] = (await settled()).feedback!;
+      expect(played!.best).toEqual({ score: { cp: 0 }, pv: expect.any(Array), ...mark });
     });
 
     it('names the best move even when the PV the engine sent leads with another', async () => {

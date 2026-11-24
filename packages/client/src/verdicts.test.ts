@@ -16,7 +16,7 @@ function game(
   moves: string[],
   verdicts?: (Verdict | null)[],
   startFen = START_FEN,
-): Pick<GameState, 'startFen' | 'fen' | 'moves' | 'humanColor' | 'verdicts'> {
+): Pick<GameState, 'startFen' | 'fen' | 'moves' | 'humanColor' | 'verdicts' | 'termination'> {
   let fen = startFen;
   for (const uci of moves) {
     const result = applyUciMove(fen, uci);
@@ -65,6 +65,20 @@ describe('boardVerdict', () => {
     expect(boardVerdict(promoting)).toEqual({ square: 'e8', verdict: 'best' });
     const castling = game('white', ['e1g1'], ['excellent'], 'r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1');
     expect(boardVerdict(castling)).toEqual({ square: 'g1', verdict: 'excellent' });
+  });
+
+  it('shows a mate in place of the verdict on the move that mated', () => {
+    const mated = { ...game('white', ['a1a8'], ['excellent'], '7k/8/6K1/8/8/8/8/R7 w - - 0 1') };
+    expect(boardVerdict({ ...mated, termination: 'checkmate' })).toEqual({
+      square: 'a8',
+      verdict: 'mate',
+    });
+    expect(plyVerdict({ ...mated, termination: 'checkmate' }, 0)).toMatchObject({
+      verdict: 'mate',
+    });
+    expect(boardVerdict({ ...mated, termination: 'resignation' })).toMatchObject({
+      verdict: 'excellent',
+    });
   });
 
   it('hides once the engine captures on that square', () => {

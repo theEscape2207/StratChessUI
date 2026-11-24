@@ -11,14 +11,17 @@ the human's; none on the engine's moves.
 **Rows**
 - **Played move:** QualityBadge when it has a verdict, the headline, the eval chip when it has a
   score. No verdict (a hinted turn earns no praise): its SAN alone. No score (its search was capped,
-  or the rules decided the game): no chip.
+  or the rules decided the game): no chip. A move that mates: the `#` badge and "is checkmate" in
+  place of its verdict's, and no best row: nothing beats a mate.
 - **Best move:** only when the move played was not the best. A line under a best move that was
   played would run on from the game's own position and give away the next turn's hint. The ★ badge,
   "O-O is best", the chip, and the PV under the headline.
+- **Alternative:** the best row when the move played scored higher than the best in its own search.
+  The two scores come from two searches, so neither is wrong: no badge, "O-O is the alternative".
 
 **The consumer supplies** the played move (SAN), its verdict and score, and, when it was not the
 best, the engine's best move, score and PV (SAN, starting with the best move, numbered from the
-position before the move). Scores are from white's side.
+position before the move), and whether the move played outscored it. Scores are from white's side.
 
 **Anatomy** QualityBadge · headline in the `feedback` style (SAN bold; "is the only good move", "is
 best", "is excellent", "is an inaccuracy", "is a mistake" or "is a blunder" lighter) · eval chip in
@@ -27,4 +30,5 @@ the `eval` style, written as SearchInfo writes a score: `eval-white` ground for 
 ellipsised.
 
 **Below 960px** one row, per GameScreenPhone: badge, headline and chip, with "Best was O-O (0.00)"
-under the headline in place of the best row. No PV.
+under the headline in place of the best row, or "Alternative was O-O (0.00)" for the alternative.
+No PV.

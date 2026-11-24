@@ -144,7 +144,8 @@ main {
   background: var(--q-great);
 }
 
-.quality-badge.best {
+.quality-badge.best,
+.quality-badge.mate {
   color: var(--on-accent);
   background: var(--q-best);
 }
