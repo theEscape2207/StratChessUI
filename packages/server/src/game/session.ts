@@ -144,10 +144,10 @@ function secondBest(fen: string, first: SearchInfo, second?: SearchInfo): Scored
   return score && { move, cp: scoreCp(second.score), score };
 }
 
-/** The best move's row of MoveFeedback, from the position search of the move's turn. */
 /**
- * The best move's line, for a move played instead that scored `playedCp` for its mover. A score
- * above the best's comes from another search, at another depth, so neither is wrong.
+ * The best move's row of MoveFeedback, from the position search of the move's turn, for a move
+ * played instead that scored `playedCp` for its mover. A score above the best's comes from another
+ * search, at another depth, so neither is wrong.
  */
 function bestLine(best: Scored, playedCp: number | undefined): NonNullable<Feedback['best']> {
   const line = { score: best.score, pv: best.pv.slice(0, FEEDBACK_PV_PLIES) };

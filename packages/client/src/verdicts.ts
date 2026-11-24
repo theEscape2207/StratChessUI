@@ -20,6 +20,11 @@ export function latestHumanPly(
   return isHumanPly(game, latest - 1) ? latest - 1 : undefined;
 }
 
+/** The badge for a move's verdict: a move that mates shows the mate in its place. */
+export function badgeOf(verdict: Verdict, mated: boolean): Badge {
+  return mated ? 'mate' : verdict;
+}
+
 /** Whether the move at index `ply` mated: a mate ends the game, so it can only be the last. */
 export function mates(game: Pick<GameState, 'moves' | 'termination'>, ply: number): boolean {
   return game.termination === 'checkmate' && ply === game.moves.length - 1;
@@ -33,7 +38,7 @@ export function plyVerdict(
   const verdict = game.verdicts?.[ply];
   if (!verdict || !isHumanPly(game, ply)) return undefined;
   // Standard UCI, so a castling king's square and a promotion's square are both the to-square.
-  return { square: game.moves[ply]!.slice(2, 4), verdict: mates(game, ply) ? 'mate' : verdict };
+  return { square: game.moves[ply]!.slice(2, 4), verdict: badgeOf(verdict, mates(game, ply)) };
 }
 
 /**

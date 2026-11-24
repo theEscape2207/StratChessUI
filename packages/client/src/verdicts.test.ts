@@ -68,7 +68,7 @@ describe('boardVerdict', () => {
   });
 
   it('shows a mate in place of the verdict on the move that mated', () => {
-    const mated = { ...game('white', ['a1a8'], ['excellent'], '7k/8/6K1/8/8/8/8/R7 w - - 0 1') };
+    const mated = game('white', ['a1a8'], ['excellent'], '7k/8/6K1/8/8/8/8/R7 w - - 0 1');
     expect(boardVerdict({ ...mated, termination: 'checkmate' })).toEqual({
       square: 'a8',
       verdict: 'mate',

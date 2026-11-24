@@ -329,6 +329,12 @@ main {
   font-size: 12px;
 }
 
+/* Keeps the alternative's headline in line with the played move's. */
+.feedback-badge-space {
+  flex: none;
+  width: var(--badge-size);
+}
+
 .feedback-text {
   flex: 1;
   min-width: 0;

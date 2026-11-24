@@ -1345,8 +1345,9 @@ describe('GameSession', () => {
     it('judges a mate the engine did not rank first as best, with no line', async () => {
       // White mates on a8 or on f8.
       const fen = '7k/8/6K1/8/8/8/8/R4Q2 w - - 0 1';
-      const mates = legalMoves(fen).filter((m) => outcome([m.fen])?.termination === 'checkmate');
-      const other = mates.find((m) => m.uci !== legalMoves(fen)[0]!.uci)!;
+      const mating = legalMoves(fen).filter((m) => outcome([m.fen])?.termination === 'checkmate');
+      // The scored fake ranks the first legal move best.
+      const other = mating.find((m) => m.uci !== legalMoves(fen)[0]!.uci)!;
       const { session, settled } = open();
       void session.newGame({ ...analysed('judged'), fen });
       await settled();

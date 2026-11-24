@@ -24,7 +24,8 @@ best, the engine's best move, score and PV (SAN, starting with the best move, nu
 position before the move), and whether the move played outscored it. Scores are from white's side.
 
 **Anatomy** QualityBadge · headline in the `feedback` style (SAN bold; "is the only good move", "is
-best", "is excellent", "is an inaccuracy", "is a mistake" or "is a blunder" lighter) · eval chip in
+best", "is excellent", "is an inaccuracy", "is a mistake", "is a blunder", "is checkmate" or, on the
+best row, "is the alternative" lighter) · eval chip in
 the `eval` style, written as SearchInfo writes a score: `eval-white` ground for scores ≥ 0,
 `eval-black` for negative. The PV under the best move is `pv` style in `muted`, one line,
 ellipsised.

@@ -3,6 +3,7 @@ import { evalLeader } from './eval.ts';
 import { verdictPhrase, type ShownFeedback } from './feedback.ts';
 import { formatScore, numberedPv } from './notation.ts';
 import { QualityBadge } from './QualityBadge.tsx';
+import { badgeOf } from './verdicts.ts';
 
 function EvalChip({ score }: { score: Score }) {
   return (
@@ -20,7 +21,7 @@ function EvalChip({ score }: { score: Score }) {
 export function MoveFeedback({ feedback }: { feedback: ShownFeedback }) {
   const { san, verdict, mates, score, best, fen } = feedback;
   const bestSan = best?.pv[0];
-  const badge = verdict && (mates ? 'mate' : verdict);
+  const badge = verdict && badgeOf(verdict, !!mates);
   const phrase = mates ? 'is checkmate' : verdict && verdictPhrase(verdict);
   return (
     <div className="move-feedback" data-testid="move-feedback">
@@ -42,7 +43,11 @@ export function MoveFeedback({ feedback }: { feedback: ShownFeedback }) {
       </div>
       {best && (
         <div className="feedback-row feedback-best" data-testid="feedback-best">
-          {!best.outscored && <QualityBadge verdict="best" />}
+          {best.outscored ? (
+            <span className="feedback-badge-space" />
+          ) : (
+            <QualityBadge verdict="best" />
+          )}
           <div className="feedback-text">
             <p className="feedback-head">
               <b>{bestSan}</b>
