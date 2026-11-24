@@ -6,11 +6,13 @@ import {
   type Score,
   type Verdict,
 } from '@stratchess-ui/shared';
-import { isHumanPly, latestHumanPly } from './verdicts.ts';
+import { isHumanPly, latestHumanPly, mates } from './verdicts.ts';
 
 export type ShownFeedback = {
   san: string;
   verdict?: Verdict;
+  /** The move mated, which its headline and badge say in place of the verdict's. */
+  mates?: true;
   score?: Score;
   best?: Feedback['best'];
   /** The position the move was played from, where the best move's PV starts. */
@@ -36,7 +38,10 @@ export function verdictPhrase(verdict: Verdict): string {
  * move's feedback goes as soon as the human moves again.
  */
 export function shownFeedback(
-  game: Pick<GameState, 'startFen' | 'moves' | 'humanColor' | 'verdicts' | 'feedback'>,
+  game: Pick<
+    GameState,
+    'startFen' | 'moves' | 'humanColor' | 'verdicts' | 'feedback' | 'termination'
+  >,
   ply = latestHumanPly(game),
 ): ShownFeedback | undefined {
   if (ply === undefined || !isHumanPly(game, ply)) return undefined;
@@ -58,6 +63,7 @@ export function shownFeedback(
     san,
     fen,
     ...(verdict && { verdict }),
+    ...(mates(game, ply) && { mates: true as const }),
     ...(feedback.score && { score: feedback.score }),
     ...(best && { best }),
   };

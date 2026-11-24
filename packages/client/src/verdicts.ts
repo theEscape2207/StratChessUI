@@ -1,6 +1,9 @@
 import { pieceColorAt, turn, type GameState, type Verdict } from '@stratchess-ui/shared';
 
-export type BoardVerdict = { square: string; verdict: Verdict };
+/** A verdict as a badge shows it: a move that mates shows the mate in place of its verdict. */
+export type Badge = Verdict | 'mate';
+
+export type BoardVerdict = { square: string; verdict: Badge };
 
 /** The human's moves are every other one in `moves`, starting with the first when they moved first. */
 export function isHumanPly(game: Pick<GameState, 'startFen' | 'humanColor'>, ply: number): boolean {
@@ -17,15 +20,25 @@ export function latestHumanPly(
   return isHumanPly(game, latest - 1) ? latest - 1 : undefined;
 }
 
+/** The badge for a move's verdict: a move that mates shows the mate in its place. */
+export function badgeOf(verdict: Verdict, mated: boolean): Badge {
+  return mated ? 'mate' : verdict;
+}
+
+/** Whether the move at index `ply` mated: a mate ends the game, so it can only be the last. */
+export function mates(game: Pick<GameState, 'moves' | 'termination'>, ply: number): boolean {
+  return game.termination === 'checkmate' && ply === game.moves.length - 1;
+}
+
 /** The verdict on the move at index `ply`, on the square it went to, when it is a judged human move. */
 export function plyVerdict(
-  game: Pick<GameState, 'startFen' | 'moves' | 'humanColor' | 'verdicts'>,
+  game: Pick<GameState, 'startFen' | 'moves' | 'humanColor' | 'verdicts' | 'termination'>,
   ply: number,
 ): BoardVerdict | undefined {
   const verdict = game.verdicts?.[ply];
   if (!verdict || !isHumanPly(game, ply)) return undefined;
   // Standard UCI, so a castling king's square and a promotion's square are both the to-square.
-  return { square: game.moves[ply]!.slice(2, 4), verdict };
+  return { square: game.moves[ply]!.slice(2, 4), verdict: badgeOf(verdict, mates(game, ply)) };
 }
 
 /**
@@ -33,7 +46,7 @@ export function plyVerdict(
  * no longer holds a piece of theirs: the badge must not sit on the piece that captured there.
  */
 export function boardVerdict(
-  game: Pick<GameState, 'startFen' | 'fen' | 'moves' | 'humanColor' | 'verdicts'>,
+  game: Pick<GameState, 'startFen' | 'fen' | 'moves' | 'humanColor' | 'verdicts' | 'termination'>,
 ): BoardVerdict | undefined {
   const latest = latestHumanPly(game);
   const shown = latest === undefined ? undefined : plyVerdict(game, latest);

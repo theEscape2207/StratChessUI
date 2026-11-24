@@ -72,10 +72,11 @@ export type Feedback = {
    */
   score?: Score;
   /**
-   * The engine's best move instead, absent when it was the move played. The PV, in SAN from the
-   * position before the move, starts with the best move.
+   * The engine's best move instead, absent when it was the move played or the move played mated.
+   * The PV, in SAN from the position before the move, starts with the best move. `outscored`: the
+   * move played scored higher in its own search, so the best is shown as the alternative.
    */
-  best?: { score: Score; pv: string[] };
+  best?: { score: Score; pv: string[]; outscored?: true };
 };
 
 export type GameState = {

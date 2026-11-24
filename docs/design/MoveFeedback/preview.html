@@ -1,4 +1,4 @@
-<!-- @dsCard group="Analysis" height=330 subtitle="A move against the engine's best, the best move played, and the phone's one row" -->
+<!-- @dsCard group="Analysis" height=630 subtitle="A move against the engine's best, the best move played, the alternative, a mate, and the phone's one row" -->
 <!doctype html>
 <html><head><meta charset="utf-8"><link rel="stylesheet" href="../../../packages/client/src/tokens.css"><style>img[src^="/_blob/"] { visibility: hidden; }</style><style>
   body { margin: 0; padding: 16px; background: var(--bg); font-family: var(--font-sans); display: grid; gap: var(--space-3); }
@@ -7,7 +7,9 @@
   .row + .row { border-top: 1px solid var(--hairline); }
   .b { width: var(--badge-size); height: var(--badge-size); border-radius: var(--radius-full); display: grid; place-items: center; font: 800 12px/1 var(--font-sans); }
   .inacc { background: var(--q-inaccuracy); color: var(--q-ink); }
-  .best { background: var(--q-best); color: var(--on-accent); }
+  .best, .mate { background: var(--q-best); color: var(--on-accent); }
+  .exc { background: var(--q-excellent); color: var(--q-ink); }
+  .nobadge { width: var(--badge-size); }
   .head { font-size: 17px; line-height: 24px; font-weight: 800; }
   .head span { font-weight: 600; font-size: 15px; }
   .pv { font: 400 12px/16px var(--font-mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -26,7 +28,17 @@
   <div class="card">
     <div class="row"><span class="b best" aria-hidden="true">★</span><div class="head">O-O <span>is best</span></div><span class="chip pos">0.00</span></div>
   </div>
+  <div class="card">
+    <div class="row"><span class="b exc" aria-hidden="true">!</span><div class="head">Nf3 <span>is excellent</span></div><span class="chip pos">+3.87</span></div>
+    <div class="row"><span class="nobadge"></span><div><div class="head">Qa4+ <span>is the alternative</span></div><div class="pv">7. Qa4+ Kd8 8. Nf3 Qc5 9. d3 Nc6</div></div><span class="chip pos">+3.75</span></div>
+  </div>
+  <div class="card">
+    <div class="row"><span class="b mate" aria-hidden="true">#</span><div class="head">Qe7# <span>is checkmate</span></div></div>
+  </div>
   <div class="card phone">
     <div class="row"><span class="b inacc" aria-hidden="true">?!</span><div><div class="head">a3 <span>is an inaccuracy</span></div><div class="bestwas">Best was <b>O-O</b> (0.00)</div></div><span class="chip neg">-0.64</span></div>
+  </div>
+  <div class="card phone">
+    <div class="row"><span class="b exc" aria-hidden="true">!</span><div><div class="head">Nf3 <span>is excellent</span></div><div class="bestwas">Alternative was <b>Qa4+</b> (+3.75)</div></div><span class="chip pos">+3.87</span></div>
   </div>
 </body></html>

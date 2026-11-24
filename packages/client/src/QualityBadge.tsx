@@ -1,23 +1,35 @@
 import type { CSSProperties } from 'react';
-import type { Color, Verdict } from '@stratchess-ui/shared';
-import type { BoardVerdict } from './verdicts.ts';
+import type { Color } from '@stratchess-ui/shared';
+import type { Badge, BoardVerdict } from './verdicts.ts';
 
-const GLYPHS: Record<Verdict, string> = {
+const GLYPHS: Record<Badge, string> = {
   great: '!!',
   best: '★',
   excellent: '!',
   inaccuracy: '?!',
   mistake: '?',
   blunder: '??',
+  mate: '#',
+};
+
+/** What a screen reader announces: the glyph is only a picture. */
+const LABELS: Record<Badge, string> = {
+  great: 'great',
+  best: 'best',
+  excellent: 'excellent',
+  inaccuracy: 'inaccuracy',
+  mistake: 'mistake',
+  blunder: 'blunder',
+  mate: 'checkmate',
 };
 
 /** A verdict as a round glyph. The glyph is only a picture: its word is what is announced. */
-export function QualityBadge({ verdict }: { verdict: Verdict }) {
+export function QualityBadge({ verdict }: { verdict: Badge }) {
   return (
     <span
       className={`quality-badge ${verdict}`}
       role="img"
-      aria-label={verdict}
+      aria-label={LABELS[verdict]}
       data-testid="quality-badge"
     >
       {GLYPHS[verdict]}

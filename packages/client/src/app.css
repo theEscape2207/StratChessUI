@@ -144,7 +144,8 @@ main {
   background: var(--q-great);
 }
 
-.quality-badge.best {
+.quality-badge.best,
+.quality-badge.mate {
   color: var(--on-accent);
   background: var(--q-best);
 }
@@ -326,6 +327,12 @@ main {
   width: var(--badge-size);
   height: var(--badge-size);
   font-size: 12px;
+}
+
+/* Keeps the alternative's headline in line with the played move's. */
+.feedback-badge-space {
+  flex: none;
+  width: var(--badge-size);
 }
 
 .feedback-text {
